@@ -1,0 +1,21 @@
+/* 本地字体：不依赖 Google Fonts，离线（装到主屏幕的 App）和打不开 Google 的网络里都能正常显示
+   - Pixelify Sans：数字和英文用的像素字体（可变字重 400~700，拉丁字符），SIL OFL 1.1，见 fonts/OFL-PixelifySans.txt
+   - ZCOOL KuaiLe：标题“骑士魔法”的字体，只截取了这四个字（标题只用到这四个字），SIL OFL 1.1，见 fonts/OFL-ZCOOLKuaiLe.txt
+   claude.ai 的 Artifact 版本里这些字体会内联成 data: 地址，前面还垫了一份 Google Fonts：
+   同名字体后定义的优先，先用这里的；这里的万一加载不了才轮到 Google Fonts */
+@font-face {
+  font-family: "Pixelify Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(../fonts/pixelify-sans-latin-wght.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "ZCOOL KuaiLe";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(../fonts/zcool-kuaile-logo.woff2) format("woff2");
+  unicode-range: U+58EB, U+6CD5, U+9A91, U+9B54;
+}

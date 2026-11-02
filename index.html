@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- 先把背景涂成深蓝（样式表还没到时也一样）：从主屏幕打开时，启动画面之后不会闪一下白屏 -->
+<style>html, body { background: #0b1424; }</style>
+<title>骑士魔法</title>
+<meta name="description" content="骑士主题的 3D 割草肉鸽小游戏：武器自动攻击，跳、滑、变强到离谱。支持 iPad 触屏，添加到主屏幕后可以离线玩。">
+<!-- 装到主屏幕 / 桌面（PWA）：manifest.webmanifest 是 App 的名字、图标和全屏方式；js/pwa.js 注册离线缓存 sw.js -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b1424">
+<meta name="color-scheme" content="dark">
+<meta name="application-name" content="骑士魔法">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="骑士魔法">
+<!-- iOS 全屏 App 的状态栏透明叠在画面上（界面用 env(safe-area-inset-*) 让开） -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<!-- iPad 启动画面（从主屏幕打开时显示）：每种屏幕尺寸竖屏、横屏各一张 -->
+<!-- iPad Pro 13 英寸（M4） -->
+<link rel="apple-touch-startup-image" media="screen and (device-width: 1032px) and (device-height: 1376px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="splash/splash-2064x2752.jpg">
+<link rel="apple-touch-startup-image" media="screen and (device-width: 1032px) and (device-height: 1376px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)" href="splash/splash-2752x2064.jpg">
+<!-- iPad Pro 12.9 英寸、iPad Air 13 英寸 -->
+<link rel="apple-touch-startup-image" media="screen and (device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="splash/splash-2048x2732.jpg">
+<link rel="apple-touch-startup-image" media="screen and (device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)" href="splash/splash-2732x2048.jpg">
+<!-- iPad Pro 11 英寸（M4） -->
+<link rel="apple-touch-startup-image" media="screen and (device-width: 834px) and (device-height: 1210px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="splash/splash-1668x2420.jpg">
+<link rel="apple-touch-startup-image" media="screen and (device-width: 834px) and (device-height: 1210px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)" href="splash/splash-2420x1668.jpg">
+<!-- iPad Pro 11 英寸 -->
+<link rel="apple-touch-startup-image" media="screen and (device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="splash/splash-1668x2388.jpg">
+<link rel="apple-touch-startup-image" media="screen and (device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)" href="splash/splash-2388x1668.jpg">
+<!-- iPad Air 10.9/11 英寸、iPad 第 10/11 代 -->
+<link rel="apple-touch-startup-image" media="screen and (device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="splash/splash-1640x2360.jpg">
+<link rel="apple-touch-startup-image" media="screen and (device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)" href="splash/splash-2360x1640.jpg">
+<!-- iPad Pro 10.5 英寸、iPad Air 第 3 代 -->
+<link rel="apple-touch-startup-image" media="screen and (device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="splash/splash-1668x2224.jpg">
+<link rel="apple-touch-startup-image" media="screen and (device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)" href="splash/splash-2224x1668.jpg">
+<!-- iPad 10.2 英寸（第 7~9 代） -->
+<link rel="apple-touch-startup-image" media="screen and (device-width: 810px) and (device-height: 1080px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="splash/splash-1620x2160.jpg">
+<link rel="apple-touch-startup-image" media="screen and (device-width: 810px) and (device-height: 1080px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)" href="splash/splash-2160x1620.jpg">
+<!-- iPad mini 第 6/7 代 -->
+<link rel="apple-touch-startup-image" media="screen and (device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="splash/splash-1488x2266.jpg">
+<link rel="apple-touch-startup-image" media="screen and (device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)" href="splash/splash-2266x1488.jpg">
+<!-- iPad 9.7 英寸、iPad mini 第 5 代 -->
+<link rel="apple-touch-startup-image" media="screen and (device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="splash/splash-1536x2048.jpg">
+<link rel="apple-touch-startup-image" media="screen and (device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)" href="splash/splash-2048x1536.jpg">
+<script src="js/pwa.js"></script>
+<!-- 字体：像素字体和标题“骑士魔法”用到的字都在 fonts/ 里（css/fonts.css），不依赖外网，离线也一样。
+     下一行注释只给 claude.ai 的 Artifact 版本用：tools/build-artifact.js 会把它放出来，
+     那边万一不让用内联的 data: 字体，就用 Google Fonts 补上（这里的网页不加载它） -->
+<!-- artifact: <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=ZCOOL+KuaiLe&display=swap"> -->
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="fxCanvas"></canvas>
+<div id="touchZone"></div>
+<div id="hurt"></div>
+
+<div id="hud" class="hidden">
+  <div id="xpBar"><div id="xpFill"></div></div>
+  <div id="topLeft">
+    <div id="statRow">
+      <span id="timeBox" class="stat"><i class="px" data-px="clock"></i><span id="runTime">0:00</span></span>
+      <span id="goldBox" class="stat"><i class="px" data-px="coin"></i><span id="goldText">0</span></span>
+      <span id="killBox" class="stat"><i class="px" data-px="skull"></i><span id="killText">0</span></span>
+    </div>
+    <div id="hpBar"><div id="hpFill"></div><div id="shieldFill"></div><span id="hpText"></span></div>
+    <div id="weaponSlots" class="slots"></div>
+    <div id="tomeSlots" class="slots"></div>
+    <div id="quest"></div>
+  </div>
+  <div id="topCenter">
+    <div id="timer">0:00</div>
+    <div id="stageName"></div>
+    <div id="bossBar" class="hidden"><div id="bossName"></div><div class="bossTrack"><div id="bossFill"></div></div></div>
+  </div>
+  <div id="topRight">
+    <div id="lvRow">
+      <span id="chestBox" title="下一个宝箱的价格"><i class="px" data-px="chest"></i><span id="chestPrice"></span></span>
+      <span id="lvText">1</span>
+      <button id="btnPause" data-act="pause" aria-label="暂停"><span></span><span></span></button>
+    </div>
+    <div id="mapBox">
+      <canvas id="minimap" width="150" height="150"></canvas>
+      <span class="cmp n">N</span><span class="cmp e">E</span><span class="cmp s">S</span><span class="cmp w">W</span>
+    </div>
+  </div>
+  <div id="bottomLeft"><div id="passiveText"></div></div>
+  <div id="itemBar"></div>
+  <div id="toasts"></div>
+  <div id="prompt" class="hidden"></div>
+  <div id="joyBase" class="hidden"></div>
+  <div id="joyKnob" class="hidden"></div>
+  <div id="touchBtns">
+    <button id="btnUse" class="hidden">互动</button>
+    <button id="btnSlide">滑铲</button>
+    <button id="btnJump">跳跃</button>
+  </div>
+</div>
+
+<div id="modalBg" class="hidden"></div>
+
+<div id="levelModal" class="modal hidden">
+  <h2 id="levelTitle">升级！</h2>
+  <div id="levelCards" class="cards"></div>
+  <div id="levelBtns" class="row">
+    <button id="btnReroll" class="sbtn" data-act="reroll">重抽</button>
+    <button id="btnBanish" class="sbtn" data-act="banish">放逐</button>
+    <button id="btnSkip" class="sbtn" data-act="skip">跳过</button>
+  </div>
+</div>
+
+<div id="itemModal" class="modal hidden">
+  <h2 id="itemTitle">宝箱打开了！</h2>
+  <div id="itemCard" class="cards"></div>
+  <div class="hint">点击卡片收下</div>
+</div>
+
+<div id="shopModal" class="modal hidden">
+  <h2>可疑商人</h2>
+  <div id="shopGold" class="hint"></div>
+  <div id="shopCards" class="cards"></div>
+  <div class="row"><button class="sbtn" data-act="leaveShop">离开</button></div>
+</div>
+
+<div id="pauseModal" class="modal hidden">
+  <h2>暂停</h2>
+  <div class="pauseCols">
+    <div class="pcStats"><h3>属性</h3><div id="statList" class="statList"></div></div>
+    <div class="pcInv"><h3>物品</h3><div id="itemList"></div></div>
+    <div class="pcSet">
+      <div>
+        <h3>设置</h3>
+        <label class="setting">视角灵敏度 <input type="range" id="sensSlider" min="0.3" max="2.5" step="0.1" value="1"></label>
+      </div>
+      <div>
+        <h3>操作</h3>
+        <div class="keys kb"><span class="nb">WASD 移动</span> · <span class="nb">鼠标 转视角</span> · <span class="nb">空格 跳跃</span> · <span class="nb">Shift / C / 右键 滑铲</span><span class="nb">（空中也能按住：落地直接滑；下坡越滑越快；落在斜坡上不摔伤）</span> · <span class="nb">E 互动</span> · <span class="nb">Esc 暂停</span></div>
+        <div class="keys kb">升级时：<span class="nb">1 2 3 选择</span> · <span class="nb">R 重抽</span> · <span class="nb">X 跳过</span> · <span class="nb">B 放逐</span></div>
+        <div class="keys tc">触屏：左边拖动移动 · 右边拖动转视角 · 按住“跳跃”自动连跳 · 点一下“滑铲”保持滑铲（空中也能用，再点一下收起）</div>
+      </div>
+    </div>
+  </div>
+  <div class="row">
+    <button class="sbtn main" data-act="resume">继续</button>
+    <button class="sbtn" data-act="restart">重新开始</button>
+    <button class="sbtn" data-act="menu">主菜单</button>
+  </div>
+</div>
+
+<div id="endModal" class="modal hidden">
+  <h2 id="endTitle"></h2>
+  <div id="endStats" class="statList"></div>
+  <h3>武器</h3>
+  <div id="endWeapons" class="statList"></div>
+  <div class="row">
+    <button class="sbtn main" data-act="restart">再来一局</button>
+    <button class="sbtn" data-act="menu">主菜单</button>
+  </div>
+</div>
+
+<div id="menu">
+  <h1 class="logo">骑士魔法</h1>
+  <div class="tag">3D 割草 · 跳、滑、变强到离谱</div>
+  <div class="menuInner">
+    <div class="menuHead">选择骑士</div>
+    <div id="charGrid"></div>
+    <div id="charDesc"></div>
+    <div id="menuSettings"></div>
+    <button class="sbtn main big" data-act="start">开始游戏</button>
+    <div class="keys"><span class="nb">WASD 移动</span> · <span class="nb">鼠标 转视角</span> · <span class="nb">空格 跳跃</span> · <span class="nb">E 互动</span> · <span class="nb">Shift/C/右键 滑铲</span><span class="nb">（空中也能按住：落地直接滑；下坡越滑越快；落在斜坡上不摔伤）</span> · <span class="nb">空中按住前进、慢慢转视角可以加速</span></div>
+    <div class="keys">每关限时：找到 Boss 传送门并召唤 Boss，打败它进入下一关。时间到了会来最终虫潮！</div>
+    <div class="keys">iPad：左半屏拖动移动，右半屏拖动转视角，按住跳跃自动连跳，点一下滑铲保持滑铲</div>
+  </div>
+</div>
+
+<div id="bootError" class="hidden"></div>
+
+<script src="vendor/three.min.js" data-cdn="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/models.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/icons_weapons.js"></script>
+<script src="js/icons_tomes.js"></script>
+<script src="js/icons_items.js"></script>
+<script src="js/icons_chars.js"></script>
+<script src="js/data.js"></script>
+<script src="js/models_chars.js"></script>
+<script src="js/rides.js"></script>
+<script src="js/models_proj.js"></script>
+<script src="js/data_enemies.js"></script>
+<script src="js/data_stages.js"></script>
+<script src="js/data_evo.js"></script>
+<script src="js/world.js"></script>
+<script src="js/input.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/player.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/weapons.js"></script>
+<script src="js/pickups.js"></script>
+<script src="js/interact.js"></script>
+<script src="js/interact_more.js"></script>
+<script src="js/progression.js"></script>
+<script src="js/evolution.js"></script>
+<script src="js/passives.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/pace.js"></script>
+<script src="js/movement_ui.js"></script>
+<script src="js/main.js"></script>
+<script src="js/menu3d.js"></script>
+</body>
+</html>
