@@ -161,11 +161,13 @@
 .kmSlip.note > .kmIco { --ip: 2px; }
 .kmSlipTab { position: absolute; left: 9px; top: -12px; padding: 0 6px; background: var(--goldM); color: #2a1600; font-size: 12px; line-height: 18px; text-shadow: none;
   box-shadow: 0 0 0 2px #000, inset 0 -2px 0 var(--goldD); }
-.kmSlipN { font-size: var(--fs-m); line-height: 24px; text-shadow: none; text-wrap: balance; }
-/* 奖励长的（两件物品、「已买过，返还……」）在 280 像素里折成两行：两行一样长，不在下一行只剩「信用卡」」这样一小截 */
+.kmSlipN { font-size: var(--fs-m); line-height: 24px; text-shadow: none; }
 .kmSlipR { font-size: 12px; line-height: 18px; color: var(--goldL); text-shadow: none; text-wrap: balance; }
-/* Kit.parts：并列的一项不在中间折行（只在「、」后面换行；一项比一行还长时才在里面折） */
+/* 奖励由 Kit.parts 分好段（段里只在词之间折），balance 只在段和词之间把两行匀开：「（已买过，返还 9600 魔晶）」这种长奖励不会剩一小截 */
+/* Kit.parts / Kit.phrase：一段（并列的一项、一个短语）不在中间折行；一段比一行还长时才在里面折，而且只在词（.kmW）和词之间。
+   kit.js 把每一段、每个词的宽度写成整数个字体像素（Kit.exact），一行里的字都从整数像素开始 */
 .kmNb { display: inline-block; max-width: 100%; }
+.kmW { display: inline-block; white-space: nowrap; }
 @keyframes kmSlipIn { from { transform: translateX(12px); opacity: 0; } }
 /* 成就小签：阵亡、通关的过场里不显示（弹窗打开时 meta.js 自己藏） */
 body.fxDead #metaToasts, body.kmEnd #metaToasts { opacity: 0; }
@@ -236,8 +238,9 @@ body.fxHold #annLayer .kmAnn, body.fxHold #annLayer .kmAnn * { animation-play-st
 
 /* ---------------------------------------------------------------- 7. 过场：Boss 出场、阵亡、通关、传送门、低血量、升级和宝箱的卡片
    这些元素是 feel.js 的：它把横幅（Kit.ribbon）放进 #fxCineT / #fxBig 以后，下面带 :has(> .kmAnn) 的规则才生效 */
-/* 黑边 72 像素（竖屏 96） */
+/* 黑边 72 像素（竖屏 96）；滑进来 0.24 秒分 4 格（不用 FEEL 原来 0.34 秒的曲线；body 开头让这条盖过 feel.js 注入的同一个选择器） */
 #fxBars > div { height: 72px; }
+body #fxBars > div { transition: transform 0.24s steps(4, end); }
 /* Boss 出场：名字横幅放在上面那条黑边下面、天空的位置（不压在 Boss 身上、不压前景） */
 #fxCineT:has(> .kmAnn) { top: calc(72px + 24px); bottom: auto; display: flex; justify-content: center; }
 #fxCineT.off:has(> .kmAnn) { transition: opacity 0.2s steps(2, end); }
@@ -312,6 +315,11 @@ body.fxDead #hud, body.kmEnd #hud { opacity: 0; transition: opacity 0.2s steps(2
   .kmAnn.s-xl { --u: 3px; --n: 16; --ip: 3px; } .kmAnn.s-xl .kmTitle { font-size: var(--fs-xl); line-height: 42px; }
   .kmCall.big .kmCT { font-size: var(--fs-l); line-height: 30px; }
 }
+/* 少动画（iPad 的「减弱动态效果」）：没有进场动画（公告、横幅、小签、升级和宝箱的面板 / 标题 / 卡片），低血量不闪，过场黑边不滑（直接出现）；
+   选中卡片的回声（Feel.popCard 的复制品，0.5 秒后才拿掉）没有动画就会停在关着的弹窗上，直接不显示 */
 @media (prefers-reduced-motion: reduce) {
-  #annLayer .kmAnn, #annLayer .kmTitle, #annLayer .kmCT, #fxCineT .kmAnn, #fxCineT .kmTitle, #fxBig .kmAnn, .kmSlip, #fxLow.on i { animation: none !important; }
+  #annLayer .kmAnn, #annLayer .kmTitle, #annLayer .kmCT, #fxCineT .kmAnn, #fxCineT .kmTitle, #fxBig .kmAnn, .kmSlip, #fxLow.on i,
+  #levelModal.fxLvOpen, #levelModal .card.fxCard, #itemModal.fxItemIn, #itemModal.fxItemIn .card, #itemModal.fxItemIn h2 { animation: none !important; }
+  .fxPop, .fxPopRing { display: none; }
+  body #fxBars > div { transition: none; }
 }

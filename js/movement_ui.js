@@ -1,7 +1,7 @@
 'use strict';
 // ============================================================
 //  移动手感相关的界面（只包装 UI 的函数，不改 ui.js）：
-//  左下角的速度读数（暂停设置里「显示速度」开关）、触屏「滑铲按钮：点按切换 / 按住」设置，和其他设置一起存；
+//  左上那一列里的速度读数（暂停设置里「显示速度」开关）、触屏「滑铲按钮：点按切换 / 按住」设置，和其他设置一起存；
 //  主菜单角色介绍里的滑铲坐骑、坐骑特性、摔落伤害；弹窗打开时收起触屏的“保持滑铲”
 // ============================================================
 var MoveUI = { showSpeed: false, KEY: 'knight_magic_settings', shownV: -1, shownTier: -1 };
@@ -30,8 +30,8 @@ MoveUI.TIER_COLORS = ['#ffffff', '#7ef0ff', '#ffc928'];
 
 // 样式只写布局、字号和颜色变量（style.css）；像素按钮、勾选框、「选中」的样子在 css/kit.css（.mvOpts button、.mvBox）
 MoveUI.CSS = [
-  // 左下角的速度读数：18 号描边字（画面上的字）
-  '#speedText { font-size: var(--fs-m); line-height: 24px; color: #fff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; white-space: nowrap; }',
+  // 速度读数：左上那一列（任务框下面）的一个小面板（kit.css 的 .kmPlate），18 号描边字
+  '#speedText { padding: 3px 12px 3px 9px; font-size: var(--fs-m); line-height: 24px; color: #fff; text-shadow: var(--ol1); white-space: nowrap; }',
   '.mvSet { margin-top: 9px; cursor: pointer; }',
   // 触屏：每一行都是 44 像素高的触控区（行和行之间不再空 9 像素，44 像素里本来就有上下的空）
   'body.touch .mvSet { min-height: 44px; margin-top: 0; }',
@@ -87,13 +87,15 @@ MoveUI.inject = function () {
   var st = document.createElement('style');
   st.textContent = MoveUI.CSS;
   document.head.appendChild(st);
-  // 左下角：速度读数（在被动进度上面）
-  var bl = document.getElementById('bottomLeft');
-  if (bl) {
+  // 速度读数：左上那一列，任务框下面的小面板（不再一个人飘在左边中间；没有左上那一列时还放在左下角）
+  var tl = document.getElementById('topLeft'), q = document.getElementById('quest'), bl = document.getElementById('bottomLeft');
+  if (tl || bl) {
     var sp = document.createElement('div');
     sp.id = 'speedText';
+    sp.className = 'kmPlate';
     sp.style.display = 'none';
-    bl.insertBefore(sp, bl.firstChild);
+    if (tl) tl.insertBefore(sp, q && q.parentNode === tl ? q.nextSibling : null);
+    else bl.insertBefore(sp, bl.firstChild);
   }
   // 暂停设置：接在视角灵敏度后面
   var sens = document.getElementById('sensSlider');
@@ -156,16 +158,11 @@ MoveUI.menuText = function () {
   var stats = box.querySelector('.cdStats');
   var ft = MoveUI.fallText(c.fall);
   var sv = stats && stats.querySelector('.kmV');
-  if (ft && sv) { sv.textContent = sv.textContent ? sv.textContent + '，' + ft : ft; stats.classList.remove('hidden'); }
+  // 内容按短语重排（UI.descText），不只改 textContent
+  if (ft && sv) { UI.descText(sv, sv.textContent ? sv.textContent + '，' + ft : ft); stats.classList.remove('hidden'); }
   var ride = typeof RIDES !== 'undefined' && RIDES[id];
   if (!ride || !ride.name) return;
-  var d = UI.descRow('滑铲', ride.name, 'cdRide');
-  if (ride.desc) {
-    var ds = document.createElement('span');
-    ds.className = 'cdRideDesc';
-    ds.textContent = ' · ' + ride.desc;
-    d.querySelector('.kmV').appendChild(ds);
-  }
+  var d = UI.descRow('滑铲', ride.name + (ride.desc ? ' · ' + ride.desc : ''), 'cdRide');
   box.insertBefore(d, stats || null);
   var tw = ride.twist && MoveUI.TWIST_TEXT[ride.twist.kind];
   if (tw) box.insertBefore(UI.descRow('坐骑特性', tw, 'cdTwist'), stats || null);

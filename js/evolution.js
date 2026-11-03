@@ -1235,7 +1235,9 @@ Evo.renderPause = function () {
   P.weapons.forEach(function (w) { box.appendChild(Evo.pauseRow(w)); });
   var hint = document.createElement('div');
   hint.className = 'evoPHint';
-  hint.textContent = '武器 Lv' + EVO_REQ.level + ' + 对应魔典 Lv' + EVO_REQ.tome + '：去圣锻炉锻造，或者打开免费金宝箱自动觉醒';
+  // 按短语排（Kit.phrase）：竖屏那一栏窄，不会剩下「觉醒」两个字一行
+  var ht = '武器 Lv' + EVO_REQ.level + ' + 对应魔典 Lv' + EVO_REQ.tome + '：去圣锻炉锻造，或者打开免费金宝箱自动觉醒';
+  if (typeof Kit !== 'undefined' && Kit.phrase) Kit.phrase(hint, ht); else hint.textContent = ht;
   box.appendChild(hint);
 };
 
@@ -1285,11 +1287,7 @@ Evo.install = function () {
         if (o.evoNo) b.classList.add('evoNo');
         if (o.evoHint) b.classList.add('evoHintCard');
         if (o.evoFoot) { var f = b.querySelector('.cardRarity'); if (f) f.textContent = o.evoFoot; }
-        // 圣锻炉三选一 / 觉醒卡片的说明按短语折行（Kit.phrase）：窄卡片里数字不和单位、加成不和名字分开，不剩一个字
-        if ((o.kind === 'evo' || o.kind === 'evo-done' || o.evoNo) && typeof Kit !== 'undefined' && Kit.phrase) {
-          var ls = b.querySelectorAll('.cardLines div');
-          for (var j = 0; j < ls.length; j++) Kit.phrase(ls[j], ls[j].textContent);
-        }
+        // 说明按短语折行（Kit.phrase）：ui.js 的 UI.card 给每张卡片都排好了，这里不用再排
       }
       return b;
     };
@@ -1325,14 +1323,16 @@ Evo.CSS = [
   '#prompt.evoMulti { bottom: calc(env(safe-area-inset-bottom, 0px) + 112px); white-space: pre-line !important; text-align: left; line-height: 24px; }',
   '@media (max-height: 560px) { #prompt.evoMulti { bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); } }',
   // 超武卡片：和别的卡片一样的深蓝底（顶上一点传说的金色，style.css 的 .card），金边，外面再一圈金色硬边（和传说卡片一样，不发光）；
-  // 不要整张的暗金 / 芥末色底。说明几行折行时每行差不多长（style.css 的 .cardLines div），而且按短语折行（上面 UI.card 里的 Kit.phrase）
+  // 不要整张的暗金 / 芥末色底。说明几行折行时每行差不多长（style.css 的 .cardLines div），而且按短语折行（ui.js 的 UI.card 里的 Kit.phrase）
   '.card.evoCard { --rc: #ffd84a; --rg: rgba(255, 201, 40, 0.7); border-color: #ffd84a !important; box-shadow: 0 0 0 2px #000, 0 0 0 5px #ffd84a, 0 0 0 7px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.55), 0 9px 0 4px #000 !important; }',
   '.card.evoCard .cardTitle, .card.evoCard .cardRarity { color: var(--goldM); }',
   '.card.evoCard .cardSub { color: var(--goldL); }',
   '.card.evoCard .cardIcon { border-color: #000; box-shadow: ' + Evo.BEVEL + ', 0 0 0 2px #ffd84a; }',
   // 「超武」小签：12 号深色字、金底、2 像素黑圈（Kit.tag 的样子）
   '.card.evoCard::before { content: "超武"; position: absolute; left: 9px; top: -12px; z-index: 1; padding: 0 6px; background: var(--goldM); box-shadow: 0 0 0 2px #000, inset 0 -2px 0 var(--goldD); color: #2a1600; font-size: var(--fs-s); line-height: 18px; text-shadow: none; }',
-  '.card.evoNo { opacity: 0.8; }',
+  // 「暂不锻造」：灰色的框和字（不是普通稀有度的绿色：绿色是主按钮的颜色）
+  '.card.evoNo { opacity: 0.8; --rc: #6f7893 !important; --rg: rgba(111, 120, 147, 0.3) !important; }',
+  '.card.evoNo .cardRarity { color: var(--muted); }',
   '.card.evoHintCard { box-shadow: 0 0 0 2px #000, 0 0 0 5px #ffd84a, 0 0 0 7px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.55), 0 9px 0 4px #000 !important; }',
   '.card.evoHintCard .cardLines div:last-child { color: var(--goldM); }',
   // 觉醒弹窗：48 号金色标题（描边 + 厚度，往下落 6 像素出来）、一张宽卡片（.card 默认最宽 280px，这里放宽到 440px）；不要旋转的光芒

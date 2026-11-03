@@ -935,7 +935,7 @@ MX.updateTurrets = function (dt) {
       o.crest.visible = false;
       o.flag.scale.set(1, 0.01, 1);
       MX.smoke(o.x, o.y + 1.2, o.z, 10, 0xb8b0a4, 0.8, 0.4);
-      UI.toast('弩车停火了（击倒 ' + t.kills + ' 个敌人）', '#7ab8ff');
+      UI.toast('弩车停火了 · 击倒 ' + t.kills + ' 个敌人', '#7ab8ff');
       continue;
     }
     t.retarget -= dt;
@@ -1031,6 +1031,8 @@ MX.CSS = [
   '.mxBuff .ic{flex:none;width:22px;height:22px;border:2px solid #000;display:flex;align-items:center;justify-content:center;font-size:var(--fs-s);line-height:12px}',
   '.mxBuff .nm{font-size:var(--fs-m);line-height:18px;text-shadow:var(--ol1)}',
   '.mxBuff .tm{min-width:22px;font-size:var(--fs-m);line-height:18px;letter-spacing:var(--o);text-align:right;text-shadow:var(--olB)}',
+  // 「秒」：汉字不加粗（数字才像素加粗），和数字之间空 1 个字体像素
+  '.mxBuff .tm i{font-style:normal;margin-left:var(--o);letter-spacing:0;text-shadow:var(--ol1)}',
   '.mxBuff .trk{position:absolute;left:2px;right:2px;bottom:1px;height:3px;background:rgba(0,0,0,.75)}',
   '.mxBuff .bar{display:block;height:100%;width:100%;box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}',
   // 站圈进度：正上方倒计时（和 Boss 血条）下面
@@ -1110,17 +1112,18 @@ MX.hudUpdate = function () {
       var ic = document.createElement('span'); ic.className = 'ic'; Kit.glyphTile(ic, b.icon, b.color);
       var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = b.name;
       var tm = document.createElement('span'); tm.className = 'tm';
+      var tn = document.createTextNode(''); tm.appendChild(tn); tm.appendChild(document.createElement('i')).textContent = '秒';
       var trk = document.createElement('span'); trk.className = 'trk';
       var bar = document.createElement('span'); bar.className = 'bar'; bar.style.background = b.color;
       trk.appendChild(bar);
       d.appendChild(ic); d.appendChild(nm); d.appendChild(tm); d.appendChild(trk);
       h.bar.appendChild(d);
-      return { tm: tm, bar: bar, s: -1, w: -1 };
+      return { tm: tn, bar: bar, s: -1, w: -1 };
     });
   }
   for (i = 0; i < list.length && i < h.chips.length; i++) {
     var c = h.chips[i], s = Math.ceil(list[i].t), w = Math.round(clamp(list[i].t / list[i].max, 0, 1) * 200) / 2;
-    if (c.s !== s) { c.s = s; c.tm.textContent = s + 's'; }
+    if (c.s !== s) { c.s = s; c.tm.data = String(s); }
     if (c.w !== w) { c.w = w; c.bar.style.width = w + '%'; }
   }
   var p = MX.shown;
@@ -1294,9 +1297,9 @@ Interact.KINDS.blacksmith = {
     var f = MX.local(o, -1.15, -1.3);
     MX.collide(f.x, f.z, 0.9, o.y + 1.15);
   },
-  label: function (o) { return '铁匠铺：花 ' + MX.smithPrice(o) + ' 金币锻造一把武器（还能锻造 ' + (3 - o.uses) + ' 次）'; },
+  label: function (o) { return '铁匠铺：花 ' + MX.smithPrice(o) + ' 金币锻造武器 · 还能锻造 ' + (3 - o.uses) + ' 次'; },
   canUse: function (o) { return P.gold >= MX.smithPrice(o) && MX.smithWeapons().length > 0; },
-  denied: function (o) { return MX.smithWeapons().length ? '金币不够（需要 ' + MX.smithPrice(o) + '）' : '没有还能强化的武器'; },
+  denied: function (o) { return MX.smithWeapons().length ? '金币不够 · 需要 ' + MX.smithPrice(o) : '没有还能强化的武器'; },
   use: function (o) { MX.openSmith(o); },
   update: function (o, dt, d2) {
     if (d2 > 3600) return;
@@ -1329,7 +1332,7 @@ MX.openSmith = function (o) {
       return { kind: 'weapon-up', id: w.id, rarity: r, title: w.def.name, icon: w.def.icon, color: w.def.color, sub: '等级 ' + w.level + ' → ' + (w.level + 1), picks: picks, lines: picks.map(Weapons.upgradeText) };
     });
     opts.push({ kind: 'leave', rarity: 0, title: '先不锻造', icon: '走', color: 0x5a5470, sub: '不花钱', lines: ['铁匠铺会一直等你回来'], foot: '离开' });
-    UI.choiceModal('blacksmith', '铁匠铺 · 选一把武器锻造（' + price + ' 金币）', opts);
+    UI.choiceModal('blacksmith', '铁匠铺 · 选一把武器锻造 · ' + price + ' 金币', opts);
     var foot = document.querySelector('#levelCards .card:last-child .cardRarity');
     if (foot) foot.textContent = '离开';
   });
@@ -1349,7 +1352,7 @@ MX.smithPick = function (opt) {
   MX.sparks(a.x, o.y + 1.3, a.z, 20, [0xffd27a, 0xffa040, 0xffffff], 6, 0.14);
   FX.ring(a.x, o.y + 1.1, a.z, 2.4, 0xffb040, 0.35);
   Game.shake(0.25);
-  UI.toast('锻造成功：' + w.def.name + ' Lv' + w.level + '（' + RARITY[opt.rarity].name + '）', RARITY[opt.rarity].color);
+  UI.toast('锻造成功：' + w.def.name + ' Lv' + w.level + ' · ' + RARITY[opt.rarity].name, RARITY[opt.rarity].color);
   if (o.uses >= 3) {
     // 用完了：炉火熄灭
     o.used = true;
@@ -1404,9 +1407,9 @@ Interact.KINDS.wishwell = {
     return g;
   },
   init: function (o) { o.uses = 5; o.pending = 0; o.dunk = 9; MX.collide(o.x, o.z, 1.15, o.y + 0.95); },
-  label: function (o) { return o.pending > 0 ? '许愿中……' : '许愿井：投 ' + MX.wishCost() + ' 金币许个愿（还能许 ' + o.uses + ' 次）'; },
+  label: function (o) { return o.pending > 0 ? '许愿中……' : '许愿井：投 ' + MX.wishCost() + ' 金币许个愿 · 还能许 ' + o.uses + ' 次'; },
   canUse: function (o) { return !(o.pending > 0) && P.gold >= MX.wishCost(); },
-  denied: function (o) { return o.pending > 0 ? '硬币还在往下掉……' : '金币不够（需要 ' + MX.wishCost() + '）'; },
+  denied: function (o) { return o.pending > 0 ? '硬币还在往下掉……' : '金币不够 · 需要 ' + MX.wishCost(); },
   use: function (o) { MX.wish(o); },
   update: function (o, dt, d2) {
     if (o.pending > 0) {
@@ -1645,7 +1648,7 @@ Interact.KINDS.ballista = {
     Game.scene.add(o.allyRing);
     o.parts.push(o.allyRing);
   },
-  label: function () { return '弩车：召唤 30 秒的友军炮台（自动射击）'; },
+  label: function () { return '弩车：召唤 30 秒的友军炮台 · 自动射击'; },
   use: function (o) { MX.activateBallista(o); },
   mapIcon: { color: '#4a9cff', shape: 'square', size: 3 },
   clear: function () { MX.reset(); }
@@ -1680,7 +1683,7 @@ Interact.KINDS.warhorse = {
     o.horse = h;
     return g;
   },
-  label: function () { return MX.mount ? '你已经骑着战马了' : '战马：骑上去冲锋 45 秒（加速、减伤、践踏敌人）'; },
+  label: function () { return MX.mount ? '你已经骑着战马了' : '战马：骑上去冲锋 45 秒 · 加速、减伤、践踏敌人'; },
   canUse: function () { return !MX.mount && P.alive; },
   denied: function () { return '你已经骑着战马了'; },
   use: function (o) { MX.mountHorse(o); },
@@ -1868,7 +1871,7 @@ Interact.KINDS.crypt = {
     Game.scene.add(o.floor);
     o.parts.push(o.floor);
   },
-  label: function () { return '骑士古墓：推开墓门（会冲出 ' + MX.cryptCount() + ' 个亡灵精英，全灭得金宝箱）'; },
+  label: function () { return '骑士古墓：放出 ' + MX.cryptCount() + ' 个亡灵精英 · 全灭得金宝箱'; },
   use: function (o) { MX.openCrypt(o); },
   update: function (o, dt, d2) {
     if (d2 > 2500) return;
@@ -2010,7 +2013,7 @@ Interact.KINDS.banner = {
     o.clothMat.color.copy(MX.BANNER_ENEMY).lerp(MX.BANNER_KNIGHT, o.charge);
     if (inside) {
       MX.capturing = true;
-      MX.progress = { text: '占领战旗据点（刷怪加快）', pct: o.charge, color: '#7ab0ff' };
+      MX.progress = { text: '占领据点 · 刷怪加快', pct: o.charge, color: '#7ab0ff' };
       if (Math.random() < dt * 10) { var a = Math.random() * TAU; MX.part(o.x + Math.cos(a) * 7, o.y + 0.3, o.z + Math.sin(a) * 7, 0, rand(1, 2.5), 0, 0.8, 0.12, 0.04, 0x9ac0ff, 0); }
     }
     if (o.charge >= 1) MX.captureBanner(o);
@@ -2186,9 +2189,9 @@ Interact.KINDS.waystone = {
     o.parts.push(o.beam);
   },
   label: function (o) {
-    if (o.cd > 0) return '传送石充能中（' + Math.ceil(o.cd) + ' 秒）';
+    if (o.cd > 0) return '传送石充能中 · ' + Math.ceil(o.cd) + ' 秒';
     var d = o.partner ? Math.round(Math.sqrt(dist2(o.x, o.z, o.partner.x, o.partner.z))) : 0;
-    return '传送石：传送到同色的另一块（' + d + ' 米外）';
+    return '传送石：传送到同色的另一块 · ' + d + ' 米外';
   },
   canUse: function (o) { return o.cd <= 0 && !!o.partner && P.alive; },
   denied: function () { return '传送石还在充能'; },

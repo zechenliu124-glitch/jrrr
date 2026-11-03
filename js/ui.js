@@ -22,7 +22,7 @@ UI.init = function () {
     if (!el || el.disabled) return;
     UI.action(el.dataset.act, el);
   });
-  $('sensSlider').addEventListener('input', function () { Input.sens = parseFloat(this.value); UI.saveSettings(); });
+  $('sensSlider').addEventListener('input', function () { Input.sens = parseFloat(this.value); UI.sensVal(); UI.saveSettings(); });
   $('btnUse').addEventListener('touchstart', function (e) { e.preventDefault(); e.stopPropagation(); Interact.use(); }, { passive: false });
   $('btnPause').addEventListener('touchstart', function (e) { e.preventDefault(); e.stopPropagation(); Game.pause(true); }, { passive: false });
   UI.mm = $('minimap').getContext('2d');
@@ -52,7 +52,10 @@ UI.loadSettings = function () {
     if (s.char && CHARACTERS[s.char]) UI.selected = s.char;
   } catch (e) { /* 忽略 */ }
   $('sensSlider').value = String(Input.sens);
+  UI.sensVal();
 };
+// 视角灵敏度后面的数值（18 号金色数字，和音乐、音效滑条一样）
+UI.sensVal = function () { var v = document.getElementById('sensVal'); if (v) v.textContent = (Math.round(Input.sens * 10) / 10).toFixed(1); };
 
 UI.action = function (a, el) {
   switch (a) {
@@ -200,12 +203,18 @@ UI.buildMenu = function () {
   var s = UI.descRow('属性', parts.join('，'), 'cdStats' + (parts.length ? '' : ' hidden'));
   box.appendChild(t); box.appendChild(w); box.appendChild(p); box.appendChild(s);
 };
-// 骑士介绍的一行：左边固定 4 个字宽的灰色标签（初始武器 / 被动 / 滑铲 / 坐骑特性 / 属性），右边内容（折行挂在内容下面，kit.css 的 .kmL）
+// 骑士介绍的一行：左边固定 4 个字宽的灰色标签（初始武器 / 被动 / 滑铲 / 坐骑特性 / 属性），右边内容（折行挂在内容下面，kit.css 的 .kmL）；
+// 内容按短语排（UI.descText → Kit.phrase：不会折成「移 / 动速度」「滑 / 铲」），改内容也用 UI.descText
+UI.descText = function (v, text) {
+  text = text == null ? '' : String(text);
+  if (typeof Kit !== 'undefined' && Kit.phrase) Kit.phrase(v, text); else v.textContent = text;
+  return v;
+};
 UI.descRow = function (label, text, cls) {
   var d = document.createElement('div');
   d.className = 'kmL' + (cls ? ' ' + cls : '');
   var k = document.createElement('span'); k.className = 'kmK'; k.textContent = label;
-  var v = document.createElement('span'); v.className = 'kmV'; v.textContent = text == null ? '' : text;
+  var v = UI.descText(document.createElement('span'), text); v.className = 'kmV';
   d.appendChild(k); d.appendChild(v);
   return d;
 };
@@ -520,6 +529,8 @@ UI.toast = function (text, color) {
   d.textContent = text;
   d.style.color = color || '#fff';
   $('toasts').appendChild(d);
+  // 18 号（.kmLong）居中：奇数个字体像素宽的一行会落在半个设备像素上，补成偶数个（24 号一个字体像素 2 像素，总是整的）
+  if (d.classList.contains('kmLong')) UI.evenFp(d, text, parseFloat(getComputedStyle(d).fontSize) || 18);
   UI.toasts.push({ el: d, t: Game.realTime });
   if (UI.toasts.length > 4) { UI.toasts[0].el.remove(); UI.toasts.shift(); }
   return d;
@@ -539,6 +550,22 @@ UI.goldPop = function () {
   g.classList.add('pop');
 };
 
+// 提示底板居中（translateX(-50%)）：最宽的一行是奇数个字体像素时，18 号字会落在半个设备像素上（笔画旁边一列灰、底板边发虚）。
+// 一行：文字的 span 补 1 个字体像素（底板照样左右 14 像素内边距）；几行（圣锻炉，pre-line）：看最宽的一行（第一行前面还有 E 键帽），
+// 补在底板的右内边距上（CSS 里的 14 像素再加 1 个字体像素）
+UI.promptEven = function (el, sp, k, text) {
+  var fs = parseFloat(getComputedStyle(el).fontSize) || 18, lines = String(text).split('\n');
+  el.style.paddingRight = '';
+  if (lines.length < 2) { UI.evenFp(sp, text, fs); return; }
+  sp.style.paddingRight = '';
+  var kw = k ? k.getBoundingClientRect().width + (parseFloat(getComputedStyle(k).marginRight) || 0) : 0, best = -1, odd = false;
+  for (var i = 0; i < lines.length; i++) {
+    var t = lines[i].replace(/\s+/g, ' ').trim(), fp = UI.fpw(t), w = fp * fs / 12 + (i === 0 ? kw : 0);
+    if (w > best + 0.01) { best = w; odd = fp % 2 === 1; }
+  }
+  if (odd) el.style.paddingRight = (parseFloat(getComputedStyle(el).paddingRight) || 0) + fs / 12 + 'px';
+};
+
 UI.setPrompt = function (text, ok) {
   if (UI.cache.prompt === text + ok) return;
   UI.cache.prompt = text + ok;
@@ -548,9 +575,13 @@ UI.setPrompt = function (text, ok) {
     var el = $('prompt');
     el.innerHTML = '';
     // 键盘玩家显示 E 键帽
-    if (!Input.isTouch) { var k = document.createElement('span'); k.className = 'key'; k.textContent = 'E'; el.appendChild(k); }
-    el.appendChild(document.createTextNode(text));
+    var k = null;
+    if (!Input.isTouch) { k = document.createElement('span'); k.className = 'key'; k.textContent = 'E'; el.appendChild(k); }
+    var sp = document.createElement('span');
+    sp.textContent = text;
+    el.appendChild(sp);
     el.classList.toggle('bad', !ok);
+    UI.promptEven(el, sp, k, text);
   }
 };
 
@@ -562,7 +593,22 @@ UI.openModal = function (id) {
   // 弹窗后面的 HUD 整体变暗；小地图也马上画一次（和指南针字母一致，不会只剩字母）
   if (Game.state !== 'menu' && UI.mm && P.pos) UI.drawMinimap(true);
   if (document.pointerLockElement) { Input.selfRelease = true; document.exitPointerLock(); }
+  // 钉在底部的按钮行下面还压着内容时，按钮行上面加一条硬边分隔线。内容是打开以后才填的：下一帧、0.35 秒后再量
+  // （不在这里马上量，那样要多排一次版）；没有 requestAnimationFrame 的环境只等 0.35 秒
+  var el = $(id);
+  if (el) {
+    if (!el.__moreHook) { el.__moreHook = true; el.addEventListener('scroll', function () { UI.modalMore(el); }, { passive: true }); }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { UI.modalMore(el); });
+    setTimeout(function () { UI.modalMore(el); }, 350);
+  }
 };
+// 弹窗里的内容还没滚到底（钉住的按钮行下面还有字）：加 .kmMore（style.css 画分隔线），滚到底或者放得下就去掉
+UI.modalMore = function (el) {
+  if (!el || el.classList.contains('hidden')) return;
+  var more = el.scrollHeight - el.clientHeight - el.scrollTop > 1;
+  if (el.__more !== more) { el.__more = more; el.classList.toggle('kmMore', more); }
+};
+window.addEventListener('resize', function () { MODALS.forEach(function (m) { UI.modalMore(document.getElementById(m)); }); });
 
 UI.closeModal = function () {
   MODALS.forEach(function (m) { UI.show(m, false); });
@@ -588,8 +634,9 @@ UI.card = function (o, i, act, foot) {
   UI.fillTile(b.querySelector('.cardIcon'), ik && ik.kind, ik && ik.id, o.icon, o.color || 0x888888);
   b.querySelector('.cardTitle').textContent = o.title;
   b.querySelector('.cardSub').textContent = o.sub || '';
+  // 每一行说明按短语排（kit.js 的 Kit.phrase：只在标点后面、数字前面换行，太长的一段只在词和词之间折，不会折成「龙卷 / 风」「生 / 命回复」）
   var lines = b.querySelector('.cardLines');
-  (o.lines || []).forEach(function (l) { var d = document.createElement('div'); d.textContent = l; lines.appendChild(d); });
+  (o.lines || []).forEach(function (l) { var d = document.createElement('div'); if (typeof Kit !== 'undefined' && Kit.phrase) Kit.phrase(d, l); else d.textContent = l; lines.appendChild(d); });
   var fe = b.querySelector('.cardRarity');
   fe.textContent = foot || r.name;
   // 价格（「160 金币」）用金币的金色，不用稀有度的颜色（史诗是红色，看起来像买不起）

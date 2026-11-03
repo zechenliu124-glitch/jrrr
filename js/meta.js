@@ -1405,7 +1405,7 @@ Meta.renderAch = function (body) {
     if (o.done) { var tag = Kit.tag('已完成'); tag.classList.add('maCheck'); top.appendChild(tag); }
     else top.appendChild(Meta.el('span', 'maCnt', Meta.fmtVal(a, Math.min(o.v, a.goal)) + ' / ' + Meta.fmtVal(a, a.goal)));
     main.appendChild(top);
-    main.appendChild(Meta.el('div', 'maDesc', a.desc));
+    main.appendChild(Kit.phrase(Meta.el('div', 'maDesc'), a.desc));   // 按短语排（只在「、」「，」后面换行，不会折成「铁匠 / 铺」）
     main.appendChild(Meta.el('div', 'maRew', '奖励：' + Meta.rewardText(a)));
     if (!o.done) main.appendChild(Meta.bar(a, false, true));
     row.appendChild(main);
@@ -1660,7 +1660,7 @@ Meta.renderEnd = function (won) {
       var tx = Meta.el('div');
       tx.appendChild(Meta.el('div', 'meItemT', it.t));
       // 几项奖励：每一项不在中间折行，只在「、」后面换行（不会折成「…、魔 / 典「…」」）
-      tx.appendChild(it.ns && it.ns.length > 1 ? Kit.parts(Meta.el('div', 'meItemN'), it.ns, '、') : Meta.el('div', 'meItemN', it.n));
+      tx.appendChild(it.ns && it.ns.length > 1 ? Kit.parts(Meta.el('div', 'meItemN'), it.ns, '、') : Kit.phrase(Meta.el('div', 'meItemN'), it.n));
       d.appendChild(tx);
       list.appendChild(d);
     });
@@ -1774,7 +1774,8 @@ Meta.pumpToast = function () {
   // 新玩家（更新前没玩过）：更新说明和老玩家礼包都不需要；记下来，下次打开（那时已经有设置存档了）也不会弹
   if (!Meta.returning && Meta.p.notice !== 1) { Meta.p.notice = 1; Meta.p.gift = 1; Meta.save(); }
   // 上次没结算就关掉的那一局：按“退出”结算
-  if (Meta.p.pending) {
+  // RESUME 钩子（resume_boot.js）：有能继续的存档点时先不结算，留给主菜单的「继续上一局」「放弃」
+  if (Meta.p.pending && !(typeof Resume !== 'undefined' && Resume.holdPending(Meta.p.pending))) {
     try { Meta.restored = Meta.finish(Meta.p.pending, 'quit'); } catch (e) { Meta.err(e); Meta.p.pending = null; Meta.save(); }
   }
 })();

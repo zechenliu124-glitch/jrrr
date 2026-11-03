@@ -210,8 +210,31 @@ FX.glow = function (x, y, z, w, h, c, a, shape) {
 
 // 持续一小段时间、逐渐变暗的闪光（爆炸、雷击、暴击火花）
 FX.flash = function (x, y, z, size, color, life, shape) {
+  // 通关的大横幅（body.kmEnd）时不再加四角星的闪光（不用随机数，种子世界不变）；已经在屏幕上的由 FX.dropStars 拿掉
+  if (shape === 2 && document.body && document.body.classList.contains('kmEnd')) return;
   if (FX.flashes.length >= 140) FX.flashes.shift();
   FX.flashes.push({ x: x, y: y, z: z, s: size, c: color, t: 0, life: life || 0.25, shape: shape || 0 });
+};
+
+// 通关 / 阵亡（Game.state 'end'）：闪光不再变老、发光网格不再重新提交，最后一帧战斗里的命中星星会一直定在骑士周围
+// （UI_STYLE §2.4、§4.2：英雄镜头里只有金色彩带，没有白色的星）。拿掉已经在屏幕上的四角星和斜十字星
+// （FX.glow 往矩阵第 10 个数写 shape + 1：3 = 四角星，4 = 斜十字星；拾取物的闪烁星也算），其余发光照旧定格。
+// 只在 'end' 里跑，不用随机数：战斗里的随机数顺序不变
+FX.dropStars = function () {
+  var i, n = 0;
+  for (i = 0; i < FX.flashes.length; i++) if (FX.flashes[i].shape === 2 || FX.flashes[i].shape === 3) n++;
+  if (n) FX.flashes = FX.flashes.filter(function (f) { return f.shape !== 2 && f.shape !== 3; });
+  var im = FX.glowMesh;
+  if (!im || !im.count) return;
+  var m = im.instanceMatrix.array, c = im.instanceColor && im.instanceColor.array, sh;
+  n = 0;
+  for (i = 0; i < im.count; i++) {
+    sh = m[i * 16 + 10];
+    if (sh === 3 || sh === 4) continue;
+    if (n !== i) { m.copyWithin(n * 16, i * 16, i * 16 + 16); if (c) c.copyWithin(n * 3, i * 3, i * 3 + 3); }
+    n++;
+  }
+  if (n !== im.count) FX.commit(im, n);
 };
 
 // ---------------- 初始化 ----------------
@@ -223,7 +246,7 @@ FX.init = function (scene, overlay) {
   try {
     if (document.fonts && document.fonts.load) {
       document.fonts.load('18px "KM Pixel 12"', '0123456789+$骑士鼓舞格挡').catch(function () {});
-      document.fonts.load('12px "KM Pixel 12"', 'Lv0123456789').catch(function () {});
+      document.fonts.load('12px "KM Pixel 12"', 'Lv0123456789').then(function () { FX.glyphInit(); }).catch(function () {});
     }
   } catch (e) { /* 忽略 */ }
   // 粒子：实例化小方块；顶点颜色让顶面亮、侧面暗，不用光照也有立体感
@@ -423,12 +446,15 @@ FX.setFont = function (ctx, f) { if (_font !== f) { ctx.font = f; _font = f; } }
 // ---------------- 画布上的字（伤害数字、拾取提示、「鼓舞！」「格挡」「处决」） ----------------
 // 和界面一样的像素字：字号只用 12 / 18 / 24 / 36（中文至少 18）；描边 = 8 个方向各 1 个字体像素 + 底下一行厚度（深紫黑 #120c1c）；
 // 数字和字母「像素加粗」（同色往右多画 1 个字体像素、字距 1 个字体像素），汉字不加粗。
-// 每个（文字、字号、颜色、屏幕倍数）只画一次，存成一张小图，以后每帧 drawImage 一次（不缓存要 12~16 次 fillText）；
-// 最近用过的留 400 个（满了扔掉最久没用的 100 个：每张小图记着上次用到的帧 u）；每帧最多新画 24 个，再多的这一帧直接画在画布上。
-// frame：FX.drawTexts 每帧加 1；pass：正在 FX.drawTexts 里（平滑缩放在那里关一次，不用每个字开关一次）
-FX.lbl = { cache: new Map(), builds: 0, CAP: 400, BUDGET: 24, hits: 0, miss: 0, ok: {}, frame: 0, pass: false };
+// 数字和字母（伤害、+经验、$、BONK!：打斗时每帧几十个）从一张静态的像素字形图集里贴（FX.glyph）：KM Pixel 12 在 12 号时 1 个字体像素
+// 正好是 1 像素，每个字形画一次描边、每种颜色画一次字（字体到了就建，以后不再往这张图上写）；贴的时候按整数倍放大
+// （12 / 18 / 24 / 36 号在 2 倍屏上是 2 / 3 / 4 / 6 倍）、不平滑，和直接画出来的像素字一样。先贴整行字的描边，再贴字（描边不盖住旁边的字）。
+// 全从一张图里贴：Chrome 一帧几十个数字合成一两次绘制，打斗时不新建画布、不往别的画布上写字（那样每个新数字都会卡一下）；Safari 也只是贴图。
+// 有汉字的（鼓舞！、格挡、处决、摔伤 -12……）不多，直接画（12~16 次 fillText）。FX.lbl.BUDGET = 0：数字也直接画（对比用）
+// frame：FX.drawTexts 每帧加 1；pass：正在 FX.drawTexts 里（平滑缩放在那里关一次，不用每个字开关一次）；hits / miss：贴图 / 直接画的次数
+FX.lbl = { cache: new Map(), BUDGET: 24, hits: 0, miss: 0, ok: {}, frame: 0, pass: false };
 FX.snapPx = function (px, cjk) { var s = px < 15 ? 12 : px < 21 ? 18 : px < 30 ? 24 : 36; return cjk && s < 18 ? 18 : s; };
-// 字体到了没有（还没到时画出来的是备用字体，不能存进缓存）
+// 字体到了没有（还没到时画出来的是备用字体，不能放进图集）
 FX.fontOk = function (size) {
   var L = FX.lbl;
   if (L.ok[size]) return true;
@@ -436,93 +462,159 @@ FX.fontOk = function (size) {
   L.ok[size] = true;
   return true;
 };
-// 在 ctx 上画一行带描边的字（左对齐、字母基线在 y）；bold：像素加粗。不支持 ctx.letterSpacing 的浏览器一个字一个字地画
+// 在 ctx 上画一行带描边的字（左对齐、字母基线在 y）；bold：像素加粗（true）/ 不加粗（false）/ 'mix'（汉字和数字混在一行，
+// 「摔伤 -12」：汉字那段不加粗、数字那段加粗；先画所有段的描边，再画所有段的字）。不支持 ctx.letterSpacing 的浏览器一个字一个字地画
+FX.MIX = /[\x00-\x7f]+|[^\x00-\x7f]+/g;
+FX.DIGIT = /[0-9]/;
 FX.paintLabel = function (ctx, s, x, y, size, color, bold) {
+  if (bold !== 'mix') { FX.paintRun(ctx, s, x, y, size, '#120c1c', bold, true); FX.paintRun(ctx, s, x, y, size, color, bold, false); return; }
+  var parts = String(s).match(FX.MIX) || [String(s)], xs = [], cx = x, i, b;
+  for (i = 0; i < parts.length; i++) { b = parts[i].charCodeAt(0) < 128; xs.push(cx); cx += FX.labelWidth(ctx, parts[i], size, b) - (b ? size / 12 : 0); }
+  for (i = 0; i < parts.length; i++) FX.paintRun(ctx, parts[i], xs[i], y, size, '#120c1c', parts[i].charCodeAt(0) < 128, true);
+  for (i = 0; i < parts.length; i++) FX.paintRun(ctx, parts[i], xs[i], y, size, color, parts[i].charCodeAt(0) < 128, false);
+};
+// 一段字：outline 为真画 8 个方向 + 底下一行厚度的描边（加粗的描边往右宽 1 格），否则画字本身（加粗的往右再画一次）。
+// 字体、字距的字符串按字号存着（每帧不拼新字符串、不建闭包：直接画的字也不产生垃圾）
+FX.FONT_S = {};
+FX.LS_S = {};
+FX.fontStr = function (size) { return FX.FONT_S[size] || (FX.FONT_S[size] = size + 'px ' + FX.PIX_FONT); };
+FX.paintRun = function (ctx, s, x, y, size, color, bold, outline) {
   var p = size / 12, dx, dy, per = bold && !('letterSpacing' in ctx);
-  if (bold && !per) ctx.letterSpacing = p + 'px';
-  var draw = function (X, Y) {
-    if (!per) { ctx.fillText(s, X, Y); return; }
-    for (var i = 0, cx = X; i < s.length; i++) { ctx.fillText(s[i], cx, Y); cx += ctx.measureText(s[i]).width + p; }
-  };
-  ctx.fillStyle = '#120c1c';
-  for (dx = -1; dx <= (bold ? 2 : 1); dx++) {
-    for (dy = -1; dy <= 2; dy++) if (!(dy === 0 && (dx === 0 || (bold && dx === 1)))) draw(x + dx * p, y + dy * p);
-  }
+  if (bold && !per) ctx.letterSpacing = FX.LS_S[size] || (FX.LS_S[size] = p + 'px');
   ctx.fillStyle = color;
-  draw(x, y);
-  if (bold) draw(x + p, y);
+  if (outline) {
+    for (dx = -1; dx <= (bold ? 2 : 1); dx++) {
+      for (dy = -1; dy <= 2; dy++) if (!(dy === 0 && (dx === 0 || (bold && dx === 1)))) FX.fillRun(ctx, s, x + dx * p, y + dy * p, p, per);
+    }
+  } else {
+    FX.fillRun(ctx, s, x, y, p, per);
+    if (bold) FX.fillRun(ctx, s, x + p, y, p, per);
+  }
   if (bold && !per) ctx.letterSpacing = '0px';
 };
-// 整行字的宽度（加粗的：每个字后面多 1 个字体像素的字距，最后再多 1 个字体像素的加粗）；ctx 的字体要先设好
+// 画一遍字：per 为真时（不支持 ctx.letterSpacing）一个字一个字地画，字后面空 p
+FX.fillRun = function (ctx, s, X, Y, p, per) {
+  if (!per) { ctx.fillText(s, X, Y); return; }
+  for (var i = 0, cx = X; i < s.length; i++) { ctx.fillText(s[i], cx, Y); cx += ctx.measureText(s[i]).width + p; }
+};
+// 整行字的宽度（加粗的：每个字后面多 1 个字体像素的字距，最后再多 1 个字体像素的加粗；'mix' 一段段加起来）；ctx 的字体要先设好
 FX.labelWidth = function (ctx, s, size, bold) {
-  var p = size / 12, w = ctx.measureText(s).width;
-  return bold ? w + s.length * p + p : w;
+  var p = size / 12;
+  if (bold === 'mix') {
+    var parts = String(s).match(FX.MIX) || [String(s)], w = 0, b = false;
+    for (var i = 0; i < parts.length; i++) { b = parts[i].charCodeAt(0) < 128; w += FX.labelWidth(ctx, parts[i], size, b) - (b ? p : 0); }
+    return w + (b ? p : 0);
+  }
+  var m = ctx.measureText(s).width;
+  return bold ? m + s.length * p + p : m;
 };
-// 画好一张小图存进缓存：{ k（键）, cv, ox, oy（字母基线在小图里的位置）, w, h（CSS 像素）, lw（字宽，用来对齐）, u（上次用到的帧）, dead（已经扔掉） }
-FX.buildLabel = function (key, s, size, color, bold, lw, dpr) {
-  var p = size / 12, pad = Math.ceil(p * 2) + 1, top = pad + Math.ceil(p * 12);
-  var cw = Math.ceil(lw + pad * 2), ch = top + Math.ceil(p * 5) + pad;
-  var cv = document.createElement('canvas');
-  cv.width = Math.ceil(cw * dpr); cv.height = Math.ceil(ch * dpr);
-  var cx = cv.getContext('2d');
-  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cx.font = size + 'px ' + FX.PIX_FONT; cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
-  FX.paintLabel(cx, s, pad, top, size, color, bold);
-  var L = FX.lbl, c = { k: key, cv: cv, ox: pad, oy: top, w: cw, h: ch, lw: lw, u: L.frame, dead: false };
-  L.cache.set(key, c);
-  if (L.cache.size > L.CAP) FX.lblEvict();
-  return c;
+// ---- 像素字形图集：第 0 行是描边，后面每种颜色一行；每个字形一格（左右各留 3 像素给描边和加粗），一行 23 像素高、字母基线在 15
+// cell[字符编码] = { x, w（格宽）, a（字宽，字体像素）}；rows[颜色] = 第几行（-1：放不下了，直接画）
+// 建图集时就画好的颜色：伤害三档、经验 / 金币提示、回血、BONK!、骰子的「6!」（不在表里的颜色第一次用到时再补一行）
+FX.GLYPHS = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
+FX.GLYPH_COLORS = ['#ffffff', '#fff', '#ffd23a', '#ff3b30', '#5fc8ff', '#5dff6a', '#ff3030', '#ffd84a'];
+FX.glyph = { cv: null, cx: null, cell: [], rows: {}, n: 0, ROWS: 16, ROW: 23, BASE: 15, PAD: 3, fail: false };
+FX.glyphInit = function () {
+  var G = FX.glyph;
+  if (G.cv) return true;
+  if (G.fail || !FX.fontOk(12)) return false;
+  try {
+    var cv = document.createElement('canvas'), cx = cv.getContext('2d'), x = 0, i, c, a;
+    cx.font = '12px ' + FX.PIX_FONT;
+    for (i = 0; i < FX.GLYPHS.length; i++) {
+      c = FX.GLYPHS.charCodeAt(i); a = Math.round(cx.measureText(FX.GLYPHS[i]).width);
+      G.cell[c] = { x: x, w: a + G.PAD * 2, a: a };
+      x += a + G.PAD * 2 + 1;
+    }
+    cv.width = x; cv.height = G.ROW * G.ROWS;
+    cx = cv.getContext('2d');
+    cx.font = '12px ' + FX.PIX_FONT; cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+    G.cv = cv; G.cx = cx; G.n = 1;
+    // 图集的画布丢了（GPU 重置、切到后台被回收：Chrome 和新的 Safari 会发 contextlost / contextrestored）：作废，下次用到时重画一张
+    cv.addEventListener('contextlost', FX.glyphLost); cv.addEventListener('contextrestored', FX.glyphLost);
+    // 描边（和 FX.paintRun 的加粗描边一样：左右 −1~+2、上下 −1~+2 个字体像素，空出字本身和加粗那一格）
+    cx.fillStyle = '#120c1c';
+    for (i = 0; i < FX.GLYPHS.length; i++) {
+      var g = G.cell[FX.GLYPHS.charCodeAt(i)];
+      for (var dx = -1; dx <= 2; dx++) for (var dy = -1; dy <= 2; dy++) if (!(dy === 0 && (dx === 0 || dx === 1))) cx.fillText(FX.GLYPHS[i], g.x + G.PAD + dx, G.BASE + dy);
+    }
+    FX.GLYPH_COLORS.forEach(FX.glyphRow);
+    return true;
+  } catch (e) { G.fail = true; G.cv = null; return false; }
 };
-// 缓存满了：扔掉最久没用的 100 张（按上次用到的帧排，很少走到这里）；小图的画布马上清成 0×0，Safari 立刻放掉这块内存
-FX.lblEvict = function () {
-  var L = FX.lbl, all = [];
-  L.cache.forEach(function (c) { all.push(c); });
-  all.sort(function (a, b) { return a.u - b.u; });
-  for (var i = 0; i < 100 && i < all.length; i++) { var c = all[i]; L.cache.delete(c.k); c.dead = true; c.cv.width = 0; c.cv.height = 0; }
+FX.glyphLost = function (e) {
+  var G = FX.glyph;
+  if (e && e.target && e.target !== G.cv) return;   // 早就换掉的旧画布
+  G.cv = null; G.cx = null; G.rows = {}; G.n = 0;
+};
+// 某种颜色的那一行（第一次用到时画：每个字形两次 fillText）；满了返回 -1
+FX.glyphRow = function (color) {
+  var G = FX.glyph, r = G.rows[color];
+  if (r !== undefined) return r;
+  if (G.n >= G.ROWS) { G.rows[color] = -1; return -1; }
+  r = G.rows[color] = G.n++;
+  var cx = G.cx, y = r * G.ROW + G.BASE;
+  cx.fillStyle = color;
+  for (var i = 0; i < FX.GLYPHS.length; i++) {
+    var g = G.cell[FX.GLYPHS.charCodeAt(i)];
+    cx.fillText(FX.GLYPHS[i], g.x + G.PAD, y); cx.fillText(FX.GLYPHS[i], g.x + G.PAD + 1, y);
+  }
+  return r;
+};
+// 一行字能不能贴（都是图集里有的字）→ 字宽（字体像素：每个字 + 1 个字距，最后 + 1 个加粗）；不能贴返回 -1
+FX.glyphFp = function (s) {
+  var G = FX.glyph, w = 0;
+  for (var i = 0; i < s.length; i++) { var g = G.cell[s.charCodeAt(i)]; if (!g) return -1; w += g.a + 1; }
+  return w + 1;
 };
 // 描边文字：(x, y) 按 ctx 当前的 textAlign（center / left / right）和 textBaseline（middle / alphabetic）对齐；画完 ctx 的对齐方式不变。
-// rec（可选）：这个字自己的记录（FX.texts 里的一条、一条拾取提示）。用过的小图记在 rec 上，文字、字号、颜色都没变时直接用，
-// 不用每帧拼一个键去查表（每帧几十个字：不拼字符串、不挪表里的位置，就不产生垃圾）
+// rec（可选）：这个字自己的记录（FX.texts 里的一条、一条拾取提示）：字、字号没变时记着上次量的宽度，不用每帧再量
 FX.drawLabel = function (ctx, s, x, y, px, color, cjk, rec) {
-  var size = FX.snapPx(px, cjk), bold = !cjk, L = FX.lbl, dpr = Math.min(window.devicePixelRatio || 1, 2), c = null, key = null, lw;
-  if (rec && rec._lc && !rec._lc.dead && rec._ls === s && rec._lz === size && rec._lk === color && rec._ld === dpr) c = rec._lc;
-  else {
-    key = String(s) + '|' + size + '|' + color + '|' + dpr;
-    c = L.cache.get(key) || null;
-    if (rec) { rec._ls = s; rec._lz = size; rec._lk = color; rec._ld = dpr; rec._lc = c; }
+  var size = FX.snapPx(px, cjk), L = FX.lbl, G = FX.glyph, f = size / 12, fp = -1, lw, i, g;
+  s = typeof s === 'string' ? s : String(s);
+  if (!cjk && L.BUDGET > 0 && (G.cv || FX.glyphInit())) {
+    if (rec && rec._ls === s) fp = rec._lf;
+    else { fp = FX.glyphFp(s); if (rec) { rec._ls = s; rec._lf = fp; } }
   }
-  if (c) { L.hits++; c.u = L.frame; lw = c.lw; }
-  else {
-    s = String(s);
-    FX.setFont(ctx, size + 'px ' + FX.PIX_FONT);
-    lw = FX.labelWidth(ctx, s, size, bold);
-    if (L.builds < L.BUDGET && FX.fontOk(size)) { L.builds++; L.miss++; c = FX.buildLabel(key, s, size, color, bold, lw, dpr); if (rec) rec._lc = c; }
-  }
+  var row = fp > 0 ? FX.glyphRow(color) : -1;
   var al = ctx.textAlign, bl = ctx.textBaseline;
-  var x0 = Math.round(al === 'center' ? x - lw / 2 : al === 'right' || al === 'end' ? x - lw : x);
-  var y0 = Math.round(bl === 'middle' ? y + size * 0.4 : y);
-  if (c) {
-    if (L.pass) { ctx.drawImage(c.cv, x0 - c.ox, y0 - c.oy, c.w, c.h); return; }
-    var sm = ctx.imageSmoothingEnabled;
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(c.cv, x0 - c.ox, y0 - c.oy, c.w, c.h);
-    ctx.imageSmoothingEnabled = sm;
+  if (row > 0) {
+    lw = fp * f;
+    var x0 = Math.round(al === 'center' ? x - lw / 2 : al === 'right' || al === 'end' ? x - lw : x);
+    var y0 = Math.round(bl === 'middle' ? y + size * 0.4 : y), top = y0 - G.BASE * f, h = G.ROW * f, gx, sm = ctx.imageSmoothingEnabled;
+    if (!L.pass) ctx.imageSmoothingEnabled = false;
+    // 先贴整行的描边（第 0 行），再贴字（这种颜色的那一行）
+    for (gx = x0, i = 0; i < s.length; i++) { g = G.cell[s.charCodeAt(i)]; ctx.drawImage(G.cv, g.x, 0, g.w, G.ROW, gx - G.PAD * f, top, g.w * f, h); gx += (g.a + 1) * f; }
+    for (gx = x0, i = 0; i < s.length; i++) { g = G.cell[s.charCodeAt(i)]; ctx.drawImage(G.cv, g.x, row * G.ROW, g.w, G.ROW, gx - G.PAD * f, top, g.w * f, h); gx += (g.a + 1) * f; }
+    if (!L.pass) ctx.imageSmoothingEnabled = sm;
+    L.hits++;
     return;
   }
+  // 直接画：汉字（不加粗；里面有数字时数字那段加粗）、图集里没有的字、字体还没到、BUDGET = 0。
+  // 宽度也记在这个字的记录上（字、字号没变，字体也到了：不再每帧量）
+  var bold = !cjk || (FX.DIGIT.test(s) ? 'mix' : false);
+  FX.setFont(ctx, FX.fontStr(size));
+  if (rec && rec._ds === s && rec._dz === size) lw = rec._dw;
+  else {
+    lw = FX.labelWidth(ctx, s, size, bold);
+    if (rec && FX.fontOk(size)) { rec._ds = s; rec._dz = size; rec._dw = lw; }
+  }
+  var x1 = Math.round(al === 'center' ? x - lw / 2 : al === 'right' || al === 'end' ? x - lw : x);
+  var y1 = Math.round(bl === 'middle' ? y + size * 0.4 : y);
+  L.miss++;
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-  FX.paintLabel(ctx, s, x0, y0, size, color, bold);
+  FX.paintLabel(ctx, s, x1, y1, size, color, bold);
   ctx.textAlign = al; ctx.textBaseline = bl;
 };
 
 FX.drawTexts = function (cam, dt) {
   var ctx = FX.ctx, cv = FX.canvas, LB = FX.lbl;
-  LB.builds = 0;   // 每帧新画的小图从 0 数
   LB.frame++;
   var w = cv.clientWidth, h = cv.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
   if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); _font = ''; }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  // 小图按像素贴（不平滑）：这一遍里关一次，画完还原
+  // 字形图集按像素贴（不平滑）：这一遍里关一次，画完还原
   var sm0 = ctx.imageSmoothingEnabled;
   ctx.imageSmoothingEnabled = false;
   LB.pass = true;
@@ -1206,7 +1298,7 @@ FX.updateEffects = function (dt) {
     }
     FX.decalMat.uniforms.uTime.value = FX.now;
     FX.commit(FX.decalMesh, FX.decalN);
-  }
+  } else if (Game.state === 'end') FX.dropStars();   // 通关、阵亡的镜头里没有定格的白星
   FX.glowN = 0;
   FX.decalN = 0;
   FX.boomN = 0;

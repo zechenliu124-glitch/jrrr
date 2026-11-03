@@ -397,16 +397,16 @@ Interact.merchantCost = function (o) {
 Interact.label = function (o) {
   if (Interact.KINDS[o.kind]) return Interact.KINDS[o.kind].label(o);
   switch (o.kind) {
-    case 'chest': return o.free ? '打开金宝箱（免费）' : '打开宝箱（' + Interact.chestCost() + ' 金币）';
-    case 'moai': return '向摩艾像祈祷（三选一物品）';
-    case 'merchant': return '和可疑商人交易（' + RARITY[o.rarity].name + '物品 · ' + Interact.merchantCost(o) + ' 金币）';
-    case 'microwave': return '微波炉：复制一个' + RARITY[o.rarity].name + '物品（' + Interact.microwaveCost(o) + ' 金币）';
+    case 'chest': return o.free ? '打开金宝箱 · 免费' : '打开宝箱 · ' + Interact.chestCost() + ' 金币';
+    case 'moai': return '向摩艾像祈祷 · 三选一物品';
+    case 'merchant': return '和可疑商人交易 · ' + RARITY[o.rarity].name + '物品 · ' + Interact.merchantCost(o) + ' 金币';
+    case 'microwave': return '微波炉：复制一个' + RARITY[o.rarity].name + '物品 · ' + Interact.microwaveCost(o) + ' 金币';
     case 'challenge': return '挑战神龛：刷出精英，全杀奖励宝箱';
     case 'greed': return '贪婪神龛：拿金币，但难度 +5%';
     case 'succ': return '吸取神龛：吸走地图上所有经验';
     case 'curse': return 'Boss 诅咒：下次 Boss 多一只，多一个宝箱';
-    case 'bossportal': return Game.bossAlive ? 'Boss 战斗中…' : '召唤 Boss（越晚召唤血越多）';
-    case 'exitportal': return '进入传送门（下一关）';
+    case 'bossportal': return Game.bossAlive ? 'Boss 战斗中…' : '召唤 Boss · 越晚召唤血越多';
+    case 'exitportal': return '进入传送门 · 下一关';
   }
   return '';
 };

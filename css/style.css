@@ -95,7 +95,8 @@ body.touch #touchZone { display: block; }
 
 /* 顶部细经验条 */
 #xpBar { position: absolute; top: env(safe-area-inset-top, 0px); left: 0; right: 0; height: 8px; background: #000; }
-#xpFill { height: 100%; width: 0; background: var(--xp); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.45), inset 0 -2px 0 rgba(0, 40, 90, 0.35); transition: width 0.15s; }
+/* 进度条（经验、生命、护盾、Boss）的长度直接跳到新值：不做 width 动画（动画只用 transform / opacity，UI_STYLE §6） */
+#xpFill { height: 100%; width: 0; background: var(--xp); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.45), inset 0 -2px 0 rgba(0, 40, 90, 0.35); }
 
 /* 左上：数据行 → 生命条 → 武器 → 魔典 → 任务 */
 #topLeft { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 17px); left: max(12px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; align-items: flex-start; gap: 7px; transform-origin: top left; }
@@ -108,9 +109,9 @@ body.touch #touchZone { display: block; }
 
 /* 血条、Boss 血条、图块：小图块边框（2 像素黑边 + 缺角 + 2 像素投影，kit.css 的 --fr-tile）；border-image 旁边只写分开的 border-* 属性 */
 #hpBar { position: relative; width: 236px; height: 22px; background: var(--hp-dark); background-clip: padding-box; border: 2px solid transparent; border-image: var(--fr-tile) 4 4 6 4 / 4px 4px 6px 4px / 0 0 2px 0 stretch; overflow: hidden; }
-#hpFill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: var(--hp); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.3), inset 0 -3px 0 rgba(0, 0, 0, 0.28); transition: width 0.12s; }
+#hpFill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: var(--hp); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.3), inset 0 -3px 0 rgba(0, 0, 0, 0.28); }
 /* 护盾：接在生命后面的琥珀色段 */
-#shieldFill { position: absolute; left: 100%; top: 0; bottom: 0; width: 0; background: var(--shield); box-shadow: inset 2px 0 0 rgba(0, 0, 0, 0.35), inset 0 3px 0 rgba(255, 255, 255, 0.38), inset 0 -3px 0 rgba(0, 0, 0, 0.25); transition: width 0.12s, left 0.12s; }
+#shieldFill { position: absolute; left: 100%; top: 0; bottom: 0; width: 0; background: var(--shield); box-shadow: inset 2px 0 0 rgba(0, 0, 0, 0.35), inset 0 3px 0 rgba(255, 255, 255, 0.38), inset 0 -3px 0 rgba(0, 0, 0, 0.25); }
 #hpText { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--fs-m); line-height: var(--fs-m); letter-spacing: var(--o); white-space: nowrap; text-shadow: var(--olB); }
 /* 低血量：血条一亮一暗（盖一层亮红，只动 opacity） */
 #hpFill::after { content: ""; position: absolute; inset: 0; background: #ff6650; box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.3), inset 0 -3px 0 rgba(0, 0, 0, 0.28); opacity: 0; }
@@ -138,8 +139,9 @@ body.touch #touchZone { display: block; }
 .questBox { flex: none; width: 14px; height: 14px; border: 2px solid currentColor; background: rgba(0, 0, 0, 0.5); box-shadow: 0 0 0 1px #000; }
 .questRow.red { color: #ff5a4a; }
 .questRow.boss { color: #ffc2b8; }
-.questRow.go { color: #e0b8ff; }
-.questRow.purple { color: #d8a8ff; }
+/* 颜色按用途（紫色只给魔晶）：进传送门是进度 = 金，挑战精英是强敌 = 橙 */
+.questRow.go { color: var(--goldL); }
+.questRow.purple { color: var(--orgL); }
 
 /* 正上：倒计时 + 关卡名 + Boss 血条 */
 #topCenter { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 13px); left: 50%; transform: translateX(-50%); transform-origin: top center; display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; }
@@ -151,7 +153,7 @@ body.touch #touchZone { display: block; }
 #bossBar { margin-top: 6px; width: clamp(220px, calc(100vw - 620px), 560px); }
 #bossName { margin-bottom: 3px; font-size: var(--fs-m); line-height: 24px; color: #fff; white-space: nowrap; text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
 .bossTrack { height: 16px; background: #2a0709; background-clip: padding-box; border: 2px solid transparent; border-image: var(--fr-tile) 4 4 6 4 / 4px 4px 6px 4px / 0 0 2px 0 stretch; }
-#bossFill { height: 100%; width: 100%; background: var(--hp); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28), inset 0 -3px 0 rgba(0, 0, 0, 0.3); transition: width 0.1s; }
+#bossFill { height: 100%; width: 100%; background: var(--hp); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28), inset 0 -3px 0 rgba(0, 0, 0, 0.3); }
 
 /* 右上：宝箱价格、等级、暂停，下面是圆形小地图 */
 #topRight { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 13px); right: max(12px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; align-items: flex-end; gap: 4px; transform-origin: top right; }
@@ -219,6 +221,13 @@ body.touch #touchBtns { display: block; }
 .cards { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; padding: 4px 2px 8px; }
 /* 卡片：边框颜色 = 稀有度（绿/蓝/紫/红/黄）；四个缺角、史诗 / 传说外面那圈硬边在 kit.css。不要软光晕 */
 .card { position: relative; flex: 1 1 230px; max-width: 280px; min-height: 172px; padding: 12px 12px 10px; text-align: left; border: 3px solid var(--rc); background: linear-gradient(180deg, var(--rg), rgba(0, 0, 0, 0) 52px), linear-gradient(180deg, #1c2744, #0e1528); color: #fff; box-shadow: 0 0 0 2px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.55), 0 6px 0 2px #000; cursor: pointer; display: flex; flex-direction: column; gap: 9px; animation: cardIn 0.2s steps(4, jump-start) backwards; }
+/* 三张以上一排（升级、商人、圣锻炉）：每张取整数宽（竖屏 (764 − 28) / 3 = 245.33 → 245 像素，一排 763 像素居中在半个像素 = 整的屏幕像素上），
+   卡片里的字不落在小数像素上（发虚）；横屏还是 280 像素，一张、两张的一排不变。手机（700 像素以下）一张一行，不用这条 */
+@media (min-width: 701px) {
+  .cards > .card:first-child:nth-last-child(n+3), .cards > .card:first-child:nth-last-child(n+3) ~ .card {
+    flex: 0 1 auto; width: min(280px, calc((100% - 28px) / 3)); width: min(280px, round(down, calc((100% - 28px) / 3), 1px));
+  }
+}
 .card:nth-child(2) { animation-delay: 0.06s; }
 .card:nth-child(3) { animation-delay: 0.12s; }
 @keyframes cardIn { from { transform: translateY(18px); opacity: 0; } }
@@ -232,7 +241,8 @@ body.touch .cardTop { padding-right: 0; }
 .cardSub { margin-top: 0; font-size: var(--fs-s); line-height: 18px; color: var(--muted); }
 .cardLines { flex: 1; font-size: var(--fs-m); line-height: 24px; color: #e3e9f7; text-wrap: pretty; }
 .cardLines div:first-child { font-weight: 800; color: #fff; }
-/* 每一行折行时几行差不多长（中文不留一两个字的尾巴：「…把敌人 / 卷飞」）；text-wrap: pretty 管不住两个字的尾巴 */
+/* 每一行折行时几行差不多长（中文不留一两个字的尾巴：「…把敌人 / 卷飞」）；text-wrap: pretty 管不住两个字的尾巴。
+   字由 UI.card 按短语排好（Kit.phrase：每段一个 .kmNb），balance 只在整段之间匀，不会在词中间断开（「龙卷 / 风」） */
 .cardLines div { text-wrap: balance; }
 .cardRarity { font-size: var(--fs-m); line-height: 24px; color: var(--rc); text-align: right; text-shadow: var(--ol1); }
 /* 价格（商人）：金币色；买不起时灰（卡片本身也变暗，后面写「还差 N」） */
@@ -245,9 +255,11 @@ body.touch .cardKey { display: none; }
 /* 弹窗最下面的按钮行：内容太高要滚动时（矮屏、手机）钉在弹窗底部，按钮一直看得到（下边距挪到按钮行里，钉住时贴着边框） */
 #levelModal, #shopModal, #pauseModal, #endModal { padding-bottom: 8px; }
 .modal > .row:last-child { position: sticky; bottom: -8px; z-index: 1; margin-top: 8px; padding: 8px 0 12px; background: var(--panel-solid); }
+/* 按钮行下面还压着内容（还能往下滚，ui.js 的 UI.modalMore 加 .kmMore）：按钮行上面一条硬边分隔线（3 像素黑 + 2 像素亮边），不会看起来把字切成两半 */
+.modal.kmMore > .row:last-child { box-shadow: 0 -3px 0 #000, 0 -5px 0 var(--edgeHi); }
 /* 暂停的按钮行：横屏（不是矮屏）上下边距收 13 像素，按钮还在原来钉在底部时的位置，iPad 横屏开局（背包很空）不用滚动；
    钉住时停在内边距的上沿，下面 8 像素用同色的投影盖住（往上滚的内容不会从按钮下面露出来）。竖屏少 1 像素，开局正好放得下 */
-@media (orientation: landscape) and (min-height: 701px) { #pauseModal > .row:last-child { bottom: 0; padding: 3px 0 4px; box-shadow: 0 8px 0 var(--panel-solid); } }
+@media (orientation: landscape) and (min-height: 701px) { #pauseModal > .row:last-child { bottom: 0; padding: 3px 0 4px; box-shadow: 0 8px 0 var(--panel-solid); } #pauseModal.kmMore > .row:last-child { box-shadow: 0 8px 0 var(--panel-solid), 0 -3px 0 #000, 0 -5px 0 var(--edgeHi); } }
 @media (orientation: portrait) { #pauseModal > .row:last-child { padding-bottom: 11px; } }
 /* 像素按钮：这里是大小和底色（只用 background-color，background 简写会冲掉 kit.css 的缺角）；边框、斜面、按下去、选中、不能按的样子在 kit.css */
 .sbtn { min-height: 48px; padding: 9px 18px; background-color: var(--panel2); color: #fff; font-size: var(--fs-m); line-height: 24px; cursor: pointer; }
@@ -283,6 +295,9 @@ body.touch .sbtn .key { display: none; }
 .invItem { position: relative; width: 42px; height: 42px; border: 3px solid; background-color: #5a6378; background-image: var(--tone) !important; display: flex; align-items: center; justify-content: center; font-size: var(--fs-m); color: #fff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; box-shadow: 0 0 0 2px #000, var(--bevel); }
 .invItem span { position: absolute; right: -6px; bottom: -6px; font-size: var(--fs-s); line-height: 12px; letter-spacing: var(--o); color: #fff; text-shadow: var(--olB); }
 .setting { display: flex; gap: 10px; align-items: center; font-size: var(--fs-m); }
+/* 滑条后面的数值（视角灵敏度；音乐、音效的在 audio.js 的 .sfxVal，同一个样子）：18 号金色数字，1 个字体像素的字距；
+   框是整数宽（40 像素，不是 2.2em = 39.6）：数字靠右时落在整的屏幕像素上，「操作」那一栏也从整像素开始 */
+.setVal { flex: none; min-width: 40px; text-align: right; font-size: var(--fs-m); line-height: 24px; letter-spacing: var(--o); color: var(--goldM); }
 .keys { margin-top: 6px; font-size: var(--fs-s); line-height: 18px; color: var(--muted); }
 /* 操作说明：触屏只显示触屏的，键鼠只显示键鼠的 */
 body.touch .keys.kb, body:not(.touch) .keys.tc { display: none; }
