@@ -1,5 +1,7 @@
-/* 骑士魔法 —— 像素风 HUD 与菜单：像素字体 + 黑色描边，深色面板配粗黑边框（单一游戏画风，不跟随系统深浅色） */
+/* 骑士魔法 —— 像素风 HUD 与菜单：一种像素字体 + 硬描边，深色面板配缺角黑框（单一游戏画风，不跟随系统深浅色） */
 /* 布局：全屏 3D 画布；顶部细经验条；左上 数据/生命/武器/魔典/任务，正上 倒计时/Boss，右上 等级/小地图；下方被动物品栏；触屏时右下角按钮 */
+/* 规则见 docs/knight-magic/design/UI_STYLE.md：字号只用 12/18/24/36/48（下面的 --fs-*），描边只用 --ol*；
+   像素边框（--fr-*）、按钮、面板、凹槽、局内公告这些公共组件在 css/kit.css（js/kit.js） */
 :root {
   --ink: #000;
   --paper: #fff;
@@ -16,27 +18,55 @@
   --accent: #ffd84a;
   --muted: #a9b6d3;
   --red: #ff3b30;
-  /* 数字和英文用像素字体；中文用系统粗黑体（混排时数字自动用像素字体） */
-  --font-pixel: "Pixelify Sans", "Silkscreen", monospace;
-  --font-cn: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  --font-mix: "Pixelify Sans", "Silkscreen", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  /* 字体：界面和画布上的字全用像素字体 KM Pixel 12（中文、数字、英文同一种，css/fonts.css）；只有标题“骑士魔法”用 ZCOOL KuaiLe。
+     后面几个是缺字时的备用（缺字用 tools/subset.py --check 查）；--font-pixel / --font-cn / --font-mix 是旧名字 */
+  --font-px: "KM Pixel 12", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-pixel: var(--font-px);
+  --font-cn: var(--font-px);
+  --font-mix: var(--font-px);
   --font-logo: "ZCOOL KuaiLe", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  /* 硬边黑描边（1/2/3 像素） */
-  --ol1: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000;
-  --ol: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000, 2px 2px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000, -2px -2px 0 #000;
-  --ol3: 3px 0 0 #000, -3px 0 0 #000, 0 3px 0 #000, 0 -3px 0 #000, 3px 3px 0 #000, -3px 3px 0 #000, 3px -3px 0 #000, -3px -3px 0 #000, 0 5px 0 #000, 3px 5px 0 #000, -3px 5px 0 #000;
+  /* 字号格子：一个字体像素（fp）= 字号 / 12，iPad 2 倍屏上 12/18/24/36/48 每个字体像素都正好是整数个屏幕像素；行高也写整数像素 */
+  --fs-s: 12px; --fs-m: 18px; --fs-l: 24px; --fs-xl: 36px; --fs-xxl: 48px;
+  /* 硬边黑描边：每一步正好 1 个字体像素（em 写法，按用它的元素自己的字号算）。
+     --ol1 八个方向（--ol 是旧名字，一样）；--ol3 再往下加 1 个字体像素的厚度（标题）。
+     text-shadow 继承下去的是算好的像素值：子元素换了字号要重新写一次 */
+  --o: calc(1em / 12); --oN: calc(-1em / 12); --o2: calc(2em / 12);
+  --ol1: var(--o) 0 0 #000, var(--oN) 0 0 #000, 0 var(--o) 0 #000, 0 var(--oN) 0 #000, var(--o) var(--o) 0 #000, var(--oN) var(--o) 0 #000, var(--o) var(--oN) 0 #000, var(--oN) var(--oN) 0 #000;
+  --ol: var(--ol1);
+  --ol3: var(--ol1), 0 var(--o2) 0 #000, var(--o) var(--o2) 0 #000, var(--oN) var(--o2) 0 #000;
+  /* 像素加粗（只给画面上的数字和拉丁字母，汉字不要）：同色往右多画 1 个字体像素，描边跟着往右宽 1 格；要配 letter-spacing: var(--o)。
+     --olB 到 24 号，--olB3 再加厚度（36、48 号） */
+  --olB: var(--o) 0 0 currentColor, var(--oN) 0 0 #000, var(--o2) 0 0 #000,
+    var(--oN) var(--oN) 0 #000, 0 var(--oN) 0 #000, var(--o) var(--oN) 0 #000, var(--o2) var(--oN) 0 #000,
+    var(--oN) var(--o) 0 #000, 0 var(--o) 0 #000, var(--o) var(--o) 0 #000, var(--o2) var(--o) 0 #000;
+  --olB3: var(--olB), var(--oN) var(--o2) 0 #000, 0 var(--o2) 0 #000, var(--o) var(--o2) 0 #000, var(--o2) var(--o2) 0 #000;
   /* 像素图块：左上亮边、右下暗边，上下两段色调 */
   --bevel: inset 2px 2px 0 rgba(255, 255, 255, 0.4), inset -2px -2px 0 rgba(0, 0, 0, 0.38);
   --tone: linear-gradient(rgba(255, 255, 255, 0.16) 50%, rgba(0, 0, 0, 0.13) 50%);
+  /* 面板：斜面的亮边 / 暗边，横幅的两种深蓝，面板里凹槽的底色 */
+  --edgeHi: #3a4e80; --edgeLo: #1c2846;
+  --navyL: #1d2a4d; --navyD: #131c36; --well: rgba(0, 0, 0, 0.3);
+  /* 文字：正文 / 标签（上面的 --muted）/ 不能用、锁住 */
+  --text2: #e6ecf8; --dim: #6f7893;
+  /* 用途色，每种一组（亮 L / 本色 M / 暗 D / 最暗 F）：金 = 奖励、进度、选中；红 = 危险（T：画面上没有底板的危险标题，红色天空上也看得清）；
+     橙 = 强敌；青 = 经验、系统；魔晶紫只给魔晶图标和魔晶数字。不要给某个功能另加新颜色 */
+  --goldL: #fff2a8; --goldM: #ffd84a; --goldD: #b8860f; --goldF: #5e4006;
+  --redL: #ffb0a0; --redM: #ff5a46; --redD: #a3262c; --redF: #4a0c0e; --redT: #ff7a64;
+  --orgL: #ffd0a0; --orgM: #ff9a4a; --orgD: #b4561a; --orgF: #52240a;
+  --cyaL: #c8f0ff; --cyaM: #6fd0ff; --cyaD: #1f6fa8; --cyaF: #0a2e4a;
+  --gemM: #c77dff; --gemL: #f3d2ff; --gemD: #6a2fa8;
   /* 旧变量名（其他文件注入的样式可能还在用） */
   --line: #000;
   --font-num: var(--font-pixel);
   --font-body: var(--font-mix);
   color-scheme: dark;
 }
+/* 3 倍屏（手机）：18 号字的一个字体像素是 4.5 个屏幕像素，会糊；--fs-m 换成 16 号（正好 4 个）。iPad 是 2 倍屏，不受影响 */
+@media (min-resolution: 2.5dppx) { :root { --fs-m: 16px; } }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1424; color: var(--paper); font-family: var(--font-mix); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; -webkit-text-size-adjust: 100%; }
+/* font-synthesis: none：像素字体不要浏览器假加粗、假斜体（字体本身声明了 100~900 所有字重） */
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1424; color: var(--paper); font-family: var(--font-px); font-synthesis: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; -webkit-text-size-adjust: 100%; }
 button { font-family: inherit; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
 #gl, #fxCanvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
@@ -48,16 +78,17 @@ body.touch #touchZone { display: block; }
 
 .hidden { display: none !important; }
 
-/* 受伤红屏 */
-#hurt { position: fixed; inset: 0; pointer-events: none; z-index: 4; box-shadow: inset 0 0 120px 40px rgba(255, 0, 30, 0.75); opacity: 0; }
-#hurt.on { animation: hurt 0.35s ease-out; }
+/* 受伤：屏幕四边一圈细的硬边红框（6 像素亮红 + 6 像素暗红，不要大片模糊的红光），0.24 秒分三格淡出；
+   伤害从哪边来，feel.js 在那一边再加一条红带（#fxDir）。在 HUD 下面（z-index 4），不会把 HUD 的字染红 */
+#hurt { position: fixed; inset: 0; pointer-events: none; z-index: 4; box-shadow: inset 0 0 0 6px rgba(255, 90, 70, 0.5), inset 0 0 0 12px rgba(163, 38, 44, 0.3); opacity: 0; }
+#hurt.on { animation: hurt 0.24s steps(3, end); }
 @keyframes hurt { from { opacity: 1; } to { opacity: 0; } }
 
 /* 像素小图标（ui.js 把字符画转成 SVG 填进来） */
 .px { display: inline-block; flex: none; width: 18px; height: 18px; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.55)); }
 .px svg { display: block; width: 100%; height: 100%; }
 /* 键位提示小键帽 */
-.key { display: inline-block; min-width: 20px; margin-right: 8px; padding: 1px 4px 2px; border: 2px solid #000; background: #eef1f7; color: #10131c; font-family: var(--font-pixel); font-weight: 700; font-size: 14px; line-height: 14px; text-align: center; text-shadow: none; box-shadow: inset 0 -3px 0 #9aa3b8; vertical-align: 2px; }
+.key { display: inline-block; min-width: 20px; margin-right: 8px; padding: 1px 4px 2px; border: 2px solid #000; background: #eef1f7; color: #10131c; font-size: var(--fs-s); line-height: 12px; text-align: center; text-shadow: none; box-shadow: inset 0 -3px 0 #9aa3b8; vertical-align: 2px; }
 
 /* ---------- HUD ---------- */
 #hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; color: #fff; font-family: var(--font-mix); }
@@ -68,86 +99,104 @@ body.touch #touchZone { display: block; }
 
 /* 左上：数据行 → 生命条 → 武器 → 魔典 → 任务 */
 #topLeft { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 17px); left: max(12px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; align-items: flex-start; gap: 7px; transform-origin: top left; }
-#statRow { display: flex; align-items: center; gap: 14px; font-family: var(--font-pixel); font-weight: 700; font-size: 19px; line-height: 1; white-space: nowrap; text-shadow: var(--ol); }
+/* 画面上的数字：像素加粗（--olB + 1 个字体像素的字距） */
+#statRow { display: flex; align-items: center; gap: 12px; font-size: var(--fs-m); line-height: var(--fs-m); letter-spacing: var(--o); white-space: nowrap; text-shadow: var(--olB); }
 .stat { display: inline-flex; align-items: center; gap: 6px; }
-#goldBox.pop { animation: pop 0.2s; }
-@keyframes pop { 50% { transform: scale(1.18); } }
+/* 捡到金币：数字往上跳 3 像素（两格），不缩放 */
+#goldBox.pop { animation: pop 0.2s steps(2, end); }
+@keyframes pop { 50% { transform: translateY(-3px); } }
 
-#hpBar { position: relative; width: 236px; height: 22px; background: var(--hp-dark); border: 2px solid #000; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45); overflow: hidden; }
+/* 血条、Boss 血条、图块：小图块边框（2 像素黑边 + 缺角 + 2 像素投影，kit.css 的 --fr-tile）；border-image 旁边只写分开的 border-* 属性 */
+#hpBar { position: relative; width: 236px; height: 22px; background: var(--hp-dark); background-clip: padding-box; border: 2px solid transparent; border-image: var(--fr-tile) 4 4 6 4 / 4px 4px 6px 4px / 0 0 2px 0 stretch; overflow: hidden; }
 #hpFill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: var(--hp); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.3), inset 0 -3px 0 rgba(0, 0, 0, 0.28); transition: width 0.12s; }
 /* 护盾：接在生命后面的琥珀色段 */
 #shieldFill { position: absolute; left: 100%; top: 0; bottom: 0; width: 0; background: var(--shield); box-shadow: inset 2px 0 0 rgba(0, 0, 0, 0.35), inset 0 3px 0 rgba(255, 255, 255, 0.38), inset 0 -3px 0 rgba(0, 0, 0, 0.25); transition: width 0.12s, left 0.12s; }
-#hpText { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-pixel); font-weight: 700; font-size: 15px; line-height: 1; letter-spacing: 0.5px; white-space: nowrap; text-shadow: var(--ol); }
-#hpBar.low #hpFill { animation: lowhp 0.9s steps(2) infinite; }
-@keyframes lowhp { 50% { background-color: #ff6650; } }
+#hpText { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--fs-m); line-height: var(--fs-m); letter-spacing: var(--o); white-space: nowrap; text-shadow: var(--olB); }
+/* 低血量：血条一亮一暗（盖一层亮红，只动 opacity） */
+#hpFill::after { content: ""; position: absolute; inset: 0; background: #ff6650; box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.3), inset 0 -3px 0 rgba(0, 0, 0, 0.28); opacity: 0; }
+#hpBar.low #hpFill::after { animation: lowhp 0.9s steps(1, end) infinite; }
+@keyframes lowhp { 50% { opacity: 1; } }
 
 /* 武器 / 魔典：像素图块，每行 4 个，等级写在图块下面；图块里面 36 像素正好放一个图标（1 倍 / iPad 2 倍，像素整齐） */
 .slots { display: grid; grid-template-columns: repeat(4, 40px); gap: 15px 6px; padding-bottom: 12px; }
 /* 往下让 3 像素：超武武器栏左上角的「超」角标（evolution.js）不压到生命条 */
 #weaponSlots { margin-top: 3px; }
-.slot { position: relative; width: 40px; height: 40px; border: 2px solid #000; background-color: #5a6378; background-image: var(--tone) !important; display: flex; align-items: center; justify-content: center; font-family: var(--font-cn); font-weight: 900; font-size: 18px; line-height: 1; color: #fff; text-shadow: var(--ol1), 0 2px 0 #000; box-shadow: var(--bevel), 0 2px 0 rgba(0, 0, 0, 0.45); }
-.slot.empty { background: rgba(6, 10, 22, 0.55); background-image: none !important; border-color: rgba(0, 0, 0, 0.7); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.slot { position: relative; width: 40px; height: 40px; border: 2px solid transparent; border-image: var(--fr-tile) 4 4 6 4 / 4px 4px 6px 4px / 0 0 2px 0 stretch; background-color: #5a6378; background-image: var(--tone) !important; background-clip: padding-box; display: flex; align-items: center; justify-content: center; font-size: var(--fs-m); line-height: 18px; color: #fff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; box-shadow: var(--bevel); }
+/* 空栏位：没有投影的小边框 */
+.slot.empty { background-color: rgba(6, 10, 22, 0.55); background-image: none !important; border-image: var(--fr-tile0) 4 / 4px stretch; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
 .slot.empty::after { content: ""; width: 4px; height: 4px; background: rgba(255, 255, 255, 0.28); }
-.slotLv { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 3px; font-family: var(--font-pixel); font-weight: 400; font-size: 12px; line-height: 1; color: #fff; white-space: nowrap; text-shadow: var(--ol1); }
+.slotLv { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 3px; font-size: var(--fs-s); line-height: 12px; letter-spacing: var(--o); color: #fff; white-space: nowrap; text-shadow: var(--olB); }
 /* 魔典：左边一条书脊 */
-#tomeSlots .slot:not(.empty) { padding-left: 3px; box-shadow: inset 5px 0 0 rgba(0, 0, 0, 0.32), var(--bevel), 0 2px 0 rgba(0, 0, 0, 0.45); }
+#tomeSlots .slot:not(.empty) { padding-left: 3px; box-shadow: inset 5px 0 0 rgba(0, 0, 0, 0.32), var(--bevel); }
+/* 超武栏位：保留 evolution.js 的金框（不用像素边框） */
+#weaponSlots .slot.evoSlot { border-image: none; }
 
 /* 任务框 */
 #quest { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: -3px; }
-.questRow { display: flex; align-items: center; gap: 7px; padding: 4px 10px 4px 6px; background: rgba(0, 0, 0, 0.58); border: 2px solid #000; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); font-weight: 700; font-size: 14px; line-height: 1.2; white-space: nowrap; text-shadow: var(--ol1); }
-.questBox { flex: none; width: 13px; height: 13px; border: 2px solid currentColor; background: rgba(0, 0, 0, 0.5); box-shadow: 0 0 0 1px #000; }
-.questRow.red { color: #ff5a4a; font-size: 16px; }
+/* 画面上允许的底板只有小面板（--fr-plate）：任务框、互动提示、状态条 */
+.questRow { display: flex; align-items: center; gap: 6px; padding: 3px 12px 3px 6px; background: rgba(0, 0, 0, 0.58); background-clip: padding-box; border: 2px solid transparent; border-image: var(--fr-plate) 4 4 7 4 / 4px 4px 7px 4px / 0 0 3px 0 stretch; font-size: var(--fs-m); line-height: 24px; white-space: nowrap; text-shadow: var(--ol1); }
+.questBox { flex: none; width: 14px; height: 14px; border: 2px solid currentColor; background: rgba(0, 0, 0, 0.5); box-shadow: 0 0 0 1px #000; }
+.questRow.red { color: #ff5a4a; }
 .questRow.boss { color: #ffc2b8; }
 .questRow.go { color: #e0b8ff; }
 .questRow.purple { color: #d8a8ff; }
 
 /* 正上：倒计时 + 关卡名 + Boss 血条 */
 #topCenter { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 13px); left: 50%; transform: translateX(-50%); transform-origin: top center; display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; }
-#timer { font-family: var(--font-pixel); font-weight: 700; font-size: 44px; line-height: 0.95; letter-spacing: 1px; color: #fff; text-shadow: var(--ol3); }
+#timer { font-size: var(--fs-xxl); line-height: var(--fs-xxl); letter-spacing: var(--o); color: #fff; text-shadow: var(--olB3); }
 #timer.red { color: var(--red); }
-#stageName { font-weight: 700; font-size: 14px; line-height: 1.2; color: #e6edff; white-space: nowrap; text-shadow: var(--ol1), 0 2px 0 #000; }
-#bossBar { margin-top: 8px; width: clamp(220px, calc(100vw - 620px), 560px); }
-#bossName { margin-bottom: 4px; font-weight: 900; font-size: 18px; line-height: 1.15; color: #fff; white-space: nowrap; text-shadow: var(--ol); }
-.bossTrack { height: 16px; border: 2px solid #000; background: #2a0709; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45); }
+/* 难度不单独占一行：接在关卡名后面，灰色（「第 1 关 · 森林 · 难度 II」；meta.js 写 data-tier=" · 难度 II"） */
+#stageName { margin-top: 3px; font-size: var(--fs-m); line-height: 24px; color: #e6edff; white-space: nowrap; text-shadow: var(--ol1); }
+#stageName::after { content: attr(data-tier); color: var(--muted); }
+#bossBar { margin-top: 6px; width: clamp(220px, calc(100vw - 620px), 560px); }
+#bossName { margin-bottom: 3px; font-size: var(--fs-m); line-height: 24px; color: #fff; white-space: nowrap; text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
+.bossTrack { height: 16px; background: #2a0709; background-clip: padding-box; border: 2px solid transparent; border-image: var(--fr-tile) 4 4 6 4 / 4px 4px 6px 4px / 0 0 2px 0 stretch; }
 #bossFill { height: 100%; width: 100%; background: var(--hp); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28), inset 0 -3px 0 rgba(0, 0, 0, 0.3); transition: width 0.1s; }
 
 /* 右上：宝箱价格、等级、暂停，下面是圆形小地图 */
 #topRight { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 13px); right: max(12px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; align-items: flex-end; gap: 4px; transform-origin: top right; }
 #lvRow { display: flex; align-items: center; gap: 12px; }
-#chestBox { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-pixel); font-weight: 700; font-size: 16px; line-height: 1; color: var(--gold); white-space: nowrap; text-shadow: var(--ol1), 0 2px 0 #000; }
+#chestBox { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-m); line-height: var(--fs-m); letter-spacing: var(--o); color: var(--gold); white-space: nowrap; text-shadow: var(--olB); }
 #chestBox .px { width: 18px; height: 16px; }
-#lvText { font-family: var(--font-pixel); font-weight: 700; font-size: 32px; line-height: 1; color: #fff; white-space: nowrap; text-shadow: var(--ol); }
-#lvText::before { content: "LV "; font-size: 20px; }
-#btnPause { pointer-events: auto; width: 40px; height: 40px; padding: 0; border: 3px solid #000; background: var(--panel2); display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: var(--bevel), 0 3px 0 #000; cursor: pointer; }
+#lvText { font-size: var(--fs-xl); line-height: var(--fs-xl); letter-spacing: var(--o); color: #fff; white-space: nowrap; text-shadow: var(--olB3); }
+#lvText::before { content: "LV "; font-size: var(--fs-m); letter-spacing: var(--o); text-shadow: var(--olB); }
+/* 暂停：和别的按钮同一种像素按钮边框（--fr-btn；按下去换 --fr-btn-d、往下 3 像素） */
+#btnPause { position: relative; pointer-events: auto; width: 40px; height: 40px; padding: 0; border: 3px solid transparent; border-image: var(--fr-btn) 6 6 10 6 / 6px 6px 10px 6px / 0 0 4px 0 stretch; background: var(--panel2); background-clip: padding-box; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: var(--bevel); cursor: pointer; }
+/* 按得到的范围四边各多 4 像素（48×48，触控至少 44；画出来的按钮还是 40×40） */
+#btnPause::before { content: ""; position: absolute; inset: -7px; }
 #btnPause span { display: block; width: 6px; height: 16px; background: #fff; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5); }
-#btnPause:active { transform: translateY(2px); box-shadow: var(--bevel), 0 1px 0 #000; }
+#btnPause:active { transform: translateY(3px); border-image-source: var(--fr-btn-d); border-image-slice: 6 6 7 6; border-image-width: 6px 6px 7px 6px; border-image-outset: 0 0 1px 0; }
 #mapBox { position: relative; width: 176px; height: 176px; }
 #minimap { position: absolute; left: 13px; top: 13px; width: 150px; height: 150px; image-rendering: pixelated; }
-.cmp { position: absolute; font-family: var(--font-pixel); font-weight: 600; font-size: 15px; line-height: 1; color: #fff; text-shadow: var(--ol1), 0 2px 0 #000; }
-.cmp.n { top: -2px; left: 50%; transform: translateX(-50%); color: var(--accent); }
-.cmp.s { bottom: -2px; left: 50%; transform: translateX(-50%); }
+.cmp { position: absolute; font-size: var(--fs-m); line-height: var(--fs-m); color: #fff; text-shadow: var(--ol1); }
+/* N / S 横着居中：不用 translateX(-50%)（N、S 是 7 个字体像素宽，往左挪一半会落在半个设备像素上），左边取整到 1 像素 */
+.cmp.n { top: -2px; left: calc(50% - 5px); left: round(calc(50% - 3.5em / 12), 1px); color: var(--accent); }
+.cmp.s { bottom: -2px; left: calc(50% - 5px); left: round(calc(50% - 3.5em / 12), 1px); }
 .cmp.w { left: 0; top: 50%; transform: translateY(-50%); }
 .cmp.e { right: 0; top: 50%; transform: translateY(-50%); }
 
 /* 左下：角色被动等状态文字 */
 #bottomLeft { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; flex-direction: column; gap: 2px; max-width: 32vw; }
-#passiveText { font-weight: 700; font-size: 14px; line-height: 1.3; color: var(--accent); text-shadow: var(--ol1), 0 2px 0 #000; }
+#passiveText { font-size: var(--fs-m); line-height: 24px; color: var(--accent); text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
 #passiveText:empty { display: none; }
 body.touch #bottomLeft { bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); }
 
 /* 下方：被动物品栏（多了往上换行） */
 #itemBar { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); transform: translateX(-50%); width: min(780px, calc(100vw - 420px)); display: flex; flex-wrap: wrap-reverse; justify-content: center; gap: 4px; }
-.itm { position: relative; flex: none; width: 40px; height: 40px; border: 2px solid #000; background-color: #5a6378; background-image: var(--tone) !important; display: flex; align-items: center; justify-content: center; font-family: var(--font-cn); font-weight: 900; font-size: 16px; line-height: 1; color: #fff; text-shadow: var(--ol1), 0 2px 0 #000; box-shadow: inset 0 -3px 0 var(--rc, transparent), var(--bevel), 0 2px 0 rgba(0, 0, 0, 0.45); }
-.itmN { position: absolute; z-index: 1; right: -5px; bottom: -6px; font-family: var(--font-pixel); font-weight: 400; font-size: 12px; line-height: 1; color: #fff; text-shadow: var(--ol1); }
+.itm { position: relative; flex: none; width: 40px; height: 40px; border: 2px solid transparent; border-image: var(--fr-tile) 4 4 6 4 / 4px 4px 6px 4px / 0 0 2px 0 stretch; background-color: #5a6378; background-image: var(--tone) !important; background-clip: padding-box; display: flex; align-items: center; justify-content: center; font-size: var(--fs-m); line-height: 18px; color: #fff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; box-shadow: inset 0 -3px 0 var(--rc, transparent), var(--bevel); }
+.itmN { position: absolute; z-index: 1; right: -5px; bottom: -6px; font-size: var(--fs-s); line-height: 12px; letter-spacing: var(--o); color: #fff; text-shadow: var(--olB); }
 /* 触屏横屏：放在摇杆区（左 45%）和右下角按钮之间 */
 body.touch #itemBar { left: calc(45vw + 30px); right: calc(max(26px, env(safe-area-inset-right, 0px)) + 228px); width: auto; transform: none; }
 
-/* 提示文字：总在正上方一列（倒计时、Boss 血条、进度条）下面（--tcBottom 由 ui.js 量出）；横屏时不宽过左上那一列 */
-#toasts { position: absolute; top: max(calc(env(safe-area-inset-top, 0px) + max(150px, 21vh)), calc(var(--tcBottom, 0px) + 10px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: max(300px, calc(100vw - 680px)); display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.toast { font-weight: 900; font-size: 22px; line-height: 1.25; text-align: center; text-shadow: var(--ol), 0 4px 0 #000; animation: toastIn 0.25s ease-out; }
-@keyframes toastIn { from { transform: scale(1.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+/* 提示文字：一行描边字，没有底板；总在正上方一列（倒计时、Boss 血条、进度条，--tcBottom 由 ui.js 量出）和局内公告（--kmAnnB，js/kit.js 量出）下面；
+   横屏时不宽过左上那一列。9 个字以内 24 号，长的 18 号（ui.js 加 .kmLong） */
+#toasts { position: absolute; top: max(calc(env(safe-area-inset-top, 0px) + max(150px, 21vh)), calc(var(--tcBottom, 0px) + 10px), calc(var(--kmAnnB, 0px) + 10px));
+  top: max(calc(env(safe-area-inset-top, 0px) + max(150px, round(21vh, 1px))), calc(var(--tcBottom, 0px) + 10px), calc(var(--kmAnnB, 0px) + 10px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: max(300px, calc(100vw - 680px)); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.toast { font-size: var(--fs-l); line-height: 30px; text-align: center; text-shadow: var(--ol3); animation: toastIn 0.18s steps(3, jump-start); }
+.toast.kmLong { font-size: var(--fs-m); line-height: 24px; text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
+@keyframes toastIn { from { transform: translateY(-6px); opacity: 0; } }
 
-#prompt { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 132px); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); padding: 6px 14px; background: rgba(0, 0, 0, 0.62); border: 2px solid #000; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12), 0 3px 0 rgba(0, 0, 0, 0.45); font-weight: 800; font-size: 19px; line-height: 1.3; text-align: center; text-shadow: var(--ol1); }
+#prompt { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 132px); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); padding: 6px 14px; background: rgba(0, 0, 0, 0.62); background-clip: padding-box; border: 2px solid transparent; border-image: var(--fr-plate) 4 4 7 4 / 4px 4px 7px 4px / 0 0 3px 0 stretch; font-size: var(--fs-m); line-height: 24px; text-align: center; text-shadow: var(--ol1); }
 #prompt.bad { color: #ff8a7a; }
 
 /* 触屏 */
@@ -155,128 +204,159 @@ body.touch #itemBar { left: calc(45vw + 30px); right: calc(max(26px, env(safe-ar
 #joyKnob { position: fixed; left: 0; top: 0; width: 52px; height: 52px; border-radius: 50%; background: #e8ecf5; border: 3px solid #000; box-shadow: inset 0 4px 0 #fff, inset 0 -5px 0 #8f99b0; pointer-events: none; z-index: 6; }
 #touchBtns { display: none; }
 body.touch #touchBtns { display: block; }
-#touchBtns button { position: absolute; pointer-events: auto; padding: 0; border: 3px solid #000; border-radius: 50%; color: #fff; font-family: var(--font-cn); font-weight: 900; text-shadow: var(--ol); box-shadow: inset 0 5px 0 rgba(255, 255, 255, 0.3), inset 0 -6px 0 rgba(0, 0, 0, 0.3), 0 4px 0 #000; }
+#touchBtns button { position: absolute; pointer-events: auto; padding: 0; border: 3px solid #000; border-radius: 50%; color: #fff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; box-shadow: inset 0 5px 0 rgba(255, 255, 255, 0.3), inset 0 -6px 0 rgba(0, 0, 0, 0.3), 0 4px 0 #000; }
 #touchBtns button.down { transform: translateY(3px); box-shadow: inset 0 5px 0 rgba(255, 255, 255, 0.3), inset 0 -3px 0 rgba(0, 0, 0, 0.3), 0 1px 0 #000; }
-#btnJump { right: max(26px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 30px); width: 96px; height: 96px; font-size: 24px; background: #3f9b3c; }
-#btnSlide { right: calc(max(26px, env(safe-area-inset-right, 0px)) + 112px); bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); width: 76px; height: 76px; font-size: 20px; background: #2f6db5; }
-#btnUse { right: calc(max(26px, env(safe-area-inset-right, 0px)) + 14px); bottom: calc(env(safe-area-inset-bottom, 0px) + 140px); width: 72px; height: 72px; font-size: 19px; background: #d4891a; }
+#btnJump { right: max(26px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 30px); width: 96px; height: 96px; font-size: var(--fs-l); background: #3f9b3c; }
+#btnSlide { right: calc(max(26px, env(safe-area-inset-right, 0px)) + 112px); bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); width: 76px; height: 76px; font-size: var(--fs-l); background: #2f6db5; }
+#btnUse { right: calc(max(26px, env(safe-area-inset-right, 0px)) + 14px); bottom: calc(env(safe-area-inset-bottom, 0px) + 140px); width: 72px; height: 72px; font-size: var(--fs-l); background: #d4891a; }
 
-/* ---------- 弹窗：深色面板 + 3 像素黑边 ---------- */
+/* ---------- 弹窗：深色面板（缺角黑边 + 两色斜面 + 硬投影，边框和底色在 kit.css 的「面板」） ---------- */
 #modalBg { position: fixed; inset: 0; background: rgba(3, 7, 16, 0.6); z-index: 10; }
-.modal { position: fixed; inset: 0; margin: auto; z-index: 11; width: min(940px, calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); height: -webkit-fit-content; height: fit-content; max-height: calc(100vh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-x: hidden; overflow-y: auto; padding: 16px 18px 20px; text-align: center; background: var(--panel-solid); border: 3px solid #000; box-shadow: inset 0 0 0 2px var(--edge), inset 0 0 0 5px rgba(0, 0, 0, 0.45), 0 8px 0 rgba(0, 0, 0, 0.45); -webkit-overflow-scrolling: touch; touch-action: pan-y; }
-.modal h2 { margin: 2px 0 14px; font-weight: 900; font-size: 34px; line-height: 1.2; letter-spacing: 1px; color: var(--accent); text-shadow: var(--ol3); }
-.modal h3 { margin: 14px 0 6px; font-weight: 800; font-size: 17px; color: var(--muted); text-shadow: var(--ol1); }
+.modal { position: fixed; inset: 0; margin: auto; z-index: 11; width: min(940px, calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); height: -webkit-fit-content; height: fit-content; max-height: calc(100vh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-x: hidden; overflow-y: auto; padding: 16px 18px 20px; text-align: center; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.modal h2 { margin: 3px 0 12px; font-size: var(--fs-xl); line-height: 42px; color: var(--accent); text-shadow: var(--ol3); }
+/* 面板里的小标题和正文不描边（只有大标题、按钮、卡片名字描边） */
+.modal h3 { margin: 12px 0 6px; font-size: var(--fs-m); line-height: 24px; color: var(--muted); }
 .cards { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; padding: 4px 2px 8px; }
-/* 卡片：边框颜色 = 稀有度（绿/蓝/紫/红/黄） */
-.card { position: relative; flex: 1 1 230px; max-width: 280px; min-height: 172px; padding: 12px 12px 10px; text-align: left; border: 3px solid var(--rc); background: linear-gradient(180deg, var(--rg), rgba(0, 0, 0, 0) 52px), linear-gradient(180deg, #1c2744, #0e1528); color: #fff; box-shadow: 0 0 0 2px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.55), 0 6px 0 2px #000, 0 0 22px var(--rg); cursor: pointer; display: flex; flex-direction: column; gap: 9px; animation: cardIn 0.25s ease-out backwards; }
-.card:nth-child(2) { animation-delay: 0.05s; }
-.card:nth-child(3) { animation-delay: 0.1s; }
-@keyframes cardIn { from { transform: translateY(20px) scale(0.9); opacity: 0; } }
+/* 卡片：边框颜色 = 稀有度（绿/蓝/紫/红/黄）；四个缺角、史诗 / 传说外面那圈硬边在 kit.css。不要软光晕 */
+.card { position: relative; flex: 1 1 230px; max-width: 280px; min-height: 172px; padding: 12px 12px 10px; text-align: left; border: 3px solid var(--rc); background: linear-gradient(180deg, var(--rg), rgba(0, 0, 0, 0) 52px), linear-gradient(180deg, #1c2744, #0e1528); color: #fff; box-shadow: 0 0 0 2px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.55), 0 6px 0 2px #000; cursor: pointer; display: flex; flex-direction: column; gap: 9px; animation: cardIn 0.2s steps(4, jump-start) backwards; }
+.card:nth-child(2) { animation-delay: 0.06s; }
+.card:nth-child(3) { animation-delay: 0.12s; }
+@keyframes cardIn { from { transform: translateY(18px); opacity: 0; } }
 @media (hover: hover) { .card:hover:not(:disabled) { transform: translateY(-4px); } }
 .card:active:not(:disabled) { transform: translateY(2px); }
 .card:disabled { opacity: 0.45; cursor: default; }
-.cardTop { display: flex; gap: 10px; align-items: center; padding-right: 22px; }
+.cardTop { display: flex; gap: 9px; align-items: center; padding-right: 22px; }
 body.touch .cardTop { padding-right: 0; }
-.cardIcon { flex: none; width: 58px; height: 58px; border: 2px solid #000; background-color: #5a6378; background-image: var(--tone) !important; display: flex; align-items: center; justify-content: center; font-family: var(--font-cn); font-weight: 900; font-size: 26px; line-height: 1; color: #fff; text-shadow: var(--ol), 0 3px 0 #000; box-shadow: var(--bevel), 0 3px 0 rgba(0, 0, 0, 0.5); }
-.cardTitle { font-weight: 900; font-size: 21px; line-height: 1.15; text-shadow: var(--ol1), 0 2px 0 #000; }
-.cardSub { margin-top: 2px; font-size: 13px; color: var(--muted); }
-.cardLines { flex: 1; font-size: 15px; line-height: 1.45; color: #e3e9f7; }
+.cardIcon { flex: none; width: 58px; height: 58px; border: 2px solid transparent; border-image: var(--fr-tile) 4 4 6 4 / 4px 4px 6px 4px / 0 0 2px 0 stretch; background-color: #5a6378; background-image: var(--tone) !important; background-clip: padding-box; display: flex; align-items: center; justify-content: center; font-size: var(--fs-l); line-height: 24px; color: #fff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; box-shadow: var(--bevel); }
+.cardTitle { font-size: var(--fs-l); line-height: 30px; text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
+.cardSub { margin-top: 0; font-size: var(--fs-s); line-height: 18px; color: var(--muted); }
+.cardLines { flex: 1; font-size: var(--fs-m); line-height: 24px; color: #e3e9f7; text-wrap: pretty; }
 .cardLines div:first-child { font-weight: 800; color: #fff; }
-.cardRarity { font-weight: 900; font-size: 15px; color: var(--rc); text-align: right; text-shadow: var(--ol1); }
-.cardKey { position: absolute; top: 8px; right: 8px; min-width: 20px; padding: 1px 4px 2px; border: 2px solid #000; background: #0b1020; color: var(--accent); font-family: var(--font-pixel); font-weight: 700; font-size: 14px; line-height: 14px; text-align: center; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2); }
+/* 每一行折行时几行差不多长（中文不留一两个字的尾巴：「…把敌人 / 卷飞」）；text-wrap: pretty 管不住两个字的尾巴 */
+.cardLines div { text-wrap: balance; }
+.cardRarity { font-size: var(--fs-m); line-height: 24px; color: var(--rc); text-align: right; text-shadow: var(--ol1); }
+/* 价格（商人）：金币色；买不起时灰（卡片本身也变暗，后面写「还差 N」） */
+.cardRarity.cardPrice { color: var(--goldM); }
+.card:disabled .cardRarity.cardPrice { color: var(--muted); }
+.cardKey { position: absolute; top: 8px; right: 8px; min-width: 20px; padding: 1px 4px 2px; border: 2px solid #000; background: #0b1020; color: var(--accent); font-size: var(--fs-s); line-height: 12px; text-align: center; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2); }
 body.touch .cardKey { display: none; }
 .banishing .card { border-style: dashed; }
 .row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
 /* 弹窗最下面的按钮行：内容太高要滚动时（矮屏、手机）钉在弹窗底部，按钮一直看得到（下边距挪到按钮行里，钉住时贴着边框） */
 #levelModal, #shopModal, #pauseModal, #endModal { padding-bottom: 8px; }
 .modal > .row:last-child { position: sticky; bottom: -8px; z-index: 1; margin-top: 8px; padding: 8px 0 12px; background: var(--panel-solid); }
-/* 像素按钮 */
-.sbtn { min-height: 46px; padding: 8px 18px; border: 3px solid #000; border-radius: 0; background: var(--panel2); color: #fff; font-weight: 800; font-size: 18px; line-height: 1.2; text-shadow: var(--ol1); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.18), inset 0 -4px 0 rgba(0, 0, 0, 0.35), 0 4px 0 #000; cursor: pointer; }
-.sbtn.main { background: #3f9b3c; }
-.sbtn.big { padding: 10px 40px; font-size: 26px; text-shadow: var(--ol); }
-.sbtn:disabled { opacity: 0.4; cursor: default; }
+/* 暂停的按钮行：横屏（不是矮屏）上下边距收 13 像素，按钮还在原来钉在底部时的位置，iPad 横屏开局（背包很空）不用滚动；
+   钉住时停在内边距的上沿，下面 8 像素用同色的投影盖住（往上滚的内容不会从按钮下面露出来）。竖屏少 1 像素，开局正好放得下 */
+@media (orientation: landscape) and (min-height: 701px) { #pauseModal > .row:last-child { bottom: 0; padding: 3px 0 4px; box-shadow: 0 8px 0 var(--panel-solid); } }
+@media (orientation: portrait) { #pauseModal > .row:last-child { padding-bottom: 11px; } }
+/* 像素按钮：这里是大小和底色（只用 background-color，background 简写会冲掉 kit.css 的缺角）；边框、斜面、按下去、选中、不能按的样子在 kit.css */
+.sbtn { min-height: 48px; padding: 9px 18px; background-color: var(--panel2); color: #fff; font-size: var(--fs-m); line-height: 24px; cursor: pointer; }
+.sbtn.main { background-color: #3f9b3c; }
+.sbtn.big { padding: 9px 36px; font-size: var(--fs-l); line-height: 30px; text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
 .sbtn .key { margin-right: 7px; vertical-align: 1px; }
-.sbtn .cnt { display: inline-block; margin-left: 8px; padding: 0 5px; border: 2px solid #000; background: rgba(0, 0, 0, 0.45); font-family: var(--font-pixel); font-weight: 700; font-size: 15px; line-height: 18px; color: var(--accent); vertical-align: 1px; }
+.sbtn .cnt { display: inline-block; margin-left: 9px; padding: 0 6px; border: 2px solid #000; background: #0b1020; font-size: var(--fs-m); line-height: 18px; color: var(--goldM); text-shadow: none; vertical-align: 1px; }
 body.touch .sbtn .key { display: none; }
-.sbtn:active:not(:disabled) { transform: translateY(3px); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.18), inset 0 -2px 0 rgba(0, 0, 0, 0.35), 0 1px 0 #000; }
-@media (hover: hover) { .sbtn:hover:not(:disabled) { filter: brightness(1.12); } }
-.hint { margin-top: 10px; font-size: 14px; color: var(--muted); }
+.hint { margin-top: 9px; font-size: var(--fs-m); line-height: 24px; color: var(--muted); }
 /* 暂停：左边属性（下面是设置和操作说明），右边一整列是武器魔典、物品（超武进度接在物品下面），iPad 横屏和桌面不用往下翻 */
 #pauseModal { width: min(1080px, calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
 .pauseCols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "st inv" "set inv"; gap: 12px 16px; text-align: left; }
+/* 左栏取整数宽（1.25 : 1 往下取整到 1 像素）：右栏从整像素开始，里面的字不会落在半个设备像素上（不支持 round() 的浏览器用上面那行） */
+.pauseCols { grid-template-columns: round(down, calc((100% - 16px) * 5 / 9), 1px) minmax(0, 1fr); }
 .pcStats { grid-area: st; }
 .pcInv { grid-area: inv; }
 .pcSet { grid-area: set; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 28px; align-items: start; }
-.pauseCols > div { min-width: 0; padding: 2px 12px 12px; background: rgba(0, 0, 0, 0.28); border: 2px solid #000; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06); }
+/* 每一栏是一个凹槽（边框在 kit.css） */
+.pauseCols > div { min-width: 0; padding: 3px 12px 12px; background-color: var(--well); }
 .statList { display: flex; flex-direction: column; gap: 2px; max-width: 440px; margin: 0 auto; text-align: left; }
-.statRow { display: flex; justify-content: space-between; gap: 12px; padding: 3px 8px; background: rgba(255, 255, 255, 0.05); font-size: 14px; line-height: 1.35; }
+.statRow { display: flex; justify-content: space-between; gap: 12px; padding: 3px 9px; background: rgba(255, 255, 255, 0.05); font-size: var(--fs-m); line-height: 24px; }
 .statRow:nth-child(odd) { background: rgba(255, 255, 255, 0.09); }
-.statRow span:last-child { font-family: var(--font-mix); font-weight: 700; color: var(--accent); text-align: right; white-space: nowrap; }
+.statRow span:last-child { color: var(--goldM); text-align: right; white-space: nowrap; }
 /* 暂停里的属性表：两列，按行交替底色 */
 #statList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 8px; max-width: none; }
+/* 每行上下 2 像素（不是 3）：触屏的设置行要 44 像素高（滑条、显示速度），开局暂停在 iPad 上还是不用滚动 */
+#statList .statRow { padding-top: 2px; padding-bottom: 2px; }
 #statList .statRow:nth-child(4n+1), #statList .statRow:nth-child(4n+2) { background: rgba(255, 255, 255, 0.09); }
 #statList .statRow:nth-child(4n+3), #statList .statRow:nth-child(4n) { background: rgba(255, 255, 255, 0.04); }
 #itemModal { width: min(420px, calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
 .wbar { background: linear-gradient(90deg, rgba(255, 216, 74, 0.28) var(--p), rgba(255, 255, 255, 0.05) var(--p)) !important; }
-#itemList { display: flex; flex-wrap: wrap; gap: 8px; min-height: 20px; padding: 2px 4px 6px 2px; font-size: 14px; color: var(--muted); }
-.invItem { position: relative; width: 42px; height: 42px; border: 3px solid; background-color: #5a6378; background-image: var(--tone) !important; display: flex; align-items: center; justify-content: center; font-family: var(--font-cn); font-weight: 900; font-size: 17px; color: #fff; text-shadow: var(--ol1), 0 2px 0 #000; box-shadow: 0 0 0 2px #000, var(--bevel); }
-.invItem span { position: absolute; right: -7px; bottom: -8px; font-family: var(--font-pixel); font-weight: 400; font-size: 13px; color: #fff; text-shadow: var(--ol1); }
-.setting { display: flex; gap: 10px; align-items: center; font-weight: 700; font-size: 15px; }
-.keys { margin-top: 6px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+#itemList { display: flex; flex-wrap: wrap; gap: 8px; min-height: 20px; padding: 2px 4px 6px 2px; font-size: var(--fs-m); color: var(--muted); }
+.invItem { position: relative; width: 42px; height: 42px; border: 3px solid; background-color: #5a6378; background-image: var(--tone) !important; display: flex; align-items: center; justify-content: center; font-size: var(--fs-m); color: #fff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; box-shadow: 0 0 0 2px #000, var(--bevel); }
+.invItem span { position: absolute; right: -6px; bottom: -6px; font-size: var(--fs-s); line-height: 12px; letter-spacing: var(--o); color: #fff; text-shadow: var(--olB); }
+.setting { display: flex; gap: 10px; align-items: center; font-size: var(--fs-m); }
+.keys { margin-top: 6px; font-size: var(--fs-s); line-height: 18px; color: var(--muted); }
 /* 操作说明：触屏只显示触屏的，键鼠只显示键鼠的 */
 body.touch .keys.kb, body:not(.touch) .keys.tc { display: none; }
+/* 暂停里的触屏操作说明：四行短话，18 号（键鼠那几行在桌面上才显示，还是 12 号） */
+#pauseModal .keys.tc { font-size: var(--fs-m); line-height: 24px; color: var(--text2); }
 .nb { white-space: nowrap; }
 #endTitle.win { color: var(--accent); }
 #endTitle.lose { color: #ff5a4a; }
 
 /* 像素滑条 / 下拉框（暂停设置、菜单设置共用） */
 input[type=range] { -webkit-appearance: none; appearance: none; width: 180px; height: 24px; margin: 0; background: transparent; touch-action: pan-x; }
-input[type=range]::-webkit-slider-runnable-track { height: 10px; background: #0b1020; border: 2px solid #000; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
-input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 24px; margin-top: -9px; background: var(--accent); border: 2px solid #000; box-shadow: inset 0 -4px 0 #b88f12; }
+/* 凹进去的轨道 + 金色方块滑块（亮的左上、暗的右下） */
+input[type=range]::-webkit-slider-runnable-track { height: 12px; background: #0b1020; border: 2px solid #000; box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.12); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 24px; margin-top: -8px; background: var(--goldM); border: 2px solid #000; box-shadow: inset 2px 2px 0 var(--goldL), inset -2px -3px 0 var(--goldD); }
 input[type=range]::-moz-range-track { height: 6px; background: #0b1020; border: 2px solid #000; }
 input[type=range]::-moz-range-thumb { width: 12px; height: 20px; border-radius: 0; background: var(--accent); border: 2px solid #000; }
-select { min-height: 36px; padding: 4px 10px; border: 3px solid #000; border-radius: 0; background: var(--panel2); color: #fff; font-family: var(--font-mix); font-weight: 700; font-size: 15px; box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.16), 0 3px 0 #000; }
+/* 触屏（所有滑条一样：视角灵敏度、音乐、音效）：iPad 上只能按住滑块本身拖（点滑轨不会跳过去），滑块做大：
+   滑条 44 像素高，30×40 的金色方块，还是左上亮、右下暗 */
+body.touch input[type=range] { height: 44px; }
+body.touch input[type=range]::-webkit-slider-thumb { width: 30px; height: 40px; margin-top: -16px; box-shadow: inset 3px 3px 0 var(--goldL), inset -3px -4px 0 var(--goldD); }
+select { min-height: 36px; padding: 4px 10px; border: 3px solid #000; border-radius: 0; background: var(--panel2); color: #fff; font-family: var(--font-px); font-size: var(--fs-m); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.16), 0 3px 0 #000; }
 
 /* ---------- 主菜单：左边是 3D 角色模型，右边是选择面板 ---------- */
 #menu { position: fixed; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: flex-end; background: linear-gradient(90deg, rgba(5, 10, 22, 0) 35%, rgba(5, 10, 22, 0.6) 62%); overflow-x: hidden; overflow-y: auto; padding: max(12px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); touch-action: pan-y; }
-.menuInner { width: min(620px, 56vw); margin: auto 0; padding: 14px; display: flex; flex-direction: column; gap: 10px; text-align: center; background: var(--panel); border: 3px solid #000; box-shadow: inset 0 0 0 2px var(--edge), inset 0 0 0 5px rgba(0, 0, 0, 0.45), 0 8px 0 rgba(0, 0, 0, 0.45); }
-.menuHead { font-weight: 900; font-size: 16px; color: var(--muted); text-align: left; text-shadow: var(--ol1); }
+/* 像素字体到了菜单才出现（ui.js 去掉 .kmFontWait，最多等 3 秒）：font-display: block 时字是透明的，不要先露出一个没有字的面板 */
+#menu.kmFontWait { visibility: hidden; }
+/* 选择面板：半透明的面板边框（kit.css 的 --fr-panelT） */
+.menuInner { width: min(620px, 56vw); margin: auto 0; padding: 9px 12px 12px; display: flex; flex-direction: column; gap: 6px; text-align: center; }
+.menuHead { font-size: var(--fs-m); line-height: 24px; color: var(--muted); text-align: left; }
 .logo { position: fixed; left: max(28px, env(safe-area-inset-left, 0px)); top: max(16px, env(safe-area-inset-top, 0px)); margin: 0; font-family: var(--font-logo); font-weight: normal; font-size: clamp(46px, 7vw, 96px); line-height: 1.15; letter-spacing: 4px; color: var(--accent); transform: rotate(-3deg); text-shadow: 4px 0 0 #000, -4px 0 0 #000, 0 4px 0 #000, 0 -4px 0 #000, 4px 4px 0 #000, -4px 4px 0 #000, 4px -4px 0 #000, -4px -4px 0 #000, 0 10px 0 #000, 4px 10px 0 #000, -4px 10px 0 #000; pointer-events: none; }
-.tag { position: fixed; left: max(34px, env(safe-area-inset-left, 0px)); top: calc(max(16px, env(safe-area-inset-top, 0px)) + clamp(66px, 9.8vw, 132px)); font-weight: 800; font-size: 17px; color: #fff; text-shadow: var(--ol); pointer-events: none; }
-#charGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-.charCard { min-width: 0; padding: 6px 2px 5px; border: 2px solid #000; background: #17213a; color: #fff; box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.12), inset -2px -2px 0 rgba(0, 0, 0, 0.35), 0 3px 0 #000; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.charCard.sel { background: #2b3c66; border-color: var(--accent); box-shadow: 0 0 0 2px #000, inset 0 0 0 2px rgba(255, 216, 74, 0.35), 0 3px 0 #000, 0 0 14px rgba(255, 216, 74, 0.55); }
-@media (hover: hover) { .charCard:hover { filter: brightness(1.15); } }
-.charIcon { width: 40px; height: 40px; border: 2px solid #000; background-color: #5a6378; background-image: var(--tone) !important; display: flex; align-items: center; justify-content: center; font-family: var(--font-cn); font-weight: 900; font-size: 21px; line-height: 1; color: #fff; text-shadow: var(--ol1), 0 2px 0 #000; box-shadow: var(--bevel); }
-.charName { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-cn); font-weight: 700; font-size: 12px; line-height: 1.2; text-shadow: var(--ol1); }
+.tag { position: fixed; left: max(34px, env(safe-area-inset-left, 0px)); top: calc(max(16px, env(safe-area-inset-top, 0px)) + clamp(66px, 9.8vw, 132px)); font-size: var(--fs-m); line-height: 24px; color: #fff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; pointer-events: none; }
+/* 高度取整到 1 像素（9.8vw 在 iPad 竖屏是 81.73，字会落在半个设备像素上）；居中时宽度由 ui.js 补成偶数个字体像素（UI.evenFp） */
+.tag { top: calc(max(16px, env(safe-area-inset-top, 0px)) + clamp(66px, round(9.8vw, 1px), 132px)); }
+/* 7 列，每列整数宽（最多 79 像素），多出来的 1 像素两边分：格子和里面的名字都从整像素 / 半像素开始，12 号的名字不发虚 */
+#charGrid { display: grid; grid-template-columns: repeat(7, minmax(0, 79px)); justify-content: center; gap: 6px; }
+/* 骑士格子：方块按钮（小图块边框）；选中 = 3 像素金色内框 + 金色名字（不要外发光） */
+.charCard { min-width: 0; padding: 4px 3px 3px; border: 2px solid transparent; border-image: var(--fr-tile) 4 4 6 4 / 4px 4px 6px 4px / 0 0 2px 0 stretch; background-color: #17213a; background-clip: padding-box; color: #fff; box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.1), inset -2px -2px 0 rgba(0, 0, 0, 0.35); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.charCard.sel { background-color: #2b3c66; box-shadow: inset 0 0 0 3px var(--goldM), inset 0 0 0 5px rgba(0, 0, 0, 0.5); }
+@media (hover: hover) { .charCard:hover { background-color: #1f2b4a; } .charCard.sel:hover { background-color: #2b3c66; } }
+.charIcon { width: 40px; height: 40px; border: 2px solid transparent; border-image: var(--fr-tile) 4 4 6 4 / 4px 4px 6px 4px / 0 0 2px 0 stretch; background-color: #5a6378; background-image: var(--tone) !important; background-clip: padding-box; display: flex; align-items: center; justify-content: center; font-size: var(--fs-l); line-height: 24px; color: #fff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; box-shadow: var(--bevel); }
+.charName { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); line-height: 14px; }
+#charGrid .charCard.sel .charName { color: var(--goldM); }
 .charWeapon { display: none; }
-#charDesc { padding: 9px 12px; text-align: left; line-height: 1.55; font-size: 14px; background: rgba(0, 0, 0, 0.35); border: 2px solid #000; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
-.cdTitle { font-weight: 900; font-size: 20px; color: var(--accent); text-shadow: var(--ol1), 0 2px 0 #000; }
-.cdStats { font-size: 13px; color: var(--muted); }
+/* 骑士介绍：一个凹槽（边框在 kit.css）；正文 18 号不描边，标题 24 号金色 */
+#charDesc { padding: 9px 12px; text-align: left; font-size: var(--fs-m); line-height: 24px; color: #e3e9f7; background-color: var(--well); }
+.cdTitle { font-size: var(--fs-l); line-height: 30px; color: var(--accent); text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
+.cdStats { font-size: var(--fs-m); line-height: 24px; }
 /* 菜单里的小设置（其他文件往 #menuSettings 里加控件） */
-#menuSettings { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 14px; font-weight: 700; font-size: 15px; text-shadow: var(--ol1); }
+#menuSettings { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 14px; font-size: var(--fs-m); text-shadow: var(--ol1); }
 #menuSettings:empty { display: none; }
 #menuSettings label { display: inline-flex; align-items: center; gap: 8px; }
-#menuSettings button { min-height: 36px; padding: 4px 12px; border: 3px solid #000; border-radius: 0; background: var(--panel2); color: #fff; font-weight: 800; font-size: 15px; text-shadow: var(--ol1); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.16), inset 0 -3px 0 rgba(0, 0, 0, 0.35), 0 3px 0 #000; cursor: pointer; }
-#menuSettings button.sel, #menuSettings button.on, #menuSettings button[aria-pressed="true"] { background: #b8860f; }
+/* 像素按钮的边框和「选中」（深蓝 + 金色内框 + 金字）在 kit.css */
+#menuSettings button { min-height: 44px; padding: 6px 12px; background-color: var(--panel2); color: #fff; font-size: var(--fs-m); line-height: 24px; cursor: pointer; }
 .menuInner .keys { margin-top: 0; }
 @media (max-width: 760px), (orientation: portrait) {
   /* 渐变从面板上沿往上一点才开始（--panelTop 由 menu3d.js 量出来，约 55~60% 屏高），角色整个都亮着 */
   #menu { align-items: flex-end; justify-content: center; background: linear-gradient(180deg, rgba(5, 10, 22, 0) calc(var(--panelTop, 58%) - 44px), rgba(5, 10, 22, 0.6) calc(var(--panelTop, 58%) + 36px)); }
   .menuInner { width: 100%; margin: auto 0 0; }
-  #charGrid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
+  #charGrid { grid-template-columns: repeat(auto-fill, 64px); justify-content: center; }
+  /* 竖屏的格子很窄：只放头像（选中的骑士名字就是下面介绍的标题） */
+  #charGrid .charName { display: none; }
+  .charCard { padding: 4px 0 3px; }
   .logo { left: 50%; transform: translateX(-50%) rotate(-3deg); white-space: nowrap; }
   .tag { left: 50%; transform: translateX(-50%); white-space: nowrap; }
 }
 @media (max-height: 700px) and (orientation: landscape) {
-  .charIcon { width: 32px; height: 32px; font-size: 18px; }
-  #charDesc { padding: 6px 10px; font-size: 13px; }
+  .charIcon { width: 32px; height: 32px; font-size: var(--fs-m); }
+  #charDesc { padding: 6px 10px; font-size: var(--fs-s); line-height: 18px; }
   .menuInner .keys, .menuHead { display: none; }
   /* 矮屏（笔记本浏览器窗口）：暂停界面紧凑一点，按钮不用往下翻就看得到；操作说明在主菜单里有 */
   #pauseModal { padding-top: 10px; }
-  #pauseModal h2 { margin: 0 0 6px; font-size: 28px; }
+  #pauseModal h2 { margin: 0 0 6px; font-size: var(--fs-l); line-height: 30px; }
   #pauseModal h3 { margin: 8px 0 4px; }
-  #pauseModal .statRow { padding: 1px 8px; line-height: 1.3; }
+  #pauseModal .statRow { padding: 1px 9px; line-height: 21px; }
   #pauseModal .row { margin-top: 4px; padding-bottom: 8px; }
   .pauseCols { grid-template-areas: "st inv" "set inv"; }
   .pcSet > div:last-child { display: none; }
@@ -291,7 +371,7 @@ select { min-height: 36px; padding: 4px 10px; border: 3px solid #000; border-rad
   background-color: #161d36 !important;
   background-image: radial-gradient(circle at 50% 42%, rgba(124, 152, 222, 0.24), rgba(124, 152, 222, 0) 70%), linear-gradient(rgba(255, 255, 255, 0.05) 50%, rgba(0, 0, 0, 0.14) 50%) !important;
 }
-#tomeSlots .slot.hasIcon { padding-left: 0; box-shadow: var(--bevel), 0 2px 0 rgba(0, 0, 0, 0.45); }
+#tomeSlots .slot.hasIcon { padding-left: 0; box-shadow: var(--bevel); }
 /* 物品栏：稀有度色条画在图标上面（图标会挡住原来画在底下的那条） */
 .itm.hasIcon::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--rc, transparent); box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.55); pointer-events: none; }
 /* 超武：暗金底（evolution.js 给栏位加金框、金光、“超”角标） */
@@ -315,7 +395,7 @@ select { min-height: 36px; padding: 4px 10px; border: 3px solid #000; border-rad
 /* 结算界面：武器伤害条前面的图标 */
 #endWeapons .statRow { align-items: center; }
 .wName { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-.wIc { flex: none; width: 40px; height: 40px; border: 2px solid #000; background-color: #5a6378; background-image: var(--tone) !important; display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-cn); font-style: normal; font-weight: 900; font-size: 18px; line-height: 1; color: #fff; text-shadow: var(--ol1), 0 2px 0 #000; box-shadow: var(--bevel); }
+.wIc { flex: none; width: 40px; height: 40px; border: 2px solid #000; background-color: #5a6378; background-image: var(--tone) !important; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: var(--fs-m); line-height: 18px; color: #fff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; box-shadow: var(--bevel); }
 .wIc.evo { border-color: #ffd84a; }
 
 /* 从主屏幕打开时状态栏叠在画面上（black-translucent），四边都让开 safe-area */
@@ -326,7 +406,8 @@ select { min-height: 36px; padding: 4px 10px; border: 3px solid #000; border-rad
 @media (orientation: portrait) {
   body.touch #itemBar { left: 50vw; right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 226px); justify-content: flex-end; }
   #bossBar { width: clamp(200px, calc(100vw - 560px), 560px); }
-  #toasts { top: max(calc(env(safe-area-inset-top, 0px) + max(150px, 30vh)), calc(var(--tcBottom, 0px) + 10px)); max-width: calc(100vw - 32px); }
+  /* 提示字的高度和横屏一样（max(150px, 21vh)、顶部中间那一列和公告的下面），只是可以更宽 */
+  #toasts { max-width: calc(100vw - 32px); }
   .pauseCols { grid-template-columns: minmax(0, 1fr); grid-template-areas: "st" "inv" "set"; }
 }
 /* iPad 竖屏：物品栏是整行宽，里面再分两列：左边武器魔典和物品，右边超武进度（evolution.js 接在物品后面的 #evoPause），不用往下翻 */
@@ -335,32 +416,37 @@ select { min-height: 36px; padding: 4px 10px; border: 3px solid #000; border-rad
   .pcInv > * { grid-column: 1; min-width: 0; }
   .pcInv > #evoPause { grid-column: 2; grid-row: 1 / -1; }
 }
+/* 小屏（手机、很矮的窗口）：HUD 三列不再整体 transform: scale()（像素字缩成小数字号会糊）：字号换小一档，血条、小地图直接写小一点 */
+@media (max-width: 700px), (max-height: 560px) {
+  #topLeft, #topCenter, #topRight { --fs-m: 12px; --fs-l: 18px; --fs-xl: 24px; --fs-xxl: 36px; }
+  #hpBar { width: 180px; }
+  #mapBox { width: 120px; height: 120px; }
+  #minimap { left: 10px; top: 10px; width: 100px; height: 100px; }
+}
 @media (max-width: 700px) {
-  #topLeft { transform: scale(0.78); }
-  #topRight { transform: scale(0.72); }
-  #topCenter { top: calc(env(safe-area-inset-top, 0px) + 150px); transform: translateX(-50%) scale(0.8); }
+  /* 手机竖屏：两个角之间放不下倒计时，正上方那一列挪到两个角下面；武器、魔典图块小一点（32 像素） */
+  .slots { grid-template-columns: repeat(4, 32px); gap: 12px 4px; }
+  .slot { width: 32px; height: 32px; }
+  #topCenter { top: calc(env(safe-area-inset-top, 0px) + 210px); }
   #itemBar { width: calc(100vw - 24px); }
   .card { flex-basis: 100%; max-width: none; min-height: 0; }
   .pauseCols { grid-template-columns: minmax(0, 1fr); grid-template-areas: "st" "inv" "set"; }
   #statList { grid-template-columns: minmax(0, 1fr); }
   .pcSet { grid-template-columns: minmax(0, 1fr); }
-  .modal h2 { font-size: 28px; }
-  .toast { font-size: 18px; }
-  #toasts { top: max(calc(env(safe-area-inset-top, 0px) + 236px), calc(var(--tcBottom, 0px) + 10px)); max-width: calc(100vw - 32px); }
+  .modal h2 { font-size: var(--fs-l); line-height: 30px; }
+  .toast { font-size: var(--fs-m); line-height: 24px; text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
+  #toasts { top: max(calc(env(safe-area-inset-top, 0px) + 236px), calc(var(--tcBottom, 0px) + 10px), calc(var(--kmAnnB, 0px) + 10px)); max-width: calc(100vw - 32px); }
 }
 @media (max-height: 560px) {
-  #topLeft { transform: scale(0.74); }
-  #topRight { transform: scale(0.7); }
-  #topCenter { transform: translateX(-50%) scale(0.8); }
-  #toasts { top: max(calc(env(safe-area-inset-top, 0px) + 112px), calc(var(--tcBottom, 0px) + 8px)); }
+  #toasts { top: max(calc(env(safe-area-inset-top, 0px) + 112px), calc(var(--tcBottom, 0px) + 8px), calc(var(--kmAnnB, 0px) + 8px)); }
   #prompt { bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); }
-  .itm { width: 26px; height: 26px; font-size: 13px; }
+  .itm { width: 26px; height: 26px; font-size: var(--fs-s); }
   .card { min-height: 0; padding: 9px; }
-  .modal h2 { margin-bottom: 6px; font-size: 26px; }
+  .modal h2 { margin-bottom: 6px; font-size: var(--fs-l); line-height: 30px; }
 }
 @media (max-height: 560px) and (max-width: 700px) {
   #topCenter { top: calc(env(safe-area-inset-top, 0px) + 12px); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .card, .toast, #hpBar.low #hpFill { animation: none; }
+  .card, .toast, #hpBar.low #hpFill::after, #goldBox.pop { animation: none; }
 }

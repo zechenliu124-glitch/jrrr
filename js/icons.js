@@ -172,6 +172,56 @@ ICONS.el = function (kind, id, cls) {
   return i;
 };
 
+// ---------------- 预热：主菜单闲着的时候，先把开局后最先用到的图标画好 ----------------
+// 第一次画一个图标要现建模型、读回像素，第一次还要编译着色器（iPad 上一两百毫秒，慢的机器上好几秒）：
+// 开局后的第一次升级、第一个宝箱如果现画就会卡一下。所以在主菜单里一帧画一个，画好的缓存起来。
+// 顺序：选中骑士的起始武器 → 所有骑士的起始武器 → 所有魔典（升级卡）→ 普通物品（宝箱最常开出来的）→ 其余武器。
+// 一开局就停（回到主菜单再接着画没画完的）；刚点过、按过、滑过（包括 iPad 松手后的惯性滚动）的 0.7 秒内不画（不和操作抢同一帧）
+ICONS.warmList = function () {
+  var out = [], seen = {}, id;
+  var add = function (kind, key) {
+    var n = ICONS.nameFor(kind, key);
+    if (n && !seen[n]) { seen[n] = true; out.push(n); }
+  };
+  var C = typeof CHARACTERS !== 'undefined' ? CHARACTERS : {};
+  var sel = typeof UI !== 'undefined' ? C[UI.selected] : null;
+  if (sel) add('weapon', sel.weapon);
+  for (id in C) add('weapon', C[id].weapon);
+  if (typeof TOMES !== 'undefined') for (id in TOMES) add('tome', id);
+  if (typeof ITEMS !== 'undefined') for (id in ITEMS) if (!ITEMS[id].rarity) add('item', id);
+  if (typeof WEAPONS !== 'undefined') for (id in WEAPONS) add('weapon', id);
+  return out;
+};
+ICONS.lastInput = 0;
+ICONS.prewarm = function (delayMs) {
+  if (ICONS.warmOn || typeof requestAnimationFrame !== 'function' || typeof performance === 'undefined') return;
+  if (!ICONS.inputHooked && typeof window !== 'undefined') {
+    ICONS.inputHooked = true;
+    var mark = function () { ICONS.lastInput = performance.now(); };
+    // scroll 不冒泡，但在 window 上捕获能收到任何元素的滚动（骑士列表、成就页）
+    ['pointerdown', 'touchstart', 'touchmove', 'keydown', 'wheel', 'scroll'].forEach(function (ev) { window.addEventListener(ev, mark, { capture: true, passive: true }); });
+  }
+  ICONS.warmOn = true;
+  var list = null, start = performance.now() + (delayMs == null ? 1000 : delayMs);
+  var step = function () {
+    // 开局了（或者还没进主菜单）：停
+    if (typeof Game === 'undefined' || Game.state !== 'menu' || !Game.renderer) { ICONS.warmOn = false; return; }
+    var now = performance.now();
+    if (now >= start && now - ICONS.lastInput > 700) {
+      if (!list) list = ICONS.warmList();
+      while (list.length && ICONS.urls[list[0]]) list.shift();
+      if (!list.length) { ICONS.warmOn = false; return; }
+      var name = list.shift();
+      try { ICONS.url(name); } catch (e) {
+        // 这个图标画不出来：预热不再试（界面用到时 UI.iconEl 会显示汉字），渲染目标切回画面
+        try { Game.renderer.setRenderTarget(null); } catch (e2) { /* 忽略 */ }
+      }
+    }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+};
+
 // 预览：把所有图标画成一张大图（测试脚本截图检查）；没有图标的显示红色汉字
 ICONS.sheet = function (kinds) {
   kinds = kinds || ['weapon', 'evo', 'tome', 'item', 'char'];

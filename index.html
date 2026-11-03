@@ -50,12 +50,14 @@
 <link rel="apple-touch-startup-image" media="screen and (device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="splash/splash-1536x2048.jpg">
 <link rel="apple-touch-startup-image" media="screen and (device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)" href="splash/splash-2048x1536.jpg">
 <script src="js/pwa.js"></script>
-<!-- 字体：像素字体和标题“骑士魔法”用到的字都在 fonts/ 里（css/fonts.css），不依赖外网，离线也一样。
+<!-- 字体：像素字体 KM Pixel 12 和标题“骑士魔法”用到的字都在 fonts/ 里（css/fonts.css），不依赖外网，离线也一样。
      下一行注释只给 claude.ai 的 Artifact 版本用：tools/build-artifact.js 会把它放出来，
-     那边万一不让用内联的 data: 字体，就用 Google Fonts 补上（这里的网页不加载它） -->
-<!-- artifact: <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=ZCOOL+KuaiLe&display=swap"> -->
+     那边万一不让用内联的 data: 字体，标题字就用 Google Fonts 补上（这里的网页不加载它；像素字体没有在线的替代） -->
+<!-- artifact: <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap"> -->
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/style.css">
+<!-- 界面套件（js/kit.js）：像素边框、按钮、面板、局内公告的样式 -->
+<link rel="stylesheet" href="css/kit.css">
 </head>
 <body>
 <canvas id="gl"></canvas>
@@ -144,7 +146,7 @@
         <h3>操作</h3>
         <div class="keys kb"><span class="nb">WASD 移动</span> · <span class="nb">鼠标 转视角</span> · <span class="nb">空格 跳跃</span> · <span class="nb">Shift / C / 右键 滑铲</span><span class="nb">（空中也能按住：落地直接滑；下坡越滑越快；落在斜坡上不摔伤）</span> · <span class="nb">E 互动</span> · <span class="nb">Esc 暂停</span></div>
         <div class="keys kb">升级时：<span class="nb">1 2 3 选择</span> · <span class="nb">R 重抽</span> · <span class="nb">X 跳过</span> · <span class="nb">B 放逐</span></div>
-        <div class="keys tc">触屏：左边拖动移动 · 右边拖动转视角 · 按住“跳跃”自动连跳 · 点一下“滑铲”保持滑铲（空中也能用，再点一下收起）</div>
+        <div class="keys tc">左边拖动：移动<br>右边拖动：转视角<br>按住跳跃：连跳<br>点一下滑铲：一直滑</div>
       </div>
     </div>
   </div>
@@ -166,7 +168,7 @@
   </div>
 </div>
 
-<div id="menu">
+<div id="menu" class="kmFontWait">
   <h1 class="logo">骑士魔法</h1>
   <div class="tag">3D 割草 · 跳、滑、变强到离谱</div>
   <div class="menuInner">
@@ -176,7 +178,7 @@
     <div id="menuSettings"></div>
     <button class="sbtn main big" data-act="start">开始游戏</button>
     <div class="keys"><span class="nb">WASD 移动</span> · <span class="nb">鼠标 转视角</span> · <span class="nb">空格 跳跃</span> · <span class="nb">E 互动</span> · <span class="nb">Shift/C/右键 滑铲</span><span class="nb">（空中也能按住：落地直接滑；下坡越滑越快；落在斜坡上不摔伤）</span> · <span class="nb">空中按住前进、慢慢转视角可以加速</span></div>
-    <div class="keys">每关限时：找到 Boss 传送门并召唤 Boss，打败它进入下一关。时间到了会来最终虫潮！</div>
+    <div class="keys">每关限时：找到 Boss 传送门，打败 Boss 进下一关；时间到了会来最终虫潮！</div>
     <div class="keys">iPad：左半屏拖动移动，右半屏拖动转视角，按住跳跃自动连跳，点一下滑铲保持滑铲</div>
   </div>
 </div>
@@ -197,6 +199,7 @@
 <script src="js/rides.js"></script>
 <script src="js/models_proj.js"></script>
 <script src="js/data_enemies.js"></script>
+<script src="js/data_enemies_more.js"></script>
 <script src="js/data_stages.js"></script>
 <script src="js/data_evo.js"></script>
 <script src="js/world.js"></script>
@@ -212,8 +215,19 @@
 <script src="js/evolution.js"></script>
 <script src="js/passives.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/kit.js"></script>
 <script src="js/pace.js"></script>
 <script src="js/movement_ui.js"></script>
+<script src="js/data_meta.js"></script>
+<script src="js/meta.js"></script>
+<script src="js/feel_fx.js"></script>
+<script src="js/feel.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/audio_sfx.js"></script>
+<script src="js/audio_songs.js"></script>
+<script src="js/audio_hooks.js"></script>
+<script src="js/content.js"></script>
+<script src="js/content_map.js"></script>
 <script src="js/main.js"></script>
 <script src="js/menu3d.js"></script>
 </body>

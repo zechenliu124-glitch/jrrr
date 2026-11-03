@@ -695,7 +695,10 @@ var ENEMY_MODELS = {}, CROWN_PARTS = null, ENEMY_KIT = null;
   })();
 
   // interact.js 也用这些小工具
-  ENEMY_KIT = { bx: bx, cy: cy, sp: sp, cn: cn, ic: ic, oc: oc, lit: lit, sym: sym, sgB: sgB, sgC: sgC };
+  ENEMY_KIT = { bx: bx, cy: cy, sp: sp, cn: cn, ic: ic, oc: oc, lit: lit, sym: sym, sgB: sgB, sgC: sgC,
+    // data_enemies_more.js 的新敌人也用同一套关节、身体模板和收尾缩放
+    CH: CH, jt: jt, on: on, mir: mir, mv: mv, scl: scl, fin: fin, fz: fz, limbs: limbs, pair: pair,
+    skel: skel, gob: gob, human: human, golem: golem, scorp: scorp, ghostP: ghostP };
 })();
 
 ENEMIES = {

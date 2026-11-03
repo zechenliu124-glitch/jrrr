@@ -1190,7 +1190,9 @@ Evo.pauseRow = function (w) {
   var ev = EVO[w.id], d = document.createElement('div');
   d.className = 'evoPRow' + (w.evo ? ' done' : Evo.canEvolve(w) ? ' ready' : '');
   var ic = Evo.span(w.def.icon, 'evoPIc');
-  ic.style.backgroundColor = Evo.hex(w.def.color);
+  // 没有图标时是符文砖（深色底 + 武器颜色的字）；有图标时 ui.js 换成武器图标
+  if (typeof Kit !== 'undefined') Kit.glyphTile(ic, w.def.icon, w.def.color);
+  else ic.style.backgroundColor = Evo.hex(w.def.color);
   // 名字一行、条件一行（暂停界面右栏比较窄）
   var tx = document.createElement('div'), nm = Evo.span('', 'evoPName'), rq = Evo.span('', 'evoPReq');
   tx.className = 'evoPTxt';
@@ -1283,6 +1285,11 @@ Evo.install = function () {
         if (o.evoNo) b.classList.add('evoNo');
         if (o.evoHint) b.classList.add('evoHintCard');
         if (o.evoFoot) { var f = b.querySelector('.cardRarity'); if (f) f.textContent = o.evoFoot; }
+        // 圣锻炉三选一 / 觉醒卡片的说明按短语折行（Kit.phrase）：窄卡片里数字不和单位、加成不和名字分开，不剩一个字
+        if ((o.kind === 'evo' || o.kind === 'evo-done' || o.evoNo) && typeof Kit !== 'undefined' && Kit.phrase) {
+          var ls = b.querySelectorAll('.cardLines div');
+          for (var j = 0; j < ls.length; j++) Kit.phrase(ls[j], ls[j].textContent);
+        }
       }
       return b;
     };
@@ -1304,53 +1311,55 @@ else window.addEventListener('load', Evo.install);
 // 跟着像素风 HUD：直角、2 像素黑边、左上亮右下暗的斜面，金色发光
 Evo.BEVEL = 'inset 2px 2px 0 rgba(255, 255, 255, 0.4), inset -2px -2px 0 rgba(0, 0, 0, 0.38)';
 Evo.CSS = [
-  // HUD 武器栏：超武是金框（外面一圈黑边）+ 金光 + 左上角的“超”字角标；可觉醒的武器金光一闪一闪
+  // 字号只用 12/18/24/36/48、描边只用 style.css 的 --ol*（docs/knight-magic/design/UI_STYLE.md）；不发光、不转圈：金色都是硬边
+  // HUD 武器栏：超武是金框（外面一圈黑边）+ 左上角的“超”字角标；可觉醒的武器外面一圈金框一闪一闪（只动 opacity）
   // 底色往金色压暗一点：超武的颜色都偏浅，白字要看得清
-  '#weaponSlots .slot.evoSlot { border-color: #ffd84a !important; background-image: linear-gradient(rgba(255, 200, 60, 0.3), rgba(150, 80, 0, 0.5)), linear-gradient(rgba(255, 255, 255, 0.16) 50%, rgba(0, 0, 0, 0.13) 50%) !important; box-shadow: ' + Evo.BEVEL + ', 0 0 0 2px #000, 0 3px 0 2px rgba(0, 0, 0, 0.45), 0 0 12px 3px rgba(255, 196, 40, 0.85) !important; }',
+  '#weaponSlots .slot.evoSlot { border-color: #ffd84a !important; background-image: linear-gradient(rgba(255, 200, 60, 0.3), rgba(150, 80, 0, 0.5)), linear-gradient(rgba(255, 255, 255, 0.16) 50%, rgba(0, 0, 0, 0.13) 50%) !important; box-shadow: ' + Evo.BEVEL + ', 0 0 0 2px #000, 0 3px 0 2px rgba(0, 0, 0, 0.45) !important; }',
   '#weaponSlots .slot.evoSlot::after { content: ""; position: absolute; left: 0; top: 0; width: 9px; height: 9px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.75) 50%, rgba(255, 255, 255, 0) 50%); pointer-events: none; }',
-  // 角标只伸进栏位之间的空隙，不压到旁边的栏位和上一排的等级字
-  '#weaponSlots .evoBadge { position: absolute; left: -6px; top: -6px; z-index: 2; width: 16px; height: 16px; border: 2px solid #000; background: #ffd23a; box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.7), inset -1px -1px 0 rgba(170, 96, 0, 0.7); color: #3a1600; font: 900 11px/12px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif; text-align: center; text-shadow: none; pointer-events: none; }',
-  '#weaponSlots .slot.evoReady { animation: evoPulse 1.1s ease-in-out infinite; }',
-  '@keyframes evoPulse { 0%, 100% { box-shadow: ' + Evo.BEVEL + ', 0 2px 0 rgba(0, 0, 0, 0.45); } 50% { box-shadow: ' + Evo.BEVEL + ', 0 0 0 2px #ffd84a, 0 0 0 4px #000, 0 0 16px 5px rgba(255, 216, 74, 0.9); } }',
-  // 圣锻炉的多行提示：按行左对齐，放低一点、字小一点，不挡住脚下的血条
-  '#prompt.evoMulti { bottom: calc(env(safe-area-inset-bottom, 0px) + 112px); white-space: pre-line !important; text-align: left; font-size: 15px; line-height: 1.35; }',
-  '@media (max-height: 560px) { #prompt.evoMulti { bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); font-size: 13px; } }',
-  // 超武卡片：金边、暗金底、金色光
-  '.card.evoCard { --rc: #ffd84a; --rg: rgba(255, 196, 40, 0.5); border-color: #ffd84a !important; background: linear-gradient(180deg, rgba(255, 206, 72, 0.32), rgba(0, 0, 0, 0) 56px), linear-gradient(180deg, #4e3a12, #241806) !important; box-shadow: 0 0 0 2px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.55), 0 6px 0 2px #000, 0 0 28px rgba(255, 196, 40, 0.75) !important; }',
-  '.card.evoCard .cardTitle, .card.evoCard .cardRarity { color: #ffe27a; }',
-  '.card.evoCard .cardSub { color: #e8d4a0; }',
-  '.card.evoCard .cardIcon { border-color: #000; box-shadow: ' + Evo.BEVEL + ', 0 0 0 2px #ffd84a, 0 0 14px 2px rgba(255, 226, 120, 0.9); }',
-  '.card.evoCard::before { content: "超武"; position: absolute; left: 10px; top: -14px; z-index: 1; padding: 0 8px; border: 2px solid #000; background: #ffd23a; box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.6), inset -2px -2px 0 rgba(170, 96, 0, 0.55), 0 2px 0 #000; color: #4a1c00; font: 900 13px/20px "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif; text-shadow: none; }',
+  // 角标只伸进栏位之间的空隙，不压到旁边的栏位和上一排的等级字（12 号深色字、金底、2 像素黑边）
+  '#weaponSlots .evoBadge { position: absolute; left: -6px; top: -6px; z-index: 2; width: 16px; height: 16px; border: 2px solid #000; background: var(--goldM); box-shadow: inset 0 -2px 0 var(--goldD); color: #2a1600; font-size: var(--fs-s); line-height: 12px; text-align: center; text-shadow: none; pointer-events: none; }',
+  // 可以觉醒：栏位外面一圈 2 像素金框（加黑边），两格一亮一暗地闪（这是除了低血量以外唯一一直在动的东西）
+  '#weaponSlots .slot.evoReady::before { content: ""; position: absolute; inset: -4px; border: 2px solid var(--goldM); box-shadow: 0 0 0 2px #000; opacity: 0.2; pointer-events: none; animation: evoPulse 1.1s steps(1, end) infinite; }',
+  '@keyframes evoPulse { 50% { opacity: 1; } }',
+  // 圣锻炉的多行提示：按行左对齐，放低一点，不挡住脚下的血条
+  '#prompt.evoMulti { bottom: calc(env(safe-area-inset-bottom, 0px) + 112px); white-space: pre-line !important; text-align: left; line-height: 24px; }',
+  '@media (max-height: 560px) { #prompt.evoMulti { bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); } }',
+  // 超武卡片：和别的卡片一样的深蓝底（顶上一点传说的金色，style.css 的 .card），金边，外面再一圈金色硬边（和传说卡片一样，不发光）；
+  // 不要整张的暗金 / 芥末色底。说明几行折行时每行差不多长（style.css 的 .cardLines div），而且按短语折行（上面 UI.card 里的 Kit.phrase）
+  '.card.evoCard { --rc: #ffd84a; --rg: rgba(255, 201, 40, 0.7); border-color: #ffd84a !important; box-shadow: 0 0 0 2px #000, 0 0 0 5px #ffd84a, 0 0 0 7px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.55), 0 9px 0 4px #000 !important; }',
+  '.card.evoCard .cardTitle, .card.evoCard .cardRarity { color: var(--goldM); }',
+  '.card.evoCard .cardSub { color: var(--goldL); }',
+  '.card.evoCard .cardIcon { border-color: #000; box-shadow: ' + Evo.BEVEL + ', 0 0 0 2px #ffd84a; }',
+  // 「超武」小签：12 号深色字、金底、2 像素黑圈（Kit.tag 的样子）
+  '.card.evoCard::before { content: "超武"; position: absolute; left: 9px; top: -12px; z-index: 1; padding: 0 6px; background: var(--goldM); box-shadow: 0 0 0 2px #000, inset 0 -2px 0 var(--goldD); color: #2a1600; font-size: var(--fs-s); line-height: 18px; text-shadow: none; }',
   '.card.evoNo { opacity: 0.8; }',
-  '.card.evoHintCard { box-shadow: 0 0 0 2px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.55), 0 6px 0 2px #000, 0 0 24px rgba(255, 216, 74, 0.9) !important; }',
-  '.card.evoHintCard .cardLines div:last-child { color: #ffe27a; font-weight: bold; }',
-  // 觉醒弹窗：大标题、旋转的金色光芒、一张宽卡片（.card 默认最宽 280px，这里放宽到 440px）
+  '.card.evoHintCard { box-shadow: 0 0 0 2px #000, 0 0 0 5px #ffd84a, 0 0 0 7px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.55), 0 9px 0 4px #000 !important; }',
+  '.card.evoHintCard .cardLines div:last-child { color: var(--goldM); }',
+  // 觉醒弹窗：48 号金色标题（描边 + 厚度，往下落 6 像素出来）、一张宽卡片（.card 默认最宽 280px，这里放宽到 440px）；不要旋转的光芒
   '#levelModal.evoShow { overflow: visible !important; }',
-  '#levelModal.evoShow h2 { color: #fff3a0 !important; font-size: clamp(36px, 6vw, 56px); text-shadow: 3px 0 0 #000, -3px 0 0 #000, 0 3px 0 #000, 0 -3px 0 #000, 3px 3px 0 #000, -3px 3px 0 #000, 3px -3px 0 #000, -3px -3px 0 #000, 0 6px 0 #4a2a00, 0 0 26px rgba(255, 200, 60, 0.95) !important; animation: evoTitle 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both; }',
+  '#levelModal.evoShow h2 { color: var(--goldL) !important; font-size: var(--fs-xxl); line-height: 54px; text-shadow: var(--ol3) !important; animation: kmTitleIn 0.2s steps(3, jump-start) both; }',
   '#levelModal.evoShow .cards { padding-top: 12px; }',
-  '#levelModal.evoShow .card { flex: 0 1 440px; width: min(440px, 100%); max-width: min(440px, 100%); min-height: 0; padding: 16px 16px 12px; gap: 11px; }',
-  '#levelModal.evoShow .cardIcon { width: 62px; height: 62px; font-size: 33px; }',
-  '#levelModal.evoShow .cardTitle { font-size: 27px; }',
-  '#levelModal.evoShow .cardSub { font-size: 14px; }',
-  '#levelModal.evoShow .cardLines { font-size: 15px; }',
-  '#levelModal.evoShow::before { content: ""; position: absolute; left: 50%; top: 50%; width: 900px; height: 900px; margin: -450px 0 0 -450px; z-index: -1; pointer-events: none; background: repeating-conic-gradient(rgba(255, 214, 90, 0.22) 0deg 7deg, rgba(255, 214, 90, 0) 7deg 18deg); -webkit-mask-image: radial-gradient(circle, #000 18%, transparent 62%); mask-image: radial-gradient(circle, #000 18%, transparent 62%); animation: evoSpin 9s linear infinite; }',
-  '@keyframes evoTitle { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }',
-  '@keyframes evoSpin { to { transform: rotate(360deg); } }',
-  // 暂停界面的超武进度（右栏，物品下面）
+  '#levelModal.evoShow .card { flex: 0 1 440px; width: min(440px, 100%); max-width: min(440px, 100%); min-height: 0; padding: 15px 15px 12px; gap: 12px; }',
+  '#levelModal.evoShow .cardIcon { width: 62px; height: 62px; font-size: var(--fs-xl); line-height: 36px; }',
+  '#levelModal.evoShow .cardTitle { font-size: var(--fs-l); line-height: 30px; }',
+  '#levelModal.evoShow .cardSub { font-size: var(--fs-s); line-height: 18px; }',
+  '#levelModal.evoShow .cardLines { font-size: var(--fs-m); line-height: 24px; }',
+  // 暂停界面的超武进度（右栏，物品下面）：每行一个凹槽（kit.css）；觉醒了的左边一条金边
   '#evoPause { margin: 10px 0 0; text-align: left; }',
   '#evoPause h3 { margin: 6px 0 5px; }',
-  '.evoPRow { display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 4px 8px 4px 4px; background: rgba(255, 255, 255, 0.06); border: 2px solid #000; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06); }',
-  '.evoPRow.done { background: linear-gradient(90deg, rgba(255, 216, 74, 0.3), rgba(255, 216, 74, 0.05)); box-shadow: inset 0 0 0 1px rgba(255, 216, 74, 0.55); }',
+  '.evoPRow { display: flex; align-items: center; gap: 9px; margin-top: 3px; padding: 3px 9px 3px 3px; background-color: rgba(255, 255, 255, 0.05); }',
+  '.evoPRow.done { background-color: rgba(255, 216, 74, 0.06); box-shadow: inset 3px 0 0 var(--goldM); }',
   '.evoPRow.ready { box-shadow: inset 0 0 0 2px #ffd84a; }',
-  '.evoPIc { flex: none; width: 30px; height: 30px; border: 2px solid #000; background-color: #5a6378; background-image: linear-gradient(rgba(255, 255, 255, 0.16) 50%, rgba(0, 0, 0, 0.13) 50%); display: flex; align-items: center; justify-content: center; font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif; font-weight: 900; font-size: 16px; line-height: 1; color: #fff; text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 0 2px 0 #000; box-shadow: ' + Evo.BEVEL + '; }',
-  '.evoPRow.done .evoPIc { border-color: #ffd84a; box-shadow: ' + Evo.BEVEL + ', 0 0 0 2px #000, 0 0 8px rgba(255, 216, 74, 0.9); }',
-  '.evoPTxt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }',
-  '.evoPName { font-weight: 800; font-size: 14px; line-height: 1.3; }',
-  '.evoPRow.done .evoPName { color: #ffe27a; }',
-  '.evoPReq { font-size: 13px; line-height: 1.3; color: #c9d3ea; }',
-  '.evoPReq .ok { color: #7dff7a; } .evoPReq .no { color: #ff9a9a; } .evoPReq .go { color: #ffe27a; font-weight: bold; }',
-  '.evoPHint { margin-top: 6px; font-size: 13px; line-height: 1.45; color: #a9b6d3; }',
-  '@media (prefers-reduced-motion: reduce) { #weaponSlots .slot.evoReady, #levelModal.evoShow h2, #levelModal.evoShow::before { animation: none; } }'
+  // 前面的图块：有武器图标就用图标（ui.js），没有就是符文砖（Kit.glyphTile）
+  '.evoPIc { flex: none; width: 30px; height: 30px; border: 2px solid #000; background-color: #5a6378; background-image: linear-gradient(rgba(255, 255, 255, 0.16) 50%, rgba(0, 0, 0, 0.13) 50%); display: flex; align-items: center; justify-content: center; font-size: var(--fs-m); line-height: 18px; color: #fff; text-shadow: var(--ol1); box-shadow: ' + Evo.BEVEL + '; }',
+  '.evoPRow.done .evoPIc { border-color: #ffd84a; box-shadow: ' + Evo.BEVEL + ', 0 0 0 2px #000; }',
+  '.evoPTxt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0; }',
+  '.evoPName { font-size: var(--fs-m); line-height: 24px; }',
+  '.evoPRow.done .evoPName { color: var(--goldM); }',
+  '.evoPReq { font-size: var(--fs-s); line-height: 18px; color: #c9d3ea; }',
+  '.evoPReq .ok { color: #8fe07a; } .evoPReq .no { color: var(--redL); } .evoPReq .go { color: var(--goldM); }',
+  '.evoPHint { margin-top: 6px; font-size: var(--fs-s); line-height: 18px; color: var(--muted); }',
+  '@media (prefers-reduced-motion: reduce) { #weaponSlots .slot.evoReady::before, #levelModal.evoShow h2 { animation: none; } #weaponSlots .slot.evoReady::before { opacity: 1; } }'
 ].join('\n');
 
 (function () {

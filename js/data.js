@@ -15,7 +15,7 @@ var STATS = {
   shield: { name: '护盾', base: 0 },
   armor: { name: '护甲', base: 0, pct: true, show: function (v) { return v / (0.75 + v); } },
   evasion: { name: '闪避', base: 0.01, pct: true, show: function (v) { return v / (1 + v); } },
-  lifesteal: { name: '吸血（命中回复 1 点的几率）', base: 0, pct: true },
+  lifesteal: { name: '吸血几率', base: 0, pct: true },
   thorns: { name: '荆棘', base: 0 },
   damage: { name: '伤害', base: 1, pct: true },
   critChance: { name: '暴击率', base: 0.01, pct: true },

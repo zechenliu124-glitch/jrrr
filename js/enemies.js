@@ -5,7 +5,10 @@
 // ============================================================
 var Enemies = {
   list: [], hash: new SpatialHash(3.5), meshes: {}, shots: [], hazards: [], nextId: 1,
-  boss: null, MAX: 330, firstElite: true
+  boss: null, MAX: 330, firstElite: true,
+  // 其他文件注册的新行为和新招式（content.js）：BEHAVIORS[def.behavior](e, dt, nx, nz, d, spd, frozen) 返回 true 表示移动和碰撞自己处理；
+  // ATTACKS[招式名] = { start(e, nx, nz, d), update(e, dt, nx, nz, d) }；def.look(e, L, dt) 改这一帧的姿态（L 见 render）
+  BEHAVIORS: {}, ATTACKS: {}, LOOK: {}
 };
 
 Enemies.init = function (scene) {
@@ -337,6 +340,7 @@ Enemies.update = function (dt) {
     var spd = frozen ? 0 : e.speed * Game.enemySpeedMult * (e.frozen > 0 ? 0.5 : 1);
 
     if (e.boss || e.mini) Enemies.bossAI(e, dt, nx, nz, d);
+    else if (def.behavior && Enemies.BEHAVIORS[def.behavior]) { if (Enemies.BEHAVIORS[def.behavior](e, dt, nx, nz, d, spd, frozen)) continue; }
     else if (def.behavior === 'roll') {
       // 风滚骨：沿直线滚动，偶尔转向玩家
       e.st -= dt;
@@ -431,12 +435,13 @@ Enemies.bossAI = function (e, dt, nx, nz, d) {
     case 'chase':
       e.vx = nx * spd; e.vz = nz * spd;
       if (e.st <= 0) {
-        var a = pick(def.attacks);
+        var a = pick(e.attacks || def.attacks);
         e.state = a;
         e.st = { slam: 1.0, charge: 0.8, volley: 0.6, summon: 0.6, spikes: 0.3, orbs: 0.5, lasers: 0.8 }[a] || 0.6;
         if (a === 'slam') FX.ring(e.x, e.y, e.z, 9 * (e.boss ? 1 : 0.8), 0xff4040, 1.0);
         if (a === 'charge') { e.dx = nx; e.dz = nz; }
         if (a === 'lasers') { e.laserT = 0; e.laserA = Math.random() * TAU; }
+        if (Enemies.ATTACKS[a]) Enemies.ATTACKS[a].start(e, nx, nz, d);
       }
       return;
     case 'slam':
@@ -503,6 +508,11 @@ Enemies.bossAI = function (e, dt, nx, nz, d) {
         for (var m = 0; m < 8; m++) Enemies.spawn(pick(types), e.x + rand(-6, 6), e.z + rand(-6, 6), { hpMult: Director.hpMult(), dmgMult: Director.dmgMult(), drop: true });
         e.state = 'chase'; e.st = rand(3, 4);
       }
+      return;
+    default:
+      // 注册的新招式（content.js）；不认识的状态回到追击
+      if (Enemies.ATTACKS[e.state]) Enemies.ATTACKS[e.state].update(e, dt, nx, nz, d);
+      else { e.state = 'chase'; e.st = 1; }
       return;
   }
 };
@@ -647,6 +657,14 @@ Enemies.render = function (dt) {
       sy = e.grounded ? 1 + Math.sin(e.phase * 9) * 0.06 : 1 + clamp(e.vy * 0.035, -0.18, 0.22);
       sx = 1 / Math.sqrt(sy);
     }
+    if (def.look) {
+      // 新敌人的特殊姿态（钻地、俯冲、擂鼓…）：def.look 改 L 里的朝向 / 起伏 / 俯仰 / 翻滚 / 缩放 / 步态，hide 为真时这一帧不画
+      var L = Enemies.LOOK;
+      L.face = face; L.bob = bob; L.pitch = pitch; L.roll = roll; L.sx = sx; L.sy = sy; L.p = p; L.a = a; L.hide = false;
+      def.look(e, L, dt);
+      if (L.hide) continue;
+      face = L.face; bob = L.bob; pitch = L.pitch; roll = L.roll; sx = L.sx; sy = L.sy; p = L.p; a = L.a;
+    }
     if (e.flash > 0) { sx *= 1.12; sy /= 1.12; }
     _ee.set(pitch, face, roll, 'YXZ');
     _eq.setFromEuler(_ee);
@@ -663,6 +681,7 @@ Enemies.render = function (dt) {
     else if (e.elite) _ec.setRGB(1.06, 1.0, 1.1);
     else if (e.dot > 0) _ec.setRGB(0.8, 1.4, 0.6);
     else _ec.setRGB(1, 1, 1);
+    if (e.tint && !(e.flash > 0)) _ec.multiply(e.tint);   // Boss 第二阶段等整体染色（content.js）
     mesh.setColorAt(n, _ec);
     counts[def.id] = n + 1;
     // 金冠：飘在头顶，慢慢转、上下浮

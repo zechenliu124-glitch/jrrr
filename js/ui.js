@@ -100,8 +100,25 @@ UI.fillIcons = function (root) {
 };
 // 脚本在页面最后加载，这时 HUD 的元素已经在了
 UI.fillIcons();
-// 提前加载像素字体（画布上的文字也能用）
-try { if (document.fonts && document.fonts.load) document.fonts.load('700 16px "Pixelify Sans"').catch(function () { /* 离线时用后备字体 */ }); } catch (e) { /* 忽略 */ }
+// 提前加载像素字体 KM Pixel 12（画布上的字不会自己去下载网页字体）；菜单等它到了再出现（#menu.kmFontWait，最多等 3 秒）
+(function () {
+  var menu = document.getElementById('menu');
+  var show = function () {
+    if (menu) menu.classList.remove('kmFontWait');
+    // 竖屏居中的标语：宽度补成偶数个字体像素（UI.evenFp）
+    var tg = document.querySelector('#menu .tag');
+    try { if (tg && UI.evenFp) UI.evenFp(tg, tg.textContent, parseFloat(getComputedStyle(tg).fontSize) || 18, false); } catch (e) { /* 量不了就不补 */ }
+  };
+  try {
+    if (document.fonts && document.fonts.load) {
+      Promise.all([
+        document.fonts.load('18px "KM Pixel 12"', '0123456789+$骑士鼓舞格挡'),
+        document.fonts.load('12px "KM Pixel 12"', 'Lv0123456789')
+      ]).then(show, show);   // 离线、加载失败：用后备字体照样显示
+      setTimeout(show, 3000);
+    } else show();
+  } catch (e) { show(); }
+})();
 
 // ---------------- 物品图标（icons.js：用游戏里同一套低多边形模型拍成的像素小图） ----------------
 // 图标第一次用到时用游戏的渲染器画一次（ICONS 会缓存成图片地址）；渲染器还没建好就不要它
@@ -119,12 +136,13 @@ UI.iconEl = function (kind, id) {
     return null;
   }
 };
-// 往图块里放图标：有图标就加 .hasIcon（深色底，见 style.css）；没有就是原来的彩色底 + 汉字
+// 往图块里放图标：有图标就加 .hasIcon（深色底，见 style.css）；没有图标就是一块「符文砖」（深色底 + 彩色的字，Kit.glyphTile）
 UI.fillTile = function (el, kind, id, glyph, color) {
   var ic = UI.iconEl(kind, id);
   el.textContent = '';
   el.classList.toggle('hasIcon', !!ic);
-  if (ic) { el.style.backgroundColor = ''; el.appendChild(ic); }
+  if (ic) { el.classList.remove('kmGlyph'); el.style.removeProperty('--gc'); el.style.backgroundColor = ''; el.appendChild(ic); }
+  else if (typeof Kit !== 'undefined') Kit.glyphTile(el, glyph || '', color != null ? color : 0x888888);
   else { el.textContent = glyph || ''; el.style.backgroundColor = UI.hex(color != null ? color : 0x888888); }
   return !!ic;
 };
@@ -174,13 +192,22 @@ UI.buildMenu = function () {
   var box = $('charDesc');
   box.innerHTML = '';
   var t = document.createElement('div'); t.className = 'cdTitle'; t.textContent = c.name + ' · ' + c.title;
-  var w = document.createElement('div'); w.textContent = '初始武器：' + WEAPONS[c.weapon].name + ' —— ' + WEAPONS[c.weapon].desc;
-  var p = document.createElement('div'); p.textContent = '被动：' + c.passive;
-  var s = document.createElement('div'); s.className = 'cdStats';
+  var w = UI.descRow('初始武器', WEAPONS[c.weapon].name + ' · ' + WEAPONS[c.weapon].desc, 'cdWeapon');
+  var p = UI.descRow('被动', c.passive, 'cdPassive');
   var parts = [];
   if (c.stats) Object.keys(c.stats).forEach(function (k) { parts.push(LevelUp.statText(k, c.stats[k])); });
-  s.textContent = parts.length ? '属性：' + parts.join('，') : '';
+  // 没有属性加成时这一行先藏着（movement_ui.js 可能往里加摔落伤害）
+  var s = UI.descRow('属性', parts.join('，'), 'cdStats' + (parts.length ? '' : ' hidden'));
   box.appendChild(t); box.appendChild(w); box.appendChild(p); box.appendChild(s);
+};
+// 骑士介绍的一行：左边固定 4 个字宽的灰色标签（初始武器 / 被动 / 滑铲 / 坐骑特性 / 属性），右边内容（折行挂在内容下面，kit.css 的 .kmL）
+UI.descRow = function (label, text, cls) {
+  var d = document.createElement('div');
+  d.className = 'kmL' + (cls ? ' ' + cls : '');
+  var k = document.createElement('span'); k.className = 'kmK'; k.textContent = label;
+  var v = document.createElement('span'); v.className = 'kmV'; v.textContent = text == null ? '' : text;
+  d.appendChild(k); d.appendChild(v);
+  return d;
 };
 
 // ---------------- HUD ----------------
@@ -198,6 +225,31 @@ UI.setClass = function (id, cls, on) {
   $(id).classList.toggle(cls, on);
 };
 
+// 一段字在 KM Pixel 12 里有几个字体像素宽（画布量，不读布局）；ls = 每个字后面还有 1 个字体像素的字距（像素加粗的数字）。
+// 18 号字一个字体像素是 1.5 像素：居中的一行字如果是奇数个字体像素宽，会落在半个设备像素上（笔画发虚），要补 1 个（kit.js 的 Kit.fpw 也用它）
+UI.fpw = function (t, ls) {
+  t = t == null ? '' : String(t);
+  if (!t) return 0;
+  var c = UI.mctx || (UI.mctx = document.createElement('canvas').getContext('2d'));
+  c.font = '12px "KM Pixel 12"';
+  return Math.round(c.measureText(t).width) + (ls ? t.length : 0);
+};
+// 居中的像素字：是奇数个字体像素宽就在右边补 1 个字体像素，让宽度变成偶数个。fs = 字号
+UI.evenFp = function (el, t, fs, ls) {
+  el.style.paddingRight = UI.fpw(t, ls) % 2 ? fs / 12 + 'px' : '';
+};
+// 血条里居中的生命数字（数字一变就一会儿清楚一会儿糊）：只在文字变了时算
+UI.hpEven = function (t) {
+  if (UI.hpEvenT === t) return;
+  var el = $('hpText');
+  if (!el) return;
+  UI.hpEvenT = t;
+  if (!UI.hpFs) UI.hpFs = parseFloat(getComputedStyle(el).fontSize) || 18;
+  UI.evenFp(el, t, UI.hpFs, true);
+};
+// 窗口变了（小屏换小一档字号）：重新量
+window.addEventListener('resize', function () { UI.hpFs = 0; UI.hpEvenT = null; });
+
 UI.update = function () {
   var st = P.st;
   // 生命条：红色是生命，琥珀色是护盾（接在生命后面）
@@ -206,7 +258,9 @@ UI.update = function () {
   UI.setPct('hpFill', hpPct);
   UI.setPct('shieldFill', hpPct, 'left');
   UI.setPct('shieldFill', maxSh > 0 ? clamp(P.shield / tot, 0, 1) * 100 : 0);
-  UI.set('hpText', Math.ceil(P.hp) + '/' + Math.round(st.maxHp) + (P.shield >= 1 ? ' +' + Math.round(P.shield) : ''));
+  var hpT = Math.ceil(P.hp) + '/' + Math.round(st.maxHp) + (P.shield >= 1 ? ' +' + Math.round(P.shield) : '');
+  UI.set('hpText', hpT);
+  UI.hpEven(hpT);
   UI.setClass('hpBar', 'low', P.hp < st.maxHp * 0.3);
   UI.setPct('xpFill', clamp(P.xp / P.xpNext, 0, 1) * 100);
   UI.set('lvText', String(P.level));
@@ -459,14 +513,16 @@ UI.drawMinimap = function (force) {
   c.beginPath(); c.arc(R, R, R - 3.5, 0, TAU); c.stroke();
 };
 
+// 提示文字：9 个字以内 24 号，长的 18 号（.kmLong）；返回这条提示的元素。颜色用用途色（Kit.toast 可以直接写 'gold' / 'red'……）
 UI.toast = function (text, color) {
   var d = document.createElement('div');
-  d.className = 'toast';
+  d.className = String(text).length > 9 ? 'toast kmLong' : 'toast';
   d.textContent = text;
   d.style.color = color || '#fff';
   $('toasts').appendChild(d);
   UI.toasts.push({ el: d, t: Game.realTime });
   if (UI.toasts.length > 4) { UI.toasts[0].el.remove(); UI.toasts.shift(); }
+  return d;
 };
 
 UI.flashHurt = function () {
@@ -534,7 +590,10 @@ UI.card = function (o, i, act, foot) {
   b.querySelector('.cardSub').textContent = o.sub || '';
   var lines = b.querySelector('.cardLines');
   (o.lines || []).forEach(function (l) { var d = document.createElement('div'); d.textContent = l; lines.appendChild(d); });
-  b.querySelector('.cardRarity').textContent = foot || r.name;
+  var fe = b.querySelector('.cardRarity');
+  fe.textContent = foot || r.name;
+  // 价格（「160 金币」）用金币的金色，不用稀有度的颜色（史诗是红色，看起来像买不起）
+  if (foot && /\d 金币/.test(foot)) fe.classList.add('cardPrice');
   if (i < 3 && act === 'pick') {
     var k = document.createElement('span'); k.className = 'cardKey'; k.textContent = String(i + 1);
     b.appendChild(k);
@@ -674,11 +733,13 @@ UI.renderShop = function () {
   var box = $('shopCards');
   box.innerHTML = '';
   UI.shopRef.stock.forEach(function (s, i) {
-    var c = UI.itemCard(s.id, i, 'buy', s.price + ' 金币');
-    c.disabled = P.gold < s.price;
+    // 价格用金币的金色（不用稀有度的颜色：史诗是红色，看起来像买不起）；钱不够时后面写「还差 N」，卡片变暗
+    var short = s.price - P.gold;
+    var c = UI.itemCard(s.id, i, 'buy', s.price + ' 金币' + (short > 0 ? ' · 还差 ' + short : ''));
+    c.disabled = short > 0;
     box.appendChild(c);
   });
-  $('shopGold').textContent = '你的金币：' + P.gold + '　（只能买一件）';
+  $('shopGold').textContent = '金币 ' + P.gold + ' · 只能买一件';
 };
 
 UI.buy = function (i) {
@@ -776,7 +837,7 @@ UI.renderGear = function () {
     var ic = d && d.querySelector ? d.querySelector('.evoPIc') : null;
     if (ic && w && w.def && !ic.querySelector('.pxicon')) {
       var k = UI.weaponIcon(w), el = UI.iconEl(k.kind, k.id);
-      if (el) { ic.textContent = ''; ic.style.backgroundColor = ''; ic.classList.add('hasIcon'); ic.appendChild(el); d.classList.add('icoRow'); }
+      if (el) { ic.textContent = ''; ic.style.backgroundColor = ''; ic.classList.remove('kmGlyph'); ic.style.removeProperty('--gc'); ic.classList.add('hasIcon'); ic.appendChild(el); d.classList.add('icoRow'); }
     }
     return d;
   };

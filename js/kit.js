@@ -1,0 +1,381 @@
+'use strict';
+// ============================================================
+//  界面套件：所有界面共用的小部件和局内公告（样式在 css/kit.css；规则见 docs/knight-magic/design/UI_STYLE.md）
+//  - Kit.icon(name)：9×9 的像素小图标（字符画 → SVG），大小由 CSS 的 --ip（每个图标像素几像素）定
+//  - Kit.callout / Kit.ribbon：文字公告（没有底板的描边像素字）/ 燕尾横幅（只给 Boss 和一局结束的大时刻）
+//  - Kit.announce：局内唯一的公告系统。一次一条，排在正上方那一列（倒计时、关卡名、Boss 血条）下面；
+//    优先级不低于当前那条的马上顶掉它，低的排队（最多 2 条，等 5 秒还没轮到就扔掉）；计时跟游戏钟走（暂停、弹窗时停住）
+//  - Kit.toast / slip / button / tag / bar / glyphTile：提示文字、成就小签、像素按钮、「新」小签、进度条、符文砖图块
+//  在 ui.js 后面加载，feel.js、meta.js、content.js 这些都可以用
+// ============================================================
+var Kit = {};
+
+Kit.el = function (tag, cls, text) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+};
+// 数字加千分位（1,340）
+Kit.num = function (n) { return String(Math.round(+n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+// 一段字在 KM Pixel 12 里有几个字体像素宽（ls = 每个字后面还有 1 个字体像素的字距）：ui.js 的 UI.fpw（画布量，不读布局）。
+// 18 号字一个字体像素是 1.5 像素：居中的一行字如果是奇数个字体像素宽，会落在半个设备像素上（笔画发虚），要补 1 个
+Kit.fpw = function (t, ls) { return UI.fpw(t, ls); };
+// 用途色（一种用途一种颜色，见 UI_STYLE.md §2.4）：Kit.toast、Kit.tag 用；不是这些名字的当作颜色原样用
+Kit.COL = {
+  gold: '#ffd84a', goldL: '#fff2a8', red: '#ff7a64', redL: '#ffb0a0', redM: '#ff5a46',
+  org: '#ff9a4a', orgL: '#ffd0a0', cya: '#6fd0ff', cyaL: '#c8f0ff', gem: '#f3d2ff', white: '#ffffff', muted: '#a9b6d3'
+};
+Kit.ROLES = { gold: 1, red: 1, org: 1, cya: 1 };
+Kit.role = function (r) { return Kit.ROLES[r] ? r : 'gold'; };
+Kit.color = function (c) { return Kit.COL[c] || c || '#ffffff'; };
+
+// ---------------- 像素小图标：9×9 字符画，k 是黑描边，其他字母是颜色（.kmPx 里的 class，见 kit.css） ----------------
+// 新图标照这个格子画，颜色只用 kit.css 里列的那几种
+Kit.ICONS = {
+  flag: ['.k.......', '.kkkkkk..', '.kYyyyyk.', '.kyyyyyok', '.kyyyyok.', '.kkkkkk..', '.k.......', '.k.......', 'kkk......'],
+  star: ['....k....', '...kYk...', '...kyk...', 'kkkkyykkk', 'kYyyyyyok', '.kyyyyok.', '..kyyok..', '.kyokyok.', '.kok.kok.'],
+  crown: ['.........', 'k...k...k', 'kk.kYk.kk', 'kYkkyykok', 'kyyyyyyok', 'kyYyyyyok', 'kyyyyyyok', 'kkkkkkkkk', '.........'],
+  skull: ['..kkkkk..', '.kwwwwwk.', 'kwwwwwwgk', 'kwkkwkkgk', 'kwkkwkkgk', 'kwwwkwwgk', '.kwwwwgk.', '.kwkwkwk.', '..kkkkk..'],
+  moon: ['..kkkkk..', '.kqrrrrk.', 'kqrrRrrRk', 'krrrrrrrk', 'krRrrrRrk', 'krrrrrrRk', 'krrRrrrRk', '.kRrrrRk.', '..kkkkk..'],
+  meteor: ['......kk.', '.....kYk.', '..kk.kk..', '.kffkk...', 'kfYffk...', 'kfYYfFk..', 'kffffFk..', '.kFFFk...', '..kkk....'],
+  bag: ['..kk.kk..', '...kbk...', '..kkkkk..', '.kyyyyyk.', 'kyyYyyyok', 'kyyYkyyok', 'kyyykyyok', '.kyyyyok.', '..kkkkk..'],
+  flame: ['....k....', '...kfk...', '..kfYfk..', '.kfYYffk.', 'kffYwYffk', 'kfYwwwYfk', 'kfYwwwYfk', '.kfffffk.', '..kkkkk..'],
+  coin: ['..kkkkk..', '.kyyyyyk.', 'kyYYyyyok', 'kyYyoyyok', 'kyYyoyyok', 'kyyyoyyok', 'kyyyyyook', '.koooook.', '..kkkkk..'],
+  chest: ['.........', '.kkkkkkk.', 'kbbbybbbk', 'kbbbybbbk', 'kyyyYyyyk', 'kbbkYkbbk', 'kbbbybbbk', 'kBBBBBBBk', 'kkkkkkkkk'],
+  key: ['.kkk.....', 'kYyyk....', 'kykyk....', 'kyyykkkkk', '.kkkyyyyk', '....kykyk', '....kk.kk', '.........', '.........'],
+  trophy: ['kkkkkkkkk', 'kYyyyyyok', 'kYyyyyyok', '.kyyyyok.', '..kyyok..', '...kyk...', '..kkykk..', '.kyyyyok.', '.kkkkkkk.'],
+  // 跳台（木头斜坡 + 冲过去的风线）：成就「坡道飞驰」
+  ramp: ['.........', '.......kk', 'CC...kkbk', '...kkbbbk', 'CCkbbbbbk', '.kbbbbbBk', 'kkkkkkkkk', '.........', '.........'],
+  // 魔晶（只给魔晶用）：价格按钮、魔晶小签、菜单和结算里的魔晶。11×10（不是 9×9）：就是 META 原来那颗带白色高光面的魔晶，
+  // 框的大小由 .kmGem 给（11 × --ip 宽、10 × --ip 高）
+  gem: ['...kkkkk...', '..kwwPPpk..', '.kwPPPpppk.', 'kpppppppppk', 'kPPPPpppvvk', '.kPPPppvvk.', '..kPPpvvk..', '...kPpvk...', '....kvk....', '.....k.....']
+};
+// 不是 9×9 的图标另加的 class（kit.css 按图的格数给框的大小）
+Kit.ICON_CLS = { gem: 'kmGem' };
+// 字符画 → SVG（同一种颜色合成一条 path，crispEdges 不糊边）
+Kit.svgRows = function (rows, cls) {
+  var paths = {}, x, y, w = rows[0].length;
+  for (y = 0; y < rows.length; y++) {
+    for (x = 0; x < rows[y].length; x++) {
+      var ch = rows[y][x];
+      if (ch !== '.') paths[ch] = (paths[ch] || '') + 'M' + x + ' ' + y + 'h1v1h-1z';
+    }
+  }
+  var s = '<svg' + (cls ? ' class="' + cls + '"' : '') + ' viewBox="0 0 ' + w + ' ' + rows.length + '" shape-rendering="crispEdges" aria-hidden="true">';
+  for (var c in paths) s += '<path class="' + c + '" d="' + paths[c] + '"/>';
+  return s + '</svg>';
+};
+Kit.svgCache = {};
+// → <i class="kmIco kmPx"><svg …></i>；不认识的名字返回 null
+Kit.icon = function (name) {
+  var rows = Kit.ICONS[name];
+  if (!rows) return null;
+  if (!Kit.svgCache[name]) Kit.svgCache[name] = Kit.svgRows(rows);
+  var i = Kit.el('i', 'kmIco kmPx' + (Kit.ICON_CLS[name] ? ' ' + Kit.ICON_CLS[name] : ''));
+  i.innerHTML = Kit.svgCache[name];
+  return i;
+};
+
+// ---------------- 公告的样子：文字公告、燕尾横幅（只建元素，不管放在哪） ----------------
+// 文字公告：o = { role: 'gold'|'red'|'org'|'cya', big, kick, title, sub, icon }
+// 小标签（18，浅色）→ 标题（24，大的 36）→ 一行说明（18，白）；图标放在第一行前面
+Kit.callout = function (o) {
+  o = o || {};
+  var a = Kit.el('div', 'kmAnn kmCall r-' + Kit.role(o.role) + (o.big ? ' big' : ''));
+  var ic = o.icon ? Kit.icon(o.icon) : null;
+  if (o.kick) {
+    var k = Kit.el('div', 'kmKick');
+    if (ic) { k.appendChild(ic); ic = null; }
+    k.appendChild(Kit.el('span', '', o.kick));
+    a.appendChild(k);
+  }
+  var t = Kit.el('div', 'kmCT');
+  if (ic) t.appendChild(ic);
+  t.appendChild(Kit.el('span', '', o.title || ''));
+  a.appendChild(t);
+  if (o.sub) a.appendChild(Kit.el('div', 'kmCS', o.sub));
+  return a;
+};
+// 横幅两头的燕尾：字符画，一格 = --u 像素；n = 横幅中间的行数（m 12 行，l / xl 16 行）
+Kit.capCache = {};
+Kit.capRows = function (n) {
+  var R = n + 5, rows = [], x, y, mid = (n + 5) / 2, half = (n - 1) / 2;
+  for (y = 0; y < R; y++) rows.push('........'.split(''));
+  for (x = 0; x < 8; x++) { rows[2][x] = 'k'; rows[n + 3][x] = 'k'; }
+  for (y = 3; y <= n + 2; y++) {
+    var c = Math.max(0, Math.min(3, Math.round(3 * (1 - Math.abs(y - mid) / half))));
+    rows[y][c] = 'k';
+    for (x = c + 1; x < 8; x++) rows[y][x] = y === 3 ? 'm' : 'd';
+  }
+  rows[n + 2][6] = 'f'; rows[n + 2][7] = 'f';
+  // 硬投影：往下错一行，半透明黑
+  for (y = R - 1; y >= 1; y--) for (x = 0; x < 8; x++) if (rows[y][x] === '.' && rows[y - 1][x] !== '.' && rows[y - 1][x] !== 's') rows[y][x] = 's';
+  return rows.map(function (r) { return r.join(''); });
+};
+Kit.cap = function (n, side) {
+  if (!Kit.capCache[n]) Kit.capCache[n] = Kit.svgRows(Kit.capRows(n), 'kmCap');
+  return Kit.capCache[n].replace('class="kmCap"', 'class="kmCap ' + side + '"');
+};
+Kit.RIB_N = { m: 12, l: 16, xl: 16 };
+// 横幅：o = { role, size: 'm'|'l'|'xl', tab, title, sub, icon }（黑边、上一行亮色、两色深蓝、下一行暗色、1 格硬投影、燕尾）
+Kit.ribbon = function (o) {
+  o = o || {};
+  var size = Kit.RIB_N[o.size] ? o.size : 'm', n = Kit.RIB_N[size];
+  var a = Kit.el('div', 'kmAnn kmRibA r-' + Kit.role(o.role) + ' s-' + size);
+  if (o.tab) a.appendChild(Kit.el('div', 'kmTab', o.tab));
+  var w = Kit.el('div', 'kmRibWrap');
+  w.insertAdjacentHTML('beforeend', Kit.cap(n, 'l'));
+  var rib = Kit.el('div', 'kmRib');
+  var ic = o.icon ? Kit.icon(o.icon) : null;
+  if (ic) rib.appendChild(ic);
+  rib.appendChild(Kit.el('span', 'kmTitle', o.title || ''));
+  w.appendChild(rib);
+  w.insertAdjacentHTML('beforeend', Kit.cap(n, 'r'));
+  a.appendChild(w);
+  if (o.sub) a.appendChild(Kit.el('div', 'kmSub', o.sub));
+  return a;
+};
+// 过场的大横幅（Boss 出场、阵亡、通关）：屏幕够大用 xl，小屏用 l
+Kit.heroSize = function () { return Math.min(window.innerWidth, window.innerHeight) >= 700 ? 'xl' : 'l'; };
+
+// ---------------- 局内公告：一次一条 ----------------
+// cur：正在显示的 { el, prio, key, out, h }；q：排队的 { o, prio, h }；gen：Kit.annClear 一次加 1（之前的定时任务都作废）
+Kit.ann = { cur: null, q: [], gen: 0, top: -1 };
+Kit.ANN_Q = 2;        // 最多排几条
+Kit.ANN_WAIT = 5;     // 排队最多等几秒（游戏时间），过了就扔掉
+Kit.feel = function () { return typeof Feel !== 'undefined' && Feel && typeof Feel.later === 'function' ? Feel : null; };
+// 定时：有 FEEL 时用它的游戏钟（暂停、升级 / 宝箱弹窗打开时停住）；ui 为真的是收尾（退场动画），什么时候都走。
+// 返回 FEEL 的定时任务（Kit.lost 用它看 FEEL 有没有把任务清掉，比如 Feel.reset），没有 FEEL 时返回 null
+Kit.after = function (sec, fn, ui) {
+  var gen = Kit.ann.gen, run = function () { if (gen === Kit.ann.gen) fn(); };
+  var F = Kit.feel();
+  if (!F) { setTimeout(run, sec * 1000); return null; }
+  var T = F.timers, n = T ? T.length : -1;
+  F.later(sec, run, 'kitAnn', !!ui);
+  return T && T.length === n + 1 ? T[n] : null;
+};
+Kit.lost = function (h) { var F = Kit.feel(); return !!(h && F && F.timers && F.timers.indexOf(h) < 0); };
+// 公告层：放在 #hud 外面（过场藏 HUD 时公告不跟着动），z-index 7，不挡点击
+Kit.layer = function () {
+  var L = document.getElementById('annLayer');
+  if (!L && document.body) {
+    L = Kit.el('div');
+    L.id = 'annLayer';
+    L.setAttribute('aria-live', 'polite');
+    document.body.appendChild(L);
+  }
+  return L;
+};
+// o = { look: 'call'|'rib', role, big, size, kick, tab, title, sub, icon, life（秒，默认 2.4）, prio（1 小事，2 关卡，3 Boss / 虫潮 / 关卡完成）, key（同一件事不重复） }
+// 返回显示出来的元素；排队了或者重复了返回 null
+Kit.announce = function (o) {
+  o = o || {};
+  if (!Kit.layer()) return null;
+  var A = Kit.ann, prio = o.prio || 1, i;
+  // 当前那条的计时被清掉了（FEEL 重置了定时任务）：说明换局了，旧的全部收掉
+  if (A.cur && !A.cur.out && Kit.lost(A.cur.h)) Kit.annClear();
+  var cur = A.cur && !A.cur.out ? A.cur : null;
+  if (o.key != null) {
+    if (cur && cur.key === o.key) return null;
+    for (i = A.q.length - 1; i >= 0; i--) if (A.q[i].o.key === o.key) A.q.splice(i, 1);
+  }
+  if (cur && prio < cur.prio) { Kit.annQueue(o, prio); return null; }
+  if (cur) {
+    // 两条差不多同时来（FEEL 的和 CONTENT 的在同一刻，前一条才出来、还没看清）：前一条回到队里，等新的这条放完再出来。
+    // 大时刻（3：Boss 第二阶段、关卡完成、最终虫潮）被另一个大时刻顶掉就不回来了：新的已经盖过它（比如 Boss 刚暴怒就被打倒）
+    if (cur.prio < 3 && Kit.annAge(cur) < Kit.ANN_JOIN) Kit.annQueue(cur.o, cur.prio, true);
+    Kit.annOut(cur, true);
+  }
+  return Kit.annShow(o, prio);
+};
+Kit.ANN_JOIN = 0.6;   // 前一条出来不到这么久（秒，游戏时间）就被顶掉，算“同时来的”
+// 这条已经显示了多久（游戏时间）
+Kit.annAge = function (rec) {
+  if (rec.h && typeof rec.h.t === 'number') return rec.life - rec.h.t;
+  return (Date.now() - rec.t0) / 1000;
+};
+// front：放在同样优先级的前面（被顶掉放回来的那条先出来）
+Kit.annQueue = function (o, prio, front) {
+  var A = Kit.ann, e = { o: o, prio: prio };
+  if (A.q.length >= Kit.ANN_Q) {
+    // 满了：扔掉最低、最早的那条；新的比排着的都低就不排了
+    var lo = 0;
+    for (var i = 1; i < A.q.length; i++) if (A.q[i].prio < A.q[lo].prio) lo = i;
+    if (A.q[lo].prio > prio) return;
+    A.q.splice(lo, 1);
+  }
+  if (front) A.q.unshift(e); else A.q.push(e);
+  e.h = Kit.after(Kit.ANN_WAIT, function () { var k = A.q.indexOf(e); if (k >= 0) A.q.splice(k, 1); });
+};
+Kit.annShow = function (o, prio) {
+  var L = Kit.layer(), a = o.look === 'rib' ? Kit.ribbon(o) : Kit.callout(o);
+  var rec = { el: a, o: o, prio: prio, key: o.key != null ? o.key : null, out: false, h: null, life: o.life || 2.4, t0: Date.now() };
+  // 画面上一次只有一条：还在退场的那条马上拿掉，不和新的叠在一起
+  L.textContent = '';
+  L.appendChild(a);
+  Kit.ann.cur = rec;
+  Kit.annPlace();
+  rec.h = Kit.after(rec.life, function () { Kit.annOut(rec); });
+  return a;
+};
+// 一件事已经不成立了（比如随机事件被 Boss 战、虫潮打断）：它的公告从队里拿掉，正在显示的也收起来
+Kit.annDrop = function (key) {
+  var A = Kit.ann;
+  if (key == null) return;
+  for (var i = A.q.length - 1; i >= 0; i--) if (A.q[i].o.key === key) A.q.splice(i, 1);
+  if (A.cur && !A.cur.out && A.cur.key === key) Kit.annOut(A.cur);
+};
+// 退场：加 .out（0.15 秒的退场动画），0.16 秒后拿掉；replaced 为真是被新的顶掉（不从队里拿下一条）
+Kit.annOut = function (rec, replaced) {
+  if (!rec || rec.out) return;
+  var A = Kit.ann;
+  rec.out = true;
+  rec.el.classList.add('out');
+  Kit.after(0.16, function () {
+    if (rec.el.parentNode) rec.el.parentNode.removeChild(rec.el);
+    if (!A.cur) Kit.annPlace();
+  }, true);
+  if (A.cur !== rec) return;
+  A.cur = null;
+  if (replaced) return;
+  // 队里优先级最高（一样高的取最早）的下一条，等这条退场完再出来
+  var best = -1;
+  for (var i = 0; i < A.q.length; i++) if (best < 0 || A.q[i].prio > A.q[best].prio) best = i;
+  if (best < 0) return;
+  var nx = A.q.splice(best, 1)[0];
+  Kit.after(0.18, function () { if (A.cur) Kit.announce(nx.o); else Kit.annShow(nx.o, nx.prio); }, true);
+};
+// 换关、重开、回菜单：马上全部清掉（没有退场动画）
+Kit.annClear = function () {
+  var A = Kit.ann, F = Kit.feel();
+  A.gen++;
+  A.q.length = 0;
+  A.cur = null;
+  if (F && typeof F.cancel === 'function') F.cancel('kitAnn');
+  var L = document.getElementById('annLayer');
+  if (L) L.textContent = '';
+  Kit.annPlace();
+};
+// 位置：正上方那一列（#topCenter：倒计时 → 关卡名 → Boss 血条 → 占领进度条）的下沿 + 12 像素，至少 84 像素；
+// 公告的下沿写进 #hud 的 --kmAnnB，提示文字（#toasts）排在它下面。#topCenter 大小变了（ResizeObserver）、窗口变了都重新放
+Kit.annPlace = function () {
+  var L = document.getElementById('annLayer'), hud = document.getElementById('hud'), tc = document.getElementById('topCenter');
+  if (!L) return;
+  var bottom = 0, r = tc ? tc.getBoundingClientRect() : null;
+  if (r && r.height > 0) bottom = r.bottom;
+  else if (hud) bottom = parseFloat(hud.style.getPropertyValue('--tcBottom')) || 0;   // HUD 没显示（菜单里）：用 ui.js 上次量的
+  var top = Math.round(Math.max(bottom + 12, 84));
+  if (Kit.ann.top !== top) { Kit.ann.top = top; L.style.top = top + 'px'; }
+  if (!hud) return;
+  var cur = Kit.ann.cur;
+  if (cur && cur.el.isConnected) hud.style.setProperty('--kmAnnB', Math.round(top + cur.el.getBoundingClientRect().height) + 'px');
+  else hud.style.removeProperty('--kmAnnB');
+};
+(function () {
+  var tc = document.getElementById('topCenter');
+  try { if (tc && window.ResizeObserver) new ResizeObserver(function () { Kit.annPlace(); }).observe(tc); } catch (e) { /* 老浏览器：只在显示公告和窗口变化时放 */ }
+  window.addEventListener('resize', function () { Kit.annPlace(); });
+})();
+
+// ---------------- 小部件 ----------------
+// 提示文字（ui.js 的 UI.toast）：颜色可以写用途名（gold / red / org / cya，还有 goldL / redL / orgL / cyaL / gem）或者颜色值；
+// 9 个字以内 24 号，长的 18 号（UI.toast 自己加 .kmLong）。返回提示文字的元素
+Kit.toast = function (text, c) { return UI.toast(text, Kit.color(c)); };
+// 一串并列的东西（奖励「武器「…」、魔典「…」」）：每一项是一个不在中间折行的小块（.kmNb），只在「、」后面换行
+// （不会折成「…、魔 / 典「…」」）；一项比一行还长时才在它里面折行。sep 接在每一项后面（最后一项不接）
+Kit.parts = function (el, list, sep) {
+  for (var i = 0; i < list.length; i++) el.appendChild(Kit.el('span', 'kmNb', list[i] + (i < list.length - 1 ? sep : '')));
+  return el;
+};
+// 一行说明按短语排（窄卡片里不会折成「…剑 / 气」「5 / 米」「攻速 / +25%」「… / · 范围」）：只在「，；：。、！？」后面、「 · 」后面、
+// 汉字和后面的数字之间、英文词和后面的汉字之间换行，每一段是一个 .kmNb；一段比一行还长时才在它里面折行。字不变（textContent 一样）
+Kit.phrase = function (el, t) {
+  t = t == null ? '' : String(t);
+  el.textContent = '';
+  var u = '', i, c, n, pv;
+  var cut = function (sep) {
+    if (u) el.appendChild(Kit.el('span', 'kmNb', u));
+    if (sep) el.appendChild(document.createTextNode(sep));
+    u = '';
+  };
+  for (i = 0; i < t.length; i++) {
+    c = t.charAt(i); n = t.charAt(i + 1); pv = t.charAt(i - 1);
+    if (c === ' ' && (pv === '·' || (/[㐀-鿿]/.test(pv) && /[0-9]/.test(n)) || (/[A-Za-z]/.test(pv) && /[㐀-鿿]/.test(n)))) { cut(' '); continue; }
+    u += c;
+    if ('，；：。、！？'.indexOf(c) >= 0 && n) cut('');
+  }
+  cut('');
+  return el;
+};
+// 局内小签（成就达成 / 魔晶提示，放进 #metaToasts）：o = { kind: 'ach'|'note', tab, name, reward（字，或者几项奖励的数组：用 Kit.parts 排）, icon（图标名或元素） }
+// 根元素也带 .mToast：meta.js 的排队、清空照样找得到；进出场：加 .out 是退场
+Kit.slip = function (o) {
+  o = o || {};
+  var note = o.kind === 'note', d = Kit.el('div', 'kmSlip mToast' + (note ? ' note' : ''));
+  var ic = o.icon && o.icon.nodeType ? o.icon : Kit.icon(o.icon || (note ? 'gem' : 'trophy'));
+  if (ic) d.appendChild(ic);
+  var tx = Kit.el('div', 'kmSlipTx'), tab = o.tab != null ? o.tab : (note ? '' : '成就达成');
+  if (tab) tx.appendChild(Kit.el('div', 'kmSlipTab', tab));
+  if (o.name) tx.appendChild(Kit.el('div', 'kmSlipN', o.name));
+  if (o.reward && o.reward.length) tx.appendChild(Array.isArray(o.reward) ? Kit.parts(Kit.el('div', 'kmSlipR'), o.reward, '、') : Kit.el('div', 'kmSlipR', o.reward));
+  d.appendChild(tx);
+  return d;
+};
+// 像素按钮：o = { label, kind: ''|'main'|'danger'|'price', gem（价格前面画魔晶，默认画）, price, small（44 像素高的紧凑按钮）, act（data-act）,
+//                 disabled, after（价格后面的字，比如「 · 还差 260」）, cls（另加的 class） }
+// 价格按钮：「解锁骑士 ◆600」深蓝底、魔晶数字是魔晶色；钱不够时 disabled
+Kit.BTN = { main: 'main', danger: 'danger', price: 'kmPrice' };
+Kit.button = function (o) {
+  o = o || {};
+  var cls = 'sbtn' + (Kit.BTN[o.kind] ? ' ' + Kit.BTN[o.kind] : '') + (o.price != null && o.kind !== 'price' ? ' kmPrice' : '') + (o.small ? ' kmSmall' : '') + (o.cls ? ' ' + o.cls : '');
+  var b = Kit.el('button', cls);
+  b.type = 'button';
+  if (o.act) b.dataset.act = o.act;
+  if (o.label) b.appendChild(o.price != null ? Kit.el('span', '', o.label) : document.createTextNode(o.label));
+  if (o.price != null) {
+    if (o.gem !== false) b.appendChild(Kit.icon('gem'));
+    b.appendChild(Kit.el('b', 'kmGemN', Kit.num(o.price)));
+  }
+  if (o.after) b.appendChild(Kit.el('span', '', o.after));
+  // 价格按钮的字是居中的：字、数字、后面的字加起来是奇数个字体像素宽时，最后一块右边补 1 个字体像素（.kmOddFp）
+  if (o.price != null && (Kit.fpw(o.label) + Kit.fpw(Kit.num(o.price), true) + Kit.fpw(o.after)) % 2) b.lastChild.classList.add('kmOddFp');
+  if (o.disabled) b.disabled = true;
+  return b;
+};
+// 小签（「新」「已完成」）：12 号深色字、用途色底、2 像素黑圈
+Kit.tag = function (text, role) { return Kit.el('span', 'kmTag r-' + Kit.role(role), text); };
+// 进度条：o = { v, max, thin（列表行底下 8 像素的细条，数字写在别处）, done（完成 = 绿；不写就看 v ≥ max）, text（条里的字，默认 v/max） }
+Kit.bar = function (o) {
+  o = o || {};
+  var max = o.max > 0 ? o.max : 1, v = Math.max(0, Math.min(max, +o.v || 0)), done = o.done != null ? !!o.done : v >= max;
+  var b = Kit.el('div', 'kmBar' + (o.thin ? ' thin' : '') + (done ? ' done' : ''));
+  var f = Kit.el('i');
+  f.style.width = Math.round(v / max * 1000) / 10 + '%';
+  b.appendChild(f);
+  if (!o.thin) b.appendChild(Kit.el('span', '', o.text != null ? o.text : Kit.num(v) + '/' + Kit.num(max)));
+  return b;
+};
+// 颜色往白提亮一点（太暗的颜色在深底上看不清）：0xRRGGBB 或 '#rrggbb' / '#rgb' → 'rgb(…)'
+Kit.lift = function (c) {
+  if (typeof c === 'string') {
+    var m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c.trim());
+    if (!m) return c;
+    var h = m[1].length === 3 ? m[1].replace(/(.)/g, '$1$1') : m[1];
+    c = parseInt(h, 16);
+  }
+  c = c == null ? 0x888888 : c >>> 0;
+  var rr = (c >> 16) & 255, gg = (c >> 8) & 255, bb = c & 255;
+  var k = (0.299 * rr + 0.587 * gg + 0.114 * bb) / 255 < 0.45 ? 0.45 : 0;
+  return 'rgb(' + Math.round(rr + (255 - rr) * k) + ',' + Math.round(gg + (255 - gg) * k) + ',' + Math.round(bb + (255 - bb) * k) + ')';
+};
+// 符文砖：没有 3D 图标、只能显示一个字的图块（「神」「抽」「跳」……）：深色底 + 彩色的字 + 同色 2 像素内框（不要亮色平涂方块配白字）
+Kit.glyphTile = function (tile, glyph, color) {
+  if (!tile) return tile;
+  tile.textContent = glyph != null ? String(glyph) : '';
+  tile.classList.remove('hasIcon');
+  tile.classList.add('kmGlyph');
+  tile.style.backgroundColor = '';
+  tile.style.setProperty('--gc', Kit.lift(color));
+  return tile;
+};

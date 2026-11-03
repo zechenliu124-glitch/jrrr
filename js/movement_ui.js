@@ -6,14 +6,15 @@
 // ============================================================
 var MoveUI = { showSpeed: false, KEY: 'knight_magic_settings', shownV: -1, shownTier: -1 };
 
-// 坐骑特性说明（RIDES[角色].twist.kind）
+// 坐骑特性说明（RIDES[角色].twist.kind）：主菜单介绍里「坐骑特性」那一行的内容。说规则（坐骑本身的样子写在 rides.js 的 desc），
+// 一行放得下（约 24 个字）：锁住的骑士介绍里还有解锁条件，横屏面板要在 800 像素以内
 MoveUI.TWIST_TEXT = {
-  board: '坐骑特性：一直按住滑铲就能一直滑；转动视角压弯会加速；空中踩着滑板继续加速',
-  hover: '坐骑特性：离地悬空滑行，摩擦更小、上坡减速减半；滑铲时放电积蓄翻倍',
-  dive: '坐骑特性：空中按住滑铲俯冲，落地把冲击变成往前冲的速度',
-  shadow: '坐骑特性：滑铲时闪避大幅提高',
-  frost: '坐骑特性：高速滑铲时身后结出薄冰，冻住踩上去的敌人',
-  moon: '坐骑特性：空中按住滑铲，下落变慢'
+  board: '按住滑铲一直滑 · 转视角压弯加速 · 空中继续加速',
+  hover: '离地悬空：摩擦更小，上坡减速减半，放电积蓄翻倍',
+  dive: '空中按住滑铲俯冲，落地把冲击变成往前冲的速度',
+  shadow: '滑铲时闪避大幅提高',
+  frost: '高速滑铲时身后结出薄冰，冻住踩上去的敌人',
+  moon: '空中按住滑铲，下落变慢'
 };
 
 // 摔落伤害倍率 → 角色属性里的一句话
@@ -27,25 +28,26 @@ MoveUI.fallText = function (k) {
 MoveUI.tier = function (v) { return v < 15 ? 0 : v <= 30 ? 1 : 2; };
 MoveUI.TIER_COLORS = ['#ffffff', '#7ef0ff', '#ffc928'];
 
+// 样式只写布局、字号和颜色变量（style.css）；像素按钮、勾选框、「选中」的样子在 css/kit.css（.mvOpts button、.mvBox）
 MoveUI.CSS = [
-  '#speedText { font-family: var(--font-mix); font-weight: 800; font-size: 18px; line-height: 1.2; color: #fff; text-shadow: var(--ol1), 0 2px 0 #000; white-space: nowrap; }',
-  '.mvSet { margin-top: 8px; cursor: pointer; }',
+  // 左下角的速度读数：18 号描边字（画面上的字）
+  '#speedText { font-size: var(--fs-m); line-height: 24px; color: #fff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; white-space: nowrap; }',
+  '.mvSet { margin-top: 9px; cursor: pointer; }',
+  // 触屏：每一行都是 44 像素高的触控区（行和行之间不再空 9 像素，44 像素里本来就有上下的空）
+  'body.touch .mvSet { min-height: 44px; margin-top: 0; }',
   '.mvSet input[type=checkbox] { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }',
-  '.mvBox { flex: none; width: 22px; height: 22px; border: 2px solid #000; background: #0b1020; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); position: relative; }',
-  '.mvSet input:checked + .mvBox { background: var(--accent, #ffd84a); box-shadow: inset 0 -4px 0 #b88f12; }',
-  '.mvSet input:checked + .mvBox::after { content: ""; position: absolute; left: 6px; top: 1px; width: 5px; height: 11px; border: solid #000; border-width: 0 3px 3px 0; transform: rotate(45deg); }',
+  // 勾选框和勾上时的像素勾在 kit.css
+  '.mvBox { flex: none; position: relative; }',
   '.mvSet input:focus-visible + .mvBox { outline: 2px solid #fff; outline-offset: 2px; }',
   '.mvTouch { display: none; flex-wrap: wrap; cursor: default; }',
   'body.touch .mvTouch { display: flex; }',
+  // 滑铲按钮方式：两个 44 像素高的方块按钮，选中的是金框金字
   '.mvOpts { display: inline-flex; gap: 6px; }',
-  '.mvOpts button { min-height: 40px; padding: 4px 12px; border: 3px solid #000; border-radius: 0; background: var(--panel2, #1a2542); color: #fff; font-weight: 800; font-size: 15px; text-shadow: var(--ol1); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.16), inset 0 -3px 0 rgba(0, 0, 0, 0.35), 0 3px 0 #000; cursor: pointer; touch-action: manipulation; }',
-  '.mvOpts button.sel { background: #b8860f; }',
-  '.mvOpts button:active { transform: translateY(2px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.16), 0 1px 0 #000; }',
-  // 触屏滑铲键“保持”中：亮蓝色 + 外圈发光，一眼看出滑铲还按着
-  '#touchBtns #btnSlide.on { background: #3f95ff; box-shadow: inset 0 5px 0 rgba(255, 255, 255, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.3), 0 1px 0 #000, 0 0 0 4px #bff0ff, 0 0 20px 6px rgba(127, 220, 255, 0.8); }',
-  '.cdRide { color: #cfe8ff; }',
-  '.cdRide .cdRideDesc { color: var(--muted, #a9b6d3); font-size: 13px; }',
-  '.cdTwist { font-size: 13px; color: #9fe8ff; }'
+  '.mvOpts button { min-height: 44px; padding: 6px 12px; background-color: var(--panel2); color: #fff; font-size: var(--fs-m); line-height: 24px; cursor: pointer; touch-action: manipulation; }',
+  // 触屏滑铲键“保持”中：亮蓝色 + 一圈浅蓝硬边，一眼看出滑铲还按着
+  '#touchBtns #btnSlide.on { background: #3f95ff; box-shadow: inset 0 5px 0 rgba(255, 255, 255, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.3), 0 1px 0 #000, 0 0 0 4px #bff0ff, 0 0 0 6px #000; }',
+  // 主菜单介绍：坐骑特性一行是浅青色
+  '.cdTwist .kmV { color: #9fe8ff; }'
 ].join('\n');
 
 // ---------------- 设置存取：包装 UI.saveSettings / UI.loadSettings（和 pace.js 一样） ----------------
@@ -147,30 +149,24 @@ MoveUI.update = function () {
   if (t !== MoveUI.shownTier) { MoveUI.shownTier = t; el.style.color = MoveUI.TIER_COLORS[t]; }
 };
 
-// 主菜单角色介绍：被动下面加「滑铲：坐骑 —— 说明」和坐骑特性；属性里加摔落伤害
+// 主菜单角色介绍（ui.js 的 UI.descRow：左边灰色标签、右边内容）：被动下面加「滑铲｜坐骑 · 说明」和「坐骑特性」；属性里加摔落伤害
 MoveUI.menuText = function () {
   var id = UI.selected, c = CHARACTERS[id], box = document.getElementById('charDesc');
   if (!c || !box) return;
   var stats = box.querySelector('.cdStats');
   var ft = MoveUI.fallText(c.fall);
-  if (ft && stats) stats.textContent = stats.textContent ? stats.textContent + '，' + ft : '属性：' + ft;
+  var sv = stats && stats.querySelector('.kmV');
+  if (ft && sv) { sv.textContent = sv.textContent ? sv.textContent + '，' + ft : ft; stats.classList.remove('hidden'); }
   var ride = typeof RIDES !== 'undefined' && RIDES[id];
   if (!ride || !ride.name) return;
-  var d = document.createElement('div');
-  d.className = 'cdRide';
-  d.textContent = '滑铲：' + ride.name;
+  var d = UI.descRow('滑铲', ride.name, 'cdRide');
   if (ride.desc) {
     var ds = document.createElement('span');
     ds.className = 'cdRideDesc';
-    ds.textContent = ' —— ' + ride.desc;
-    d.appendChild(ds);
+    ds.textContent = ' · ' + ride.desc;
+    d.querySelector('.kmV').appendChild(ds);
   }
   box.insertBefore(d, stats || null);
   var tw = ride.twist && MoveUI.TWIST_TEXT[ride.twist.kind];
-  if (tw) {
-    var t = document.createElement('div');
-    t.className = 'cdTwist';
-    t.textContent = tw;
-    box.insertBefore(t, stats || null);
-  }
+  if (tw) box.insertBefore(UI.descRow('坐骑特性', tw, 'cdTwist'), stats || null);
 };

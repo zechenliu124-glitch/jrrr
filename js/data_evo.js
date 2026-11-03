@@ -10,15 +10,16 @@ var EVO_REQ = { level: 8, tome: 2 };
 var EVO_BONUS = { damage: 1.6, count: 1, size: 1.25, cd: 0.8 };
 
 // 命中特性（只对超武生效；特性打出的伤害不会再触发特性）
+// desc 显示在觉醒卡片上（局内）：不用括号，数字用「 · 」接在后面（docs/knight-magic/design/UI_STYLE.md §8.2）
 var EVO_TRAITS = {
   burn: { name: '燃烧', desc: '命中时点燃敌人，每秒 40% 伤害，持续 2 秒' },
-  chain: { name: '连锁闪电', desc: '25% 几率放出闪电，劈中附近 2 个敌人（50% 伤害）' },
-  nova: { name: '圣光新星', desc: '每命中 8 次释放圣光爆发（5 米，120% 伤害）' },
+  chain: { name: '连锁闪电', desc: '25% 几率放出闪电，劈中附近 2 个敌人 · 50% 伤害' },
+  nova: { name: '圣光新星', desc: '每命中 8 次爆发 5 米圣光 · 120% 伤害' },
   freeze: { name: '冰封', desc: '12% 几率冻住敌人 1.2 秒；已冻住的敌人会被冻裂，再受一次伤害' },
   execute: { name: '斩杀', desc: '生命低于 12% 的非 Boss 敌人直接毙命' },
   leech: { name: '吸血', desc: '8% 几率回复 2 点生命' },
   gold: { name: '点金', desc: '击杀的敌人额外掉落金币' },
-  split: { name: '分裂', desc: '弹丸命中时分裂出 2 枚碎片（35% 伤害）' },
+  split: { name: '分裂', desc: '弹丸命中时分裂出 2 枚碎片 · 35% 伤害' },
   stun: { name: '眩晕', desc: '10% 几率击晕敌人 0.6 秒' },
   mark: { name: '标记', desc: '20% 几率标记敌人 4 秒，被标记的敌人受到双倍伤害' }
 };
@@ -38,9 +39,9 @@ var EVO = {
   katana: { tome: 'agi', name: '疾风细剑', icon: '疾', color: 0xffb0a0, over: { back: true }, traits: ['leech'], text: '同时向前后两边斩击' },
   tornado: { tome: 'pspd', name: '天灾飓风', icon: '灾', color: 0xfff6d8, stats: { count: 1 }, traits: ['chain'], text: '龙卷风再 +1' },
   dagger: { tome: 'cd', name: '影舞飞刃', icon: '影', color: 0xe0ffc0, stats: { bounces: 2 }, traits: ['execute'], text: '匕首弹射 +2 次' },
-  sniper: { tome: 'dmg', name: '攻城巨弩', icon: '攻', color: 0xe8b060, over: { explode: true, blast: 2.6 }, traits: ['mark'], text: '重弩箭命中后爆炸（约 3.3 米）' },
+  sniper: { tome: 'dmg', name: '攻城巨弩', icon: '攻', color: 0xe8b060, over: { explode: true, blast: 2.6 }, traits: ['mark'], text: '重弩箭命中后爆炸，范围约 3.3 米' },
   blackhole: { tome: 'size', name: '虚空奇点', icon: '虚', color: 0xc59aff, over: { range: 4.2 }, traits: ['execute'], text: '黑洞范围 +40%' },
-  dexe: { tome: 'cursed', name: '断头巨刃', icon: '断', color: 0xffe6b0, over: { execute: 0.06 }, traits: ['gold'], text: '处决几率 ×3（6%）' },
+  dexe: { tome: 'cursed', name: '断头巨刃', icon: '断', color: 0xffe6b0, over: { execute: 0.06 }, traits: ['gold'], text: '处决几率 ×3，达到 6%' },
   bloodmagic: { tome: 'blood', name: '血月秘法', icon: '月', color: 0xff5a6a, stats: { count: 1 }, traits: ['leech'], text: '血球再 +1' },
   frost: { tome: 'shield', name: '永冬领域', icon: '冬', color: 0xe0f8ff, over: { range: 5.5 }, traits: ['freeze'], text: '冰霜范围 +30%' },
   poison: { tome: 'evade', name: '瘟疫之源', icon: '瘟', color: 0xc8ff6a, over: { range: 3.7, burnColor: 0x9dff4a }, traits: ['burn'], text: '毒云更大，中毒的敌人持续溃烂' },

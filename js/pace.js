@@ -40,15 +40,13 @@ Pace.setMinutes = function (m) {
 })();
 
 // ---------------- 主菜单：关卡时长选择 ----------------
+// 只写布局、字号和颜色变量；方块像素按钮（缺角黑边、斜面、按下去、选中 = 金框金字）的样子在 css/kit.css
 Pace.CSS = [
-  '#paceSetting { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }',
-  '#paceSetting .paceLabel { font-family: var(--font-cn, sans-serif); font-size: 18px; color: var(--paper, #fff7e6); text-shadow: 0 2px 0 var(--line, #0b0714); }',
+  '#paceSetting { display: flex; align-items: center; justify-content: center; gap: 9px; flex-wrap: wrap; }',
+  '#paceSetting .paceLabel { font-size: var(--fs-m); color: var(--muted); }',
   '#paceSetting .paceOpts { display: flex; gap: 6px; }',
-  '#paceSetting .paceBtn { font-family: var(--font-cn, sans-serif); font-size: 17px; min-height: 44px; min-width: 86px; padding: 6px 12px; border-radius: 10px;',
-  '  border: 3px solid var(--line, #0b0714); background: var(--panel, #241a3a); color: var(--paper, #fff7e6); box-shadow: 0 3px 0 var(--line, #0b0714); cursor: pointer; touch-action: manipulation; }',
-  '#paceSetting .paceBtn.sel { background: var(--panel2, #33264f); border-color: var(--accent, #ffd84a); color: var(--accent, #ffd84a); box-shadow: 0 3px 0 var(--line, #0b0714), 0 0 12px rgba(255, 216, 74, 0.55); }',
-  '#paceSetting .paceBtn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line, #0b0714); }',
-  '#paceSetting .paceHint { flex-basis: 100%; font-size: 13px; color: var(--muted, #b9a9d9); }',
+  '#paceSetting .paceBtn { min-height: 44px; min-width: 86px; padding: 6px 12px; background-color: var(--panel2); color: #fff; font-size: var(--fs-m); line-height: 24px; cursor: pointer; touch-action: manipulation; }',
+  '#paceSetting .paceHint { flex-basis: 100%; font-size: var(--fs-s); line-height: 18px; color: var(--muted); }',
   '@media (max-height: 700px) and (orientation: landscape) { #paceSetting .paceHint { display: none; } #paceSetting .paceBtn { min-height: 40px; } }'
 ].join('\n');
 

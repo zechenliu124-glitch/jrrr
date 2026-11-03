@@ -112,7 +112,7 @@ window.addEventListener('keydown', function (e) {
   if (e.code === 'KeyR' && !e.repeat && Game.state === 'menu') Game.menuRideHold = !Game.menuRideHold;
 });
 
-// 角色说明里加一行滑铲坐骑（名字 —— 说明）；别的文件已经加过 .cdRide 这一行就不重复加
+// 角色说明里加一行滑铲坐骑（「滑铲｜名字 · 说明」，ui.js 的 UI.descRow）；别的文件已经加过 .cdRide 这一行就不重复加
 (function () {
   if (typeof UI === 'undefined' || !UI.buildMenu) return;
   var build = UI.buildMenu;
@@ -120,9 +120,7 @@ window.addEventListener('keydown', function (e) {
     var r = build.apply(this, arguments);
     var rd = typeof RIDES !== 'undefined' && RIDES[UI.selected], box = document.getElementById('charDesc');
     if (rd && box && !box.querySelector('.cdRide')) {
-      var line = document.createElement('div');
-      line.className = 'cdRide';
-      line.textContent = '滑铲坐骑：' + rd.name + ' —— ' + rd.desc;
+      var line = UI.descRow('滑铲', rd.name + (rd.desc ? ' · ' + rd.desc : ''), 'cdRide');
       var stats = box.querySelector('.cdStats');
       box.insertBefore(line, stats || null);
     }

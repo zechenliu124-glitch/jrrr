@@ -18,9 +18,10 @@ FX.EFFECT_CAP = 48;        // 同时存在的形状特效（每个一次绘制�
 FX.DECAL_CAP = 128;
 FX.SPARK_CAP = 10;         // 每帧最多几个命中火花
 FX.NOPULL = 10;            // 发光精灵的形状 + 10：贴地的光，不往镜头挪
-FX.POP_PX = 22;
-FX.PIX_FONT = '"Pixelify Sans", "Silkscreen", monospace';
-FX.CJK_FONT = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif';
+FX.POP_PX = 24;
+// 画布上的字和界面一样只用像素字体 KM Pixel 12（中文、数字都是它；后面是缺字时的备用）
+FX.PIX_FONT = '"KM Pixel 12", "PingFang SC", "Hiragino Sans GB", sans-serif';
+FX.CJK_FONT = FX.PIX_FONT;
 FX.boomT = [-9, -9, -9, -9, -9, -9];   // 最近 6 次爆炸的时间
 
 // 实例化网格：颜色缓冲按当前 count 分配，所以先把所有槽位填好颜色，再把 count 设为 0
@@ -219,7 +220,12 @@ FX.init = function (scene, overlay) {
   FX.canvas = overlay;
   FX.ctx = overlay.getContext('2d');
   // 画布文字不会自己去下载网页字体：先请求一次像素字体（没声明这个字体时什么也不做）
-  try { if (document.fonts && document.fonts.load) document.fonts.load('700 16px "Pixelify Sans"').catch(function () {}); } catch (e) { /* 忽略 */ }
+  try {
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load('18px "KM Pixel 12"', '0123456789+$骑士鼓舞格挡').catch(function () {});
+      document.fonts.load('12px "KM Pixel 12"', 'Lv0123456789').catch(function () {});
+    }
+  } catch (e) { /* 忽略 */ }
   // 粒子：实例化小方块；顶点颜色让顶面亮、侧面暗，不用光照也有立体感
   var bg = new THREE.BoxGeometry(1, 1, 1);
   var nor = bg.attributes.normal.array, col = new Float32Array(nor.length);
@@ -319,6 +325,15 @@ FX.clear = function () {
   }
   FX.glowN = 0; FX.trailN = 0; FX.decalN = 0;
   if (FX.glowMesh) { FX.commit(FX.glowMesh, 0); FX.commit(FX.partMesh, 0); FX.commit(FX.decalMesh, 0); FX.boltGeo.setDrawRange(0, 0); }
+  FX.wipeCanvas();
+};
+// 马上擦掉画布上的字（伤害数字、拾取提示）：平时只有 FX.drawTexts 每帧擦，主菜单不画字也就不擦，
+// 不在这里擦的话，回主菜单时上一局最后的数字会一直留在菜单上
+FX.wipeCanvas = function () {
+  var cv = FX.canvas, ctx = FX.ctx;
+  if (!cv || !ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
 };
 
 // ---------------- 伤害数字 ----------------
@@ -405,27 +420,115 @@ FX.popup = function (kind, v) {
 var _v3 = null, _font = '';
 FX.setFont = function (ctx, f) { if (_font !== f) { ctx.font = f; _font = f; } };
 
-// 描边文字：先描深色粗边，再填色
-FX.drawLabel = function (ctx, s, x, y, px, color, cjk) {
-  FX.setFont(ctx, (cjk ? '900 ' : '700 ') + px + 'px ' + (cjk ? FX.CJK_FONT : FX.PIX_FONT));
-  ctx.lineJoin = cjk ? 'round' : 'miter';
-  ctx.lineWidth = Math.max(3, Math.round(px * (cjk ? 0.24 : 0.3)));
-  ctx.strokeStyle = '#120c1c';
-  ctx.strokeText(s, x, y);
+// ---------------- 画布上的字（伤害数字、拾取提示、「鼓舞！」「格挡」「处决」） ----------------
+// 和界面一样的像素字：字号只用 12 / 18 / 24 / 36（中文至少 18）；描边 = 8 个方向各 1 个字体像素 + 底下一行厚度（深紫黑 #120c1c）；
+// 数字和字母「像素加粗」（同色往右多画 1 个字体像素、字距 1 个字体像素），汉字不加粗。
+// 每个（文字、字号、颜色、屏幕倍数）只画一次，存成一张小图，以后每帧 drawImage 一次（不缓存要 12~16 次 fillText）；
+// 最近用过的留 400 个（满了扔掉最久没用的 100 个：每张小图记着上次用到的帧 u）；每帧最多新画 24 个，再多的这一帧直接画在画布上。
+// frame：FX.drawTexts 每帧加 1；pass：正在 FX.drawTexts 里（平滑缩放在那里关一次，不用每个字开关一次）
+FX.lbl = { cache: new Map(), builds: 0, CAP: 400, BUDGET: 24, hits: 0, miss: 0, ok: {}, frame: 0, pass: false };
+FX.snapPx = function (px, cjk) { var s = px < 15 ? 12 : px < 21 ? 18 : px < 30 ? 24 : 36; return cjk && s < 18 ? 18 : s; };
+// 字体到了没有（还没到时画出来的是备用字体，不能存进缓存）
+FX.fontOk = function (size) {
+  var L = FX.lbl;
+  if (L.ok[size]) return true;
+  try { if (document.fonts && !document.fonts.check(size + 'px "KM Pixel 12"')) return false; } catch (e) { /* 没有 FontFace API：当作到了 */ }
+  L.ok[size] = true;
+  return true;
+};
+// 在 ctx 上画一行带描边的字（左对齐、字母基线在 y）；bold：像素加粗。不支持 ctx.letterSpacing 的浏览器一个字一个字地画
+FX.paintLabel = function (ctx, s, x, y, size, color, bold) {
+  var p = size / 12, dx, dy, per = bold && !('letterSpacing' in ctx);
+  if (bold && !per) ctx.letterSpacing = p + 'px';
+  var draw = function (X, Y) {
+    if (!per) { ctx.fillText(s, X, Y); return; }
+    for (var i = 0, cx = X; i < s.length; i++) { ctx.fillText(s[i], cx, Y); cx += ctx.measureText(s[i]).width + p; }
+  };
+  ctx.fillStyle = '#120c1c';
+  for (dx = -1; dx <= (bold ? 2 : 1); dx++) {
+    for (dy = -1; dy <= 2; dy++) if (!(dy === 0 && (dx === 0 || (bold && dx === 1)))) draw(x + dx * p, y + dy * p);
+  }
   ctx.fillStyle = color;
-  ctx.fillText(s, x, y);
+  draw(x, y);
+  if (bold) draw(x + p, y);
+  if (bold && !per) ctx.letterSpacing = '0px';
+};
+// 整行字的宽度（加粗的：每个字后面多 1 个字体像素的字距，最后再多 1 个字体像素的加粗）；ctx 的字体要先设好
+FX.labelWidth = function (ctx, s, size, bold) {
+  var p = size / 12, w = ctx.measureText(s).width;
+  return bold ? w + s.length * p + p : w;
+};
+// 画好一张小图存进缓存：{ k（键）, cv, ox, oy（字母基线在小图里的位置）, w, h（CSS 像素）, lw（字宽，用来对齐）, u（上次用到的帧）, dead（已经扔掉） }
+FX.buildLabel = function (key, s, size, color, bold, lw, dpr) {
+  var p = size / 12, pad = Math.ceil(p * 2) + 1, top = pad + Math.ceil(p * 12);
+  var cw = Math.ceil(lw + pad * 2), ch = top + Math.ceil(p * 5) + pad;
+  var cv = document.createElement('canvas');
+  cv.width = Math.ceil(cw * dpr); cv.height = Math.ceil(ch * dpr);
+  var cx = cv.getContext('2d');
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cx.font = size + 'px ' + FX.PIX_FONT; cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+  FX.paintLabel(cx, s, pad, top, size, color, bold);
+  var L = FX.lbl, c = { k: key, cv: cv, ox: pad, oy: top, w: cw, h: ch, lw: lw, u: L.frame, dead: false };
+  L.cache.set(key, c);
+  if (L.cache.size > L.CAP) FX.lblEvict();
+  return c;
+};
+// 缓存满了：扔掉最久没用的 100 张（按上次用到的帧排，很少走到这里）；小图的画布马上清成 0×0，Safari 立刻放掉这块内存
+FX.lblEvict = function () {
+  var L = FX.lbl, all = [];
+  L.cache.forEach(function (c) { all.push(c); });
+  all.sort(function (a, b) { return a.u - b.u; });
+  for (var i = 0; i < 100 && i < all.length; i++) { var c = all[i]; L.cache.delete(c.k); c.dead = true; c.cv.width = 0; c.cv.height = 0; }
+};
+// 描边文字：(x, y) 按 ctx 当前的 textAlign（center / left / right）和 textBaseline（middle / alphabetic）对齐；画完 ctx 的对齐方式不变。
+// rec（可选）：这个字自己的记录（FX.texts 里的一条、一条拾取提示）。用过的小图记在 rec 上，文字、字号、颜色都没变时直接用，
+// 不用每帧拼一个键去查表（每帧几十个字：不拼字符串、不挪表里的位置，就不产生垃圾）
+FX.drawLabel = function (ctx, s, x, y, px, color, cjk, rec) {
+  var size = FX.snapPx(px, cjk), bold = !cjk, L = FX.lbl, dpr = Math.min(window.devicePixelRatio || 1, 2), c = null, key = null, lw;
+  if (rec && rec._lc && !rec._lc.dead && rec._ls === s && rec._lz === size && rec._lk === color && rec._ld === dpr) c = rec._lc;
+  else {
+    key = String(s) + '|' + size + '|' + color + '|' + dpr;
+    c = L.cache.get(key) || null;
+    if (rec) { rec._ls = s; rec._lz = size; rec._lk = color; rec._ld = dpr; rec._lc = c; }
+  }
+  if (c) { L.hits++; c.u = L.frame; lw = c.lw; }
+  else {
+    s = String(s);
+    FX.setFont(ctx, size + 'px ' + FX.PIX_FONT);
+    lw = FX.labelWidth(ctx, s, size, bold);
+    if (L.builds < L.BUDGET && FX.fontOk(size)) { L.builds++; L.miss++; c = FX.buildLabel(key, s, size, color, bold, lw, dpr); if (rec) rec._lc = c; }
+  }
+  var al = ctx.textAlign, bl = ctx.textBaseline;
+  var x0 = Math.round(al === 'center' ? x - lw / 2 : al === 'right' || al === 'end' ? x - lw : x);
+  var y0 = Math.round(bl === 'middle' ? y + size * 0.4 : y);
+  if (c) {
+    if (L.pass) { ctx.drawImage(c.cv, x0 - c.ox, y0 - c.oy, c.w, c.h); return; }
+    var sm = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(c.cv, x0 - c.ox, y0 - c.oy, c.w, c.h);
+    ctx.imageSmoothingEnabled = sm;
+    return;
+  }
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  FX.paintLabel(ctx, s, x0, y0, size, color, bold);
+  ctx.textAlign = al; ctx.textBaseline = bl;
 };
 
 FX.drawTexts = function (cam, dt) {
-  var ctx = FX.ctx, cv = FX.canvas;
+  var ctx = FX.ctx, cv = FX.canvas, LB = FX.lbl;
+  LB.builds = 0;   // 每帧新画的小图从 0 数
+  LB.frame++;
   var w = cv.clientWidth, h = cv.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
   if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); _font = ''; }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
+  // 小图按像素贴（不平滑）：这一遍里关一次，画完还原
+  var sm0 = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = false;
+  LB.pass = true;
   if (!_v3) _v3 = new THREE.Vector3();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.miterLimit = 2;
   var now = FX.now, T = FX.texts, i;
   for (i = T.length - 1; i >= 0; i--) {
     T[i].t += dt || 0; T[i].pt += dt || 0;
@@ -439,7 +542,7 @@ FX.drawTexts = function (cam, dt) {
     var sx = Math.round((_v3.x * 0.5 + 0.5) * w + t.dx * k), sy = Math.round((-_v3.y * 0.5 + 0.5) * h);
     var pop = t.pt < 0.09 ? 1 + (0.09 - t.pt) * 4 : 1;
     ctx.globalAlpha = k > 0.6 ? (1 - k) / 0.4 : 1;
-    FX.drawLabel(ctx, t.s, sx, sy, Math.round(t.px * pop), t.c, t.cjk);
+    FX.drawLabel(ctx, t.s, sx, sy, Math.round(t.px * pop), t.c, t.cjk, t);
   }
   // 拾取提示：在头的右边，经验在上（浅蓝），金币在下（金色），左对齐
   var L = FX.pops;
@@ -453,15 +556,19 @@ FX.drawTexts = function (cam, dt) {
       var rise = Math.max(0, age - 0.6) / 0.7;
       if (rise >= 1 || age < 0) { L.splice(i, 1); continue; }
       if (!show) continue;
-      var bump = Math.max(0, 1 - (now - p.last) / 0.14);
-      var px = Math.round(FX.POP_PX * (1 + bump * 0.2));
+      // 刚出来的 0.09 秒大一档（36，和伤害数字一样一格跳，不平滑放大），之后 24
+      var px = age < 0.09 ? 36 : FX.POP_PX;
       var y = hy + (p.k === 'xp' ? 0 : FX.POP_PX + 4) - Math.round(rise * 30);
       ctx.globalAlpha = rise > 0.45 ? (1 - rise) / 0.55 : 1;
-      FX.drawLabel(ctx, (p.k === 'xp' ? '+' : '$') + fmtNum(p.v), hx, y, px, p.k === 'xp' ? '#5fc8ff' : '#ffd23a', false);
+      // 数值没变就用上次拼好的字（不每帧新拼字符串）
+      if (p._tv !== p.v) { p._tv = p.v; p._t = (p.k === 'xp' ? '+' : '$') + fmtNum(p.v); }
+      FX.drawLabel(ctx, p._t, hx, y, px, p.k === 'xp' ? '#5fc8ff' : '#ffd23a', false, p);
     }
     ctx.textAlign = 'center';
   }
   ctx.globalAlpha = 1;
+  ctx.imageSmoothingEnabled = sm0;
+  LB.pass = false;
 };
 
 // ---------------- 粒子 ----------------
@@ -1144,4 +1251,8 @@ Shadows.update = function () {
   }
   Shadows.mesh.count = n;
   Shadows.mesh.instanceMatrix.needsUpdate = true;
+};
+// 换关、回主菜单：上一局的影子全部拿掉（Shadows.update 只在游戏进行时和 Boss 出场时跑，主菜单里不会自己清）
+Shadows.clear = function () {
+  if (Shadows.mesh) Shadows.mesh.count = 0;
 };

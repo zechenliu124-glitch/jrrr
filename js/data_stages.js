@@ -222,11 +222,11 @@ STAGES = [
       // （关卡的 hpMult / dmgMult 是起点倍率，关卡内血量按 e^(hpGrow·p) 成长；bossHp：Boss 血量相对小怪曲线的系数）
       { p: 0, min: 4, rate: 0.35, types: ['goblin', 'slime'], w: [3, 2] },
       { p: 0.1, min: 10, rate: 0.7, types: ['goblin', 'slime', 'bee'], w: [3, 3, 1] },
-      { p: 0.2, min: 18, rate: 1.1, types: ['goblin', 'slime', 'bee', 'goblin2'], w: [3, 2, 2, 1] },
-      { p: 0.32, min: 30, rate: 1.7, types: ['goblin', 'bee', 'goblin2', 'ghoul', 'golem'], w: [2, 2, 2, 1, 1] },
-      { p: 0.46, min: 45, rate: 2.4, types: ['goblin', 'goblin2', 'ghoul', 'golem', 'skeleton', 'bee'], w: [1, 3, 2, 2, 2, 1] },
-      { p: 0.62, min: 65, rate: 3.3, types: ['goblin2', 'skeleton', 'boomer', 'ghoul', 'golem', 'goblintank'], w: [2, 3, 1, 2, 1, 1] },
-      { p: 0.8, min: 90, rate: 4.4, types: ['goblin2', 'skeleton', 'skelarmor', 'goblintank', 'boomer', 'ghoul'], w: [2, 2, 2, 2, 1, 2] },
+      { p: 0.2, min: 18, rate: 1.1, types: ['goblin', 'slime', 'bee', 'goblin2', 'wolf'], w: [3, 2, 2, 1, 0.4] },
+      { p: 0.32, min: 30, rate: 1.7, types: ['goblin', 'bee', 'goblin2', 'ghoul', 'golem', 'wolf', 'shroom'], w: [2, 2, 2, 1, 1, 0.45, 0.7] },
+      { p: 0.46, min: 45, rate: 2.4, types: ['goblin', 'goblin2', 'ghoul', 'golem', 'skeleton', 'bee', 'wolf', 'shroom', 'drummer'], w: [1, 3, 2, 2, 2, 1, 0.5, 0.8, 0.5] },
+      { p: 0.62, min: 65, rate: 3.3, types: ['goblin2', 'skeleton', 'boomer', 'ghoul', 'golem', 'goblintank', 'wolf', 'shroom', 'drummer'], w: [2, 3, 1, 2, 1, 1, 0.5, 0.8, 0.7] },
+      { p: 0.8, min: 90, rate: 4.4, types: ['goblin2', 'skeleton', 'skelarmor', 'goblintank', 'boomer', 'ghoul', 'wolf', 'shroom', 'drummer'], w: [2, 2, 2, 2, 1, 2, 0.6, 0.9, 0.9] },
       { p: 1, min: 115, rate: 5.5 }
     ] },
   { name: '沙漠', boss: 'pharaoh', minis: ['sandgolem', 'scorpboss'], hpMult: 40, hpGrow: 2.9, bossHp: 0.25, dmgMult: 2.3,
@@ -250,11 +250,11 @@ STAGES = [
     pool: [
       { p: 0, min: 48, rate: 2.4, types: ['mummy', 'scorpion'], w: [3, 1] },
       { p: 0.1, min: 54, rate: 2.7, types: ['mummy', 'scorpion', 'wisp', 'tumble'], w: [3, 2, 1, 1] },
-      { p: 0.22, min: 60, rate: 3, types: ['mummy', 'scorpion', 'wisp', 'tumble', 'dustyskel'], w: [2, 2, 2, 2, 1] },
-      { p: 0.36, min: 62, rate: 3.3, types: ['mummy', 'dustyskel', 'wisp', 'tumble', 'cactus', 'scorpion'], w: [1, 2, 2, 2, 1, 1] },
-      { p: 0.5, min: 76, rate: 4, types: ['dustyskel', 'scorpion', 'cactus', 'wisp', 'tumble', 'mummytank'], w: [3, 2, 1, 1, 1, 1] },
-      { p: 0.66, min: 92, rate: 4.8, types: ['dustyskel', 'mummytank', 'scorpion', 'cactus', 'tumble', 'dustyarmor'], w: [2, 2, 2, 1, 1, 1] },
-      { p: 0.82, min: 110, rate: 5.6, types: ['mummytank', 'ancient', 'dustyarmor', 'scorpion', 'cactus', 'tumble'], w: [2, 1, 2, 2, 1, 1] },
+      { p: 0.22, min: 60, rate: 3, types: ['mummy', 'scorpion', 'wisp', 'tumble', 'dustyskel', 'worm'], w: [2, 2, 2, 2, 1, 0.7] },
+      { p: 0.36, min: 62, rate: 3.3, types: ['mummy', 'dustyskel', 'wisp', 'tumble', 'cactus', 'scorpion', 'worm', 'vulture'], w: [1, 2, 2, 2, 1, 1, 0.8, 0.8] },
+      { p: 0.5, min: 76, rate: 4, types: ['dustyskel', 'scorpion', 'cactus', 'wisp', 'tumble', 'mummytank', 'worm', 'vulture', 'lizard'], w: [3, 2, 1, 1, 1, 1, 0.8, 0.8, 0.7] },
+      { p: 0.66, min: 92, rate: 4.8, types: ['dustyskel', 'mummytank', 'scorpion', 'cactus', 'tumble', 'dustyarmor', 'worm', 'vulture', 'lizard'], w: [2, 2, 2, 1, 1, 1, 0.8, 0.9, 0.9] },
+      { p: 0.82, min: 110, rate: 5.6, types: ['mummytank', 'ancient', 'dustyarmor', 'scorpion', 'cactus', 'tumble', 'worm', 'vulture', 'lizard'], w: [2, 1, 2, 2, 1, 1, 0.9, 0.9, 1] },
       { p: 1, min: 130, rate: 6.4 }
     ] },
   { name: '墓地', boss: 'bigbob', minis: ['ghostham', 'skelking'], hpMult: 500, hpGrow: 2.6, bossHp: 0.15, dmgMult: 5,
@@ -278,11 +278,11 @@ STAGES = [
     pool: [
       { p: 0, min: 52, rate: 2.6, types: ['ghost', 'zombie'], w: [3, 2] },
       { p: 0.1, min: 58, rate: 2.9, types: ['ghost', 'zombie', 'head', 'skeleton'], w: [3, 2, 1, 1] },
-      { p: 0.22, min: 64, rate: 3.2, types: ['ghost', 'zombie', 'head', 'skeleton', 'ghost2'], w: [2, 2, 2, 2, 1] },
-      { p: 0.36, min: 70, rate: 3.6, types: ['ghost', 'ghost2', 'zombie', 'ghoul', 'head', 'skeleton'], w: [1, 2, 2, 1, 2, 1] },
-      { p: 0.5, min: 85, rate: 4.3, types: ['ghost2', 'skeleton', 'skelarmor', 'ghoul', 'head', 'zombie'], w: [3, 2, 1, 2, 1, 1] },
-      { p: 0.66, min: 102, rate: 5.1, types: ['ghost2', 'skelarmor', 'ghoul', 'ghost3', 'zombie', 'head'], w: [2, 2, 2, 1, 2, 1] },
-      { p: 0.82, min: 120, rate: 6, types: ['ghost2', 'ghost3', 'skelarmor', 'ghoul', 'zombie'], w: [2, 2, 2, 2, 1] },
+      { p: 0.22, min: 64, rate: 3.2, types: ['ghost', 'zombie', 'head', 'skeleton', 'ghost2', 'ecto', 'tomb'], w: [2, 2, 2, 2, 1, 0.7, 0.18] },
+      { p: 0.36, min: 70, rate: 3.6, types: ['ghost', 'ghost2', 'zombie', 'ghoul', 'head', 'skeleton', 'ecto', 'tomb'], w: [1, 2, 2, 1, 2, 1, 0.8, 0.2] },
+      { p: 0.5, min: 85, rate: 4.3, types: ['ghost2', 'skeleton', 'skelarmor', 'ghoul', 'head', 'zombie', 'ecto', 'tomb', 'headless'], w: [3, 2, 1, 2, 1, 1, 0.8, 0.2, 0.7] },
+      { p: 0.66, min: 102, rate: 5.1, types: ['ghost2', 'skelarmor', 'ghoul', 'ghost3', 'zombie', 'head', 'ecto', 'tomb', 'headless'], w: [2, 2, 2, 1, 2, 1, 0.9, 0.22, 0.9] },
+      { p: 0.82, min: 120, rate: 6, types: ['ghost2', 'ghost3', 'skelarmor', 'ghoul', 'zombie', 'ecto', 'tomb', 'headless'], w: [2, 2, 2, 2, 1, 1, 0.25, 1] },
       { p: 1, min: 145, rate: 7 }
     ] }
 ];

@@ -44,6 +44,8 @@ Game.init = function () {
   Game.showMenuModel(UI.selected);
   Game.last = performance.now();
   requestAnimationFrame(Game.loop);
+  // 主菜单闲着时先画好开局后最先用到的图标（第一次升级不卡），开局就停
+  if (ICONS.prewarm) ICONS.prewarm(1500);
 };
 
 // 内部分辨率约 720 行（触屏 600 行）再像素化放大：画面带一点颗粒感，iPad 也跑得动
@@ -80,6 +82,7 @@ Game.playing = function () { return Game.state === 'play'; };
 // ---------------- 开局 / 关卡 ----------------
 Game.start = function (charId) {
   P.weapons.forEach(Weapons.detach);
+  Game.runId = (Game.runId || 0) + 1;
   Game.charId = charId;
   Game.stage = 1;
   Game.totalTime = 0;
@@ -106,6 +109,7 @@ Game.buildStage = function (menuOnly) {
   Pickups.clear();
   Interact.clear();
   FX.clear();
+  Shadows.clear();
   Game.timers = [];
   Game.challenges = [];
   Game.time = 0;
@@ -142,11 +146,15 @@ Game.win = function () {
 Game.onDeath = function () {
   Game.state = 'end';
   FX.burst(P.pos.x, P.pos.y + 1, P.pos.z, 30, 0xff3333, 8, 0.4);
-  setTimeout(function () { UI.showEnd(false); }, 900);
+  // 0.9 秒内已经重开 / 回了主菜单：不再弹出这一局的结算界面（不然它会盖在新的一局或菜单上）
+  var run = Game.runId;
+  setTimeout(function () { if (Game.state === 'end' && Game.runId === run) UI.showEnd(false); }, 900);
 };
 
 Game.toMenu = function () {
   Game.state = 'menu';
+  // 直接回菜单（不是从按钮来的，比如通关的结算界面已经弹出来了）：弹窗也一起关掉，不留在菜单上面
+  UI.closeModal();
   if (Game.menuModel) Game.menuModel.visible = true;
   Game.stage = 1;
   if (P.model && P.model.parent) P.model.parent.remove(P.model);
@@ -157,6 +165,7 @@ Game.toMenu = function () {
   UI.show('hud', false);
   UI.show('menu', true);
   UI.buildMenu();
+  if (ICONS.prewarm) ICONS.prewarm(800);
 };
 
 // ---------------- Boss / 挑战 ----------------

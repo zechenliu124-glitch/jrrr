@@ -1,15 +1,15 @@
-/* 本地字体：不依赖 Google Fonts，离线（装到主屏幕的 App）和打不开 Google 的网络里都能正常显示
-   - Pixelify Sans：数字和英文用的像素字体（可变字重 400~700，拉丁字符），SIL OFL 1.1，见 fonts/OFL-PixelifySans.txt
+/* 本地字体：不依赖外网，离线（装到主屏幕的 App）和打不开 Google 的网络里都能正常显示
+   - KM Pixel 12：界面和画布上所有的字（中文、数字、英文都用它）。Fusion Pixel Font 12px Proportional zh_hans 的子集（改了名字），
+     SIL OFL 1.1，见 fonts/OFL-KMPixel12.txt；改了什么见 fonts/KM-PATCH.txt（只留用到的字 + GB2312 一级字，数字 0 去掉斜线）。
+     tools/subset.py 生成；改了文案跑一次 python3 -I tools/subset.py --check，有缺字就重新生成
    - ZCOOL KuaiLe：标题“骑士魔法”的字体，只截取了这四个字（标题只用到这四个字），SIL OFL 1.1，见 fonts/OFL-ZCOOLKuaiLe.txt
-   claude.ai 的 Artifact 版本里这些字体会内联成 data: 地址，前面还垫了一份 Google Fonts：
-   同名字体后定义的优先，先用这里的；这里的万一加载不了才轮到 Google Fonts */
+   claude.ai 的 Artifact 版本里这些字体会内联成 data: 地址（标题字前面还垫了一份 Google Fonts） */
 @font-face {
-  font-family: "Pixelify Sans";
+  font-family: "KM Pixel 12";
   font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url(../fonts/pixelify-sans-latin-wght.woff2) format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  font-weight: 100 900;   /* 一个字重覆盖所有 weight：浏览器不会给它假加粗 */
+  font-display: block;
+  src: url(../fonts/km-pixel-12.woff2) format("woff2");
 }
 @font-face {
   font-family: "ZCOOL KuaiLe";

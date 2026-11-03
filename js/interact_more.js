@@ -1019,24 +1019,26 @@ MX.renderBolts = function () {
 // ============================================================
 //  HUD：增益栏（战马 / 温暖 / 弩车倒计时）、站圈进度条、传送闪光（自己注入样式）
 // ============================================================
-// 和 HUD 一样的像素风：深蓝面板 + 黑色粗边 + 内描边，数字用像素字体（css/style.css 里的变量），中文粗黑体加黑描边
+// 和 HUD 一样的像素风（css/kit.css）：增益栏每一格是画面上的小面板（.mxBuff，--fr-plate），图标是符文砖（Kit.glyphTile）；
+// 站圈进度是半透明面板（#mxProgress，--fr-panelT）。这里只写布局、字号（--fs-*）和描边（--ol*）
 MX.CSS = [
   // 增益栏：在左上任务框下面，一排小面板（太多时换行）
-  '#mxBuffs{display:flex;flex-wrap:wrap;gap:5px 6px;max-width:320px;pointer-events:none}',
+  '#mxBuffs{display:flex;flex-wrap:wrap;gap:6px;max-width:320px;pointer-events:none}',
   '#mxBuffs:empty{display:none}',
   '#mxBuffs.float{position:absolute;left:max(12px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 150px)}',
-  '.mxBuff{position:relative;display:flex;align-items:center;gap:5px;height:32px;padding:0 8px 3px 3px;background:var(--panel,rgba(8,13,28,.92));border:2px solid #000;box-shadow:inset 0 0 0 1px var(--edge,#2f3f66),0 3px 0 rgba(0,0,0,.45);color:#fff;white-space:nowrap}',
-  '.mxBuff .ic{flex:none;width:24px;height:24px;border:2px solid #000;background-image:var(--tone);box-shadow:var(--bevel);display:flex;align-items:center;justify-content:center;font-family:var(--font-cn);font-weight:900;font-size:14px;line-height:1;color:#fff;text-shadow:var(--ol1)}',
-  '.mxBuff .nm{font-family:var(--font-cn);font-weight:800;font-size:13px;line-height:1;text-shadow:var(--ol1)}',
-  '.mxBuff .tm{min-width:22px;font-family:var(--font-pixel);font-weight:700;font-size:15px;line-height:1;text-align:right;text-shadow:var(--ol1)}',
-  '.mxBuff .trk{position:absolute;left:1px;right:1px;bottom:1px;height:4px;background:rgba(0,0,0,.75)}',
+  // 30 像素高：22 像素的符文砖 + 18 号名字 + 18 号像素加粗的秒数，底下一条 3 像素的效果色进度
+  '.mxBuff{position:relative;display:flex;align-items:center;gap:6px;height:30px;padding:0 9px 4px 3px;color:#fff;white-space:nowrap}',
+  '.mxBuff .ic{flex:none;width:22px;height:22px;border:2px solid #000;display:flex;align-items:center;justify-content:center;font-size:var(--fs-s);line-height:12px}',
+  '.mxBuff .nm{font-size:var(--fs-m);line-height:18px;text-shadow:var(--ol1)}',
+  '.mxBuff .tm{min-width:22px;font-size:var(--fs-m);line-height:18px;letter-spacing:var(--o);text-align:right;text-shadow:var(--olB)}',
+  '.mxBuff .trk{position:absolute;left:2px;right:2px;bottom:1px;height:3px;background:rgba(0,0,0,.75)}',
   '.mxBuff .bar{display:block;height:100%;width:100%;box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}',
   // 站圈进度：正上方倒计时（和 Boss 血条）下面
-  '#mxProgress{width:248px;margin-top:6px;padding:5px 8px 7px;background:var(--panel,rgba(8,13,28,.92));border:3px solid #000;box-shadow:inset 0 0 0 2px var(--edge,#2f3f66),0 4px 0 rgba(0,0,0,.45);pointer-events:none;white-space:nowrap}',
+  '#mxProgress{width:248px;margin-top:6px;padding:6px 9px 9px;pointer-events:none;white-space:nowrap}',
   '#mxProgress.float{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 96px);transform:translateX(-50%)}',
-  '#mxProgress .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px}',
-  '#mxProgress .tt{font-family:var(--font-cn);font-weight:800;font-size:14px;line-height:1.1;color:#fff;text-shadow:var(--ol1)}',
-  '#mxProgress .pc{font-family:var(--font-pixel);font-weight:700;font-size:17px;line-height:1;text-shadow:var(--ol1)}',
+  '#mxProgress .row{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-bottom:6px}',
+  '#mxProgress .tt{font-size:var(--fs-m);line-height:18px;color:#fff;text-shadow:var(--ol1)}',
+  '#mxProgress .pc{font-size:var(--fs-m);line-height:18px;text-shadow:var(--ol1)}',
   '#mxProgress .trk{position:relative;height:14px;border:2px solid #000;background:#0b1020;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}',
   '#mxProgress .fill{height:100%;width:0;box-shadow:inset 0 3px 0 rgba(255,255,255,.35),inset 0 -3px 0 rgba(0,0,0,.3)}',
   // 每 10% 一道刻度
@@ -1104,7 +1106,8 @@ MX.hudUpdate = function () {
     h.chips = list.map(function (b) {
       var d = document.createElement('div');
       d.className = 'mxBuff';
-      var ic = document.createElement('span'); ic.className = 'ic'; ic.textContent = b.icon; ic.style.backgroundColor = b.color;
+      // 图标：符文砖（深色底 + 效果色的字和内框），不是彩色平涂方块
+      var ic = document.createElement('span'); ic.className = 'ic'; Kit.glyphTile(ic, b.icon, b.color);
       var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = b.name;
       var tm = document.createElement('span'); tm.className = 'tm';
       var trk = document.createElement('span'); trk.className = 'trk';

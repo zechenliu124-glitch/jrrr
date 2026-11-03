@@ -1,0 +1,317 @@
+/* 骑士魔法 · 界面套件（js/kit.js 的样式）：像素边框、按钮、面板、凹槽、选中、小签、进度条、局内公告、过场横幅
+   规则见 docs/knight-magic/design/UI_STYLE.md（字号只用 12/18/24/36/48，描边只用 style.css 的 --ol* 变量，颜色按用途）。
+   - 边框都是 9 宫格像素图（下面的 --fr-*，tools/frames.py 生成）：只画黑边、缺角、斜面和投影，颜色和底色由 CSS 给
+   - 用 border-image 的元素只写分开的 border-* 属性（border 简写会把 border-image 清掉）；
+     底色只写 background-color（background 简写会把 background-clip 冲掉，缺角就露底色了）
+   - 各功能自己的 CSS 只写布局；这里也列了几个功能里的元素（.tierBtn、.maRow……），
+     那个功能把自己的边框、底色、阴影删掉以后，这里的样子就生效（功能的样式表插在 kit.css 后面，同样的选择器它优先） */
+
+/* ---------------------------------------------------------------- 0. 像素边框 */
+:root {
+  /* @frames：tools/frames.py 生成，别手改 */
+  --fr-panel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='23' shape-rendering='crispEdges'%3E%3Crect x='3' y='0' width='11' height='1' fill='%23000'/%3E%3Crect x='3' y='1' width='11' height='1' fill='%23000'/%3E%3Crect x='3' y='2' width='11' height='1' fill='%23000'/%3E%3Crect x='0' y='3' width='6' height='1' fill='%23000'/%3E%3Crect x='6' y='3' width='5' height='1' fill='%233a4e80'/%3E%3Crect x='11' y='3' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='4' width='6' height='1' fill='%23000'/%3E%3Crect x='6' y='4' width='5' height='1' fill='%233a4e80'/%3E%3Crect x='11' y='4' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='5' width='6' height='1' fill='%23000'/%3E%3Crect x='6' y='5' width='5' height='1' fill='%2304070e'/%3E%3Crect x='11' y='5' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='6' width='3' height='1' fill='%23000'/%3E%3Crect x='3' y='6' width='2' height='1' fill='%233a4e80'/%3E%3Crect x='5' y='6' width='7' height='1' fill='%2304070e'/%3E%3Crect x='12' y='6' width='2' height='1' fill='%231c2846'/%3E%3Crect x='14' y='6' width='3' height='1' fill='%23000'/%3E%3Crect x='0' y='7' width='3' height='1' fill='%23000'/%3E%3Crect x='3' y='7' width='2' height='1' fill='%233a4e80'/%3E%3Crect x='5' y='7' width='7' height='1' fill='%2304070e'/%3E%3Crect x='12' y='7' width='2' height='1' fill='%231c2846'/%3E%3Crect x='14' y='7' width='3' height='1' fill='%23000'/%3E%3Crect x='0' y='8' width='3' height='1' fill='%23000'/%3E%3Crect x='3' y='8' width='2' height='1' fill='%233a4e80'/%3E%3Crect x='5' y='8' width='3' height='1' fill='%2304070e'/%3E%3Crect x='8' y='8' width='1' height='1' fill='%230a0f1e'/%3E%3Crect x='9' y='8' width='3' height='1' fill='%2304070e'/%3E%3Crect x='12' y='8' width='2' height='1' fill='%231c2846'/%3E%3Crect x='14' y='8' width='3' height='1' fill='%23000'/%3E%3Crect x='0' y='9' width='3' height='1' fill='%23000'/%3E%3Crect x='3' y='9' width='2' height='1' fill='%233a4e80'/%3E%3Crect x='5' y='9' width='7' height='1' fill='%2304070e'/%3E%3Crect x='12' y='9' width='2' height='1' fill='%231c2846'/%3E%3Crect x='14' y='9' width='3' height='1' fill='%23000'/%3E%3Crect x='0' y='10' width='3' height='1' fill='%23000'/%3E%3Crect x='3' y='10' width='2' height='1' fill='%233a4e80'/%3E%3Crect x='5' y='10' width='7' height='1' fill='%2304070e'/%3E%3Crect x='12' y='10' width='2' height='1' fill='%231c2846'/%3E%3Crect x='14' y='10' width='3' height='1' fill='%23000'/%3E%3Crect x='0' y='11' width='6' height='1' fill='%23000'/%3E%3Crect x='6' y='11' width='5' height='1' fill='%2304070e'/%3E%3Crect x='11' y='11' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='12' width='6' height='1' fill='%23000'/%3E%3Crect x='6' y='12' width='5' height='1' fill='%231c2846'/%3E%3Crect x='11' y='12' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='13' width='6' height='1' fill='%23000'/%3E%3Crect x='6' y='13' width='5' height='1' fill='%231c2846'/%3E%3Crect x='11' y='13' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='14' width='3' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='3' y='14' width='11' height='1' fill='%23000'/%3E%3Crect x='14' y='14' width='3' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='15' width='3' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='3' y='15' width='11' height='1' fill='%23000'/%3E%3Crect x='14' y='15' width='3' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='16' width='3' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='3' y='16' width='11' height='1' fill='%23000'/%3E%3Crect x='14' y='16' width='3' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='17' width='17' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='18' width='17' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='19' width='17' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='3' y='20' width='11' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='3' y='21' width='11' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='3' y='22' width='11' height='1' fill='%23000' fill-opacity='0.45'/%3E%3C/svg%3E");
+  --fr-panelT: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='23' shape-rendering='crispEdges'%3E%3Crect x='3' y='0' width='11' height='1' fill='%23000'/%3E%3Crect x='3' y='1' width='11' height='1' fill='%23000'/%3E%3Crect x='3' y='2' width='11' height='1' fill='%23000'/%3E%3Crect x='0' y='3' width='6' height='1' fill='%23000'/%3E%3Crect x='6' y='3' width='5' height='1' fill='%233a4e80'/%3E%3Crect x='11' y='3' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='4' width='6' height='1' fill='%23000'/%3E%3Crect x='6' y='4' width='5' height='1' fill='%233a4e80'/%3E%3Crect x='11' y='4' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='5' width='6' height='1' fill='%23000'/%3E%3Crect x='6' y='5' width='5' height='1' fill='%2304070e' fill-opacity='0.93'/%3E%3Crect x='11' y='5' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='6' width='3' height='1' fill='%23000'/%3E%3Crect x='3' y='6' width='2' height='1' fill='%233a4e80'/%3E%3Crect x='5' y='6' width='7' height='1' fill='%2304070e' fill-opacity='0.93'/%3E%3Crect x='12' y='6' width='2' height='1' fill='%231c2846'/%3E%3Crect x='14' y='6' width='3' height='1' fill='%23000'/%3E%3Crect x='0' y='7' width='3' height='1' fill='%23000'/%3E%3Crect x='3' y='7' width='2' height='1' fill='%233a4e80'/%3E%3Crect x='5' y='7' width='7' height='1' fill='%2304070e' fill-opacity='0.93'/%3E%3Crect x='12' y='7' width='2' height='1' fill='%231c2846'/%3E%3Crect x='14' y='7' width='3' height='1' fill='%23000'/%3E%3Crect x='0' y='8' width='3' height='1' fill='%23000'/%3E%3Crect x='3' y='8' width='2' height='1' fill='%233a4e80'/%3E%3Crect x='5' y='8' width='3' height='1' fill='%2304070e' fill-opacity='0.93'/%3E%3Crect x='8' y='8' width='1' height='1' fill='%23080d1c' fill-opacity='0.93'/%3E%3Crect x='9' y='8' width='3' height='1' fill='%2304070e' fill-opacity='0.93'/%3E%3Crect x='12' y='8' width='2' height='1' fill='%231c2846'/%3E%3Crect x='14' y='8' width='3' height='1' fill='%23000'/%3E%3Crect x='0' y='9' width='3' height='1' fill='%23000'/%3E%3Crect x='3' y='9' width='2' height='1' fill='%233a4e80'/%3E%3Crect x='5' y='9' width='7' height='1' fill='%2304070e' fill-opacity='0.93'/%3E%3Crect x='12' y='9' width='2' height='1' fill='%231c2846'/%3E%3Crect x='14' y='9' width='3' height='1' fill='%23000'/%3E%3Crect x='0' y='10' width='3' height='1' fill='%23000'/%3E%3Crect x='3' y='10' width='2' height='1' fill='%233a4e80'/%3E%3Crect x='5' y='10' width='7' height='1' fill='%2304070e' fill-opacity='0.93'/%3E%3Crect x='12' y='10' width='2' height='1' fill='%231c2846'/%3E%3Crect x='14' y='10' width='3' height='1' fill='%23000'/%3E%3Crect x='0' y='11' width='6' height='1' fill='%23000'/%3E%3Crect x='6' y='11' width='5' height='1' fill='%2304070e' fill-opacity='0.93'/%3E%3Crect x='11' y='11' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='12' width='6' height='1' fill='%23000'/%3E%3Crect x='6' y='12' width='5' height='1' fill='%231c2846'/%3E%3Crect x='11' y='12' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='13' width='6' height='1' fill='%23000'/%3E%3Crect x='6' y='13' width='5' height='1' fill='%231c2846'/%3E%3Crect x='11' y='13' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='14' width='3' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='3' y='14' width='11' height='1' fill='%23000'/%3E%3Crect x='14' y='14' width='3' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='15' width='3' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='3' y='15' width='11' height='1' fill='%23000'/%3E%3Crect x='14' y='15' width='3' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='16' width='3' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='3' y='16' width='11' height='1' fill='%23000'/%3E%3Crect x='14' y='16' width='3' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='17' width='17' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='18' width='17' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='19' width='17' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='3' y='20' width='11' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='3' y='21' width='11' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='3' y='22' width='11' height='1' fill='%23000' fill-opacity='0.45'/%3E%3C/svg%3E");
+  --fr-well: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='5' height='1' fill='%23000'/%3E%3Crect x='2' y='1' width='5' height='1' fill='%23000'/%3E%3Crect x='0' y='2' width='4' height='1' fill='%23000'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%23000' fill-opacity='0.35'/%3E%3Crect x='5' y='2' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='3' width='4' height='1' fill='%23000'/%3E%3Crect x='4' y='3' width='1' height='1' fill='%23000' fill-opacity='0.35'/%3E%3Crect x='5' y='3' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='4' width='2' height='1' fill='%23000'/%3E%3Crect x='2' y='4' width='2' height='1' fill='%23000' fill-opacity='0.35'/%3E%3Crect x='6' y='4' width='1' height='1' fill='%23ffffff' fill-opacity='0.08'/%3E%3Crect x='7' y='4' width='2' height='1' fill='%23000'/%3E%3Crect x='0' y='5' width='4' height='1' fill='%23000'/%3E%3Crect x='5' y='5' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='6' width='4' height='1' fill='%23000'/%3E%3Crect x='4' y='6' width='1' height='1' fill='%23ffffff' fill-opacity='0.08'/%3E%3Crect x='5' y='6' width='4' height='1' fill='%23000'/%3E%3Crect x='2' y='7' width='5' height='1' fill='%23000'/%3E%3Crect x='2' y='8' width='5' height='1' fill='%23000'/%3E%3C/svg%3E");
+  --fr-btn: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='17' shape-rendering='crispEdges'%3E%3Crect x='3' y='0' width='7' height='1' fill='%23000'/%3E%3Crect x='3' y='1' width='7' height='1' fill='%23000'/%3E%3Crect x='3' y='2' width='7' height='1' fill='%23000'/%3E%3Crect x='0' y='3' width='6' height='1' fill='%23000'/%3E%3Crect x='7' y='3' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='4' width='6' height='1' fill='%23000'/%3E%3Crect x='7' y='4' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='5' width='6' height='1' fill='%23000'/%3E%3Crect x='7' y='5' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='6' width='3' height='1' fill='%23000'/%3E%3Crect x='10' y='6' width='3' height='1' fill='%23000'/%3E%3Crect x='0' y='7' width='6' height='1' fill='%23000'/%3E%3Crect x='7' y='7' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='8' width='6' height='1' fill='%23000'/%3E%3Crect x='7' y='8' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='9' width='6' height='1' fill='%23000'/%3E%3Crect x='7' y='9' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='10' width='13' height='1' fill='%23000'/%3E%3Crect x='0' y='11' width='13' height='1' fill='%23000'/%3E%3Crect x='0' y='12' width='13' height='1' fill='%23000'/%3E%3Crect x='0' y='13' width='13' height='1' fill='%23000'/%3E%3Crect x='3' y='14' width='7' height='1' fill='%23000'/%3E%3Crect x='3' y='15' width='7' height='1' fill='%23000'/%3E%3Crect x='3' y='16' width='7' height='1' fill='%23000'/%3E%3C/svg%3E");
+  --fr-btn-d: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='14' shape-rendering='crispEdges'%3E%3Crect x='3' y='0' width='7' height='1' fill='%23000'/%3E%3Crect x='3' y='1' width='7' height='1' fill='%23000'/%3E%3Crect x='3' y='2' width='7' height='1' fill='%23000'/%3E%3Crect x='0' y='3' width='6' height='1' fill='%23000'/%3E%3Crect x='7' y='3' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='4' width='6' height='1' fill='%23000'/%3E%3Crect x='7' y='4' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='5' width='6' height='1' fill='%23000'/%3E%3Crect x='7' y='5' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='6' width='3' height='1' fill='%23000'/%3E%3Crect x='10' y='6' width='3' height='1' fill='%23000'/%3E%3Crect x='0' y='7' width='6' height='1' fill='%23000'/%3E%3Crect x='7' y='7' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='8' width='6' height='1' fill='%23000'/%3E%3Crect x='7' y='8' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='9' width='6' height='1' fill='%23000'/%3E%3Crect x='7' y='9' width='6' height='1' fill='%23000'/%3E%3Crect x='0' y='10' width='13' height='1' fill='%23000'/%3E%3Crect x='3' y='11' width='7' height='1' fill='%23000'/%3E%3Crect x='3' y='12' width='7' height='1' fill='%23000'/%3E%3Crect x='3' y='13' width='7' height='1' fill='%23000'/%3E%3C/svg%3E");
+  --fr-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='11' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='5' height='1' fill='%23000'/%3E%3Crect x='2' y='1' width='5' height='1' fill='%23000'/%3E%3Crect x='0' y='2' width='4' height='1' fill='%23000'/%3E%3Crect x='5' y='2' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='3' width='4' height='1' fill='%23000'/%3E%3Crect x='5' y='3' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='4' width='2' height='1' fill='%23000'/%3E%3Crect x='7' y='4' width='2' height='1' fill='%23000'/%3E%3Crect x='0' y='5' width='4' height='1' fill='%23000'/%3E%3Crect x='5' y='5' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='6' width='4' height='1' fill='%23000'/%3E%3Crect x='5' y='6' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='7' width='2' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='2' y='7' width='5' height='1' fill='%23000'/%3E%3Crect x='7' y='7' width='2' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='8' width='2' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='2' y='8' width='5' height='1' fill='%23000'/%3E%3Crect x='7' y='8' width='2' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='2' y='9' width='5' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='2' y='10' width='5' height='1' fill='%23000' fill-opacity='0.45'/%3E%3C/svg%3E");
+  --fr-tile0: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='5' height='1' fill='%23000'/%3E%3Crect x='2' y='1' width='5' height='1' fill='%23000'/%3E%3Crect x='0' y='2' width='4' height='1' fill='%23000'/%3E%3Crect x='5' y='2' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='3' width='4' height='1' fill='%23000'/%3E%3Crect x='5' y='3' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='4' width='2' height='1' fill='%23000'/%3E%3Crect x='7' y='4' width='2' height='1' fill='%23000'/%3E%3Crect x='0' y='5' width='4' height='1' fill='%23000'/%3E%3Crect x='5' y='5' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='6' width='4' height='1' fill='%23000'/%3E%3Crect x='5' y='6' width='4' height='1' fill='%23000'/%3E%3Crect x='2' y='7' width='5' height='1' fill='%23000'/%3E%3Crect x='2' y='8' width='5' height='1' fill='%23000'/%3E%3C/svg%3E");
+  --fr-plate: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='12' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='5' height='1' fill='%23000'/%3E%3Crect x='2' y='1' width='5' height='1' fill='%23000'/%3E%3Crect x='0' y='2' width='4' height='1' fill='%23000'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%23ffffff' fill-opacity='0.16'/%3E%3Crect x='5' y='2' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='3' width='4' height='1' fill='%23000'/%3E%3Crect x='5' y='3' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='4' width='2' height='1' fill='%23000'/%3E%3Crect x='2' y='4' width='1' height='1' fill='%23ffffff' fill-opacity='0.16'/%3E%3Crect x='6' y='4' width='1' height='1' fill='%23000' fill-opacity='0.4'/%3E%3Crect x='7' y='4' width='2' height='1' fill='%23000'/%3E%3Crect x='0' y='5' width='4' height='1' fill='%23000'/%3E%3Crect x='5' y='5' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='6' width='4' height='1' fill='%23000'/%3E%3Crect x='4' y='6' width='1' height='1' fill='%23000' fill-opacity='0.4'/%3E%3Crect x='5' y='6' width='4' height='1' fill='%23000'/%3E%3Crect x='0' y='7' width='2' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='2' y='7' width='5' height='1' fill='%23000'/%3E%3Crect x='7' y='7' width='2' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='8' width='2' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='2' y='8' width='5' height='1' fill='%23000'/%3E%3Crect x='7' y='8' width='2' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='0' y='9' width='9' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='2' y='10' width='5' height='1' fill='%23000' fill-opacity='0.45'/%3E%3Crect x='2' y='11' width='5' height='1' fill='%23000' fill-opacity='0.45'/%3E%3C/svg%3E");
+  /* @frames-end */
+}
+
+/* ---------------------------------------------------------------- 1. 框：面板、半透明面板、凹槽、小面板、小图块 */
+/* 面板（弹窗、页面、确认框、说明卡、喇叭弹窗）：3 像素黑边 + 缺角，两色斜面，实心深蓝底，6 像素硬投影 */
+.kmPanel, .modal, .mlPanel, #metaNotice, #sfxPop {
+  border-style: solid; border-width: 3px; border-color: transparent;
+  border-image: var(--fr-panel) 8 8 14 8 fill / 8px 8px 14px 8px / 0 0 6px 0 stretch;
+  background: none; box-shadow: none;
+}
+/* 半透明面板（主菜单的选择面板、占领进度条）：底 93% */
+.kmPanelT, .menuInner, #mxProgress {
+  border-style: solid; border-width: 3px; border-color: transparent;
+  border-image: var(--fr-panelT) 8 8 14 8 fill / 8px 8px 14px 8px / 0 0 6px 0 stretch;
+  background: none; box-shadow: none;
+}
+/* 凹槽（面板里的分区、列表的一行）：2 像素黑边 + 缺角，左上暗、右下一条细亮线；底色由 CSS 给（.kmWell 是 --well，列表行 .kmRow 是 4% 白） */
+.kmWell, .kmRow, #charDesc, .pauseCols > div, .maRow, .muCard, .mrRow, .mhHelp .keys, #metaEnd, .meItem, .evoPRow, .cdLock, .mrWarn, .mrDanger {
+  border-style: solid; border-width: 2px; border-color: transparent;
+  border-image: var(--fr-well) 4 / 4px stretch;
+  background-clip: padding-box !important; box-shadow: none;
+}
+.kmWell { background-color: var(--well); }
+.kmRow { background-color: rgba(255, 255, 255, 0.04); }
+/* 完成的 / 满级的一行：左边一条 3 像素金边 + 一点点金色（不要整片黄） */
+.kmRow.kmDone { background-color: rgba(255, 216, 74, 0.06); box-shadow: inset 3px 0 0 var(--goldM); }
+/* 小面板（画面上唯一允许的底板：任务框、互动提示、状态条）：2 像素黑边 + 缺角，1 像素两色内边，3 像素投影 */
+.kmPlate, .mxBuff {
+  border-style: solid; border-width: 2px; border-color: transparent;
+  border-image: var(--fr-plate) 4 4 7 4 / 4px 4px 7px 4px / 0 0 3px 0 stretch;
+  background-color: rgba(8, 13, 28, 0.86); background-clip: padding-box !important; box-shadow: none;
+}
+/* 小图块（图标格、头像、血条和进度条的轨道）：2 像素黑边 + 缺角；.kmTile 带 2 像素投影，.kmTile0 不带 */
+.kmTile { border-style: solid; border-width: 2px; border-color: transparent; border-image: var(--fr-tile) 4 4 6 4 / 4px 4px 6px 4px / 0 0 2px 0 stretch; background-clip: padding-box !important; }
+.kmTile0 { border-style: solid; border-width: 2px; border-color: transparent; border-image: var(--fr-tile0) 4 / 4px stretch; background-clip: padding-box !important; }
+
+/* ---------------------------------------------------------------- 2. 按钮：同一种像素按钮（缺角黑边 + 两色斜面 + 4 像素硬投影）
+   大小和底色：.sbtn 在 style.css（48 像素高，紧凑的 .kmSmall 44）；主按钮绿、危险红、价格按钮深蓝 */
+.sbtn, .mlClose, .tierBtn, #paceSetting .paceBtn, #menuSettings button, .mvOpts button, #sfxMenuBtn {
+  border-style: solid; border-width: 3px; border-color: transparent; border-radius: 0;
+  border-image: var(--fr-btn) 6 6 10 6 / 6px 6px 10px 6px / 0 0 4px 0 stretch;
+  background-clip: padding-box !important;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.18), inset 0 -3px 0 rgba(0, 0, 0, 0.35);
+  font-family: var(--font-px); font-weight: 400; text-shadow: var(--ol1);
+}
+/* 按下去：往下 3 像素，投影只剩 1 像素 */
+.sbtn:active:not(:disabled), .mlClose:active, .tierBtn:active, #paceSetting .paceBtn:active, #menuSettings button:active, .mvOpts button:active, #sfxMenuBtn:active {
+  transform: translateY(3px);
+  border-image-source: var(--fr-btn-d); border-image-slice: 6 6 7 6; border-image-width: 6px 6px 7px 6px; border-image-outset: 0 0 1px 0;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.1), inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+}
+/* 鼠标指上去（只有能悬停的设备）：底色亮一点，不用 filter */
+@media (hover: hover) {
+  .sbtn:hover:not(:disabled) { background-color: #23315a; }
+  .sbtn.main:hover:not(:disabled) { background-color: #47aa43; }
+  .sbtn.danger:hover:not(:disabled) { background-color: #b52e34; }
+}
+/* 不能按：只有边框，没有斜面，字是暗灰 */
+.sbtn:disabled { background-color: #222a3f; color: var(--dim); box-shadow: none; cursor: default; }
+.sbtn.danger { background-color: #a3262c; }
+.sbtn.kmSmall { min-height: 44px; padding: 6px 12px; }
+/* 价格按钮（「解锁骑士 ◆600」「升级 ◆180」）：魔晶图标 + 魔晶色的像素加粗数字；钱不够时整个变暗 */
+.sbtn.kmPrice { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.sbtn .kmIco { --ip: 2px; }
+.kmGemN { font-weight: 400; color: var(--gemL); letter-spacing: var(--o); text-shadow: var(--olB); }
+/* Kit.button 量出价格按钮的字是奇数个字体像素宽：补 1 个字体像素，居中时不落在半个设备像素上 */
+.kmOddFp { padding-right: calc(1em / 12); }
+.sbtn:disabled .kmGemN { color: var(--muted); }
+/* 选中（关卡时长、难度、滑铲按钮方式、开关……）：深蓝 + 3 像素金色内框 + 金字（不用芥末黄的整块底色） */
+.kmSel, .sbtn.sel, #paceSetting .paceBtn.sel, .tierBtn.sel, .mvOpts button.sel, #menuSettings button.sel, #menuSettings button.on, #menuSettings button[aria-pressed="true"] {
+  background-color: #2b3c66; color: var(--goldM);
+  box-shadow: inset 0 0 0 3px var(--goldM), inset 0 -3px 0 3px rgba(0, 0, 0, 0.35);
+}
+/* 打开着的按钮（菜单右上角的喇叭）：选中的样子 + 一直是按下去的 */
+.kmSel.kmDown, #sfxMenuBtn.on {
+  background-color: #2b3c66; transform: translateY(3px);
+  border-image-source: var(--fr-btn-d); border-image-slice: 6 6 7 6; border-image-width: 6px 6px 7px 6px; border-image-outset: 0 0 1px 0;
+  box-shadow: inset 0 0 0 3px var(--goldM), inset 0 -3px 0 3px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------------------------------------------------------------- 3. 面板里：正文不描边、卡片、勾选框 */
+/* 实心面板里的正文、表格、说明不描边（标题、按钮、卡片名字才描边） */
+.statRow, .hint, .setting, .keys, #itemList, #charDesc > div:not(.cdTitle), .cardSub, .cardLines,
+.mlBody, .mlSub, .mlNote, .maName, .maDesc, .maRew, .muName, .muEff, .mrName, .mrBest, .meParts, .meBal, .meItemT, .meItemN, .sfxRow, .sfxTitle { text-shadow: none; }
+/* 卡片（升级、宝箱、商人）：四个角补 3×3 黑格成缺角；史诗、传说外面再加一圈稀有度颜色的硬边。不发光、不闪、没有小星星 */
+.modal .card::after {
+  content: ""; position: absolute; inset: -3px; pointer-events: none;
+  background: linear-gradient(#000, #000) left top / 3px 3px no-repeat, linear-gradient(#000, #000) right top / 3px 3px no-repeat,
+              linear-gradient(#000, #000) left bottom / 3px 3px no-repeat, linear-gradient(#000, #000) right bottom / 3px 3px no-repeat;
+}
+.modal .card.fxR3, .modal .card.fxR4 { box-shadow: 0 0 0 2px #000, 0 0 0 5px var(--rc), 0 0 0 7px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.55), 0 9px 0 4px #000; }
+/* 勾选框：22 像素的像素方框（2 像素黑边、凹进去）；勾上 = 金色（左上亮、右下暗）+ 一个 7×7 的像素勾（2 像素一格，黑色，不是转 45° 的线） */
+.kmCheck, .mBox, .sfxBox, .mvBox { position: relative; width: 22px; height: 22px; border: 2px solid #000; background: #0b1020; box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.14); }
+.kmCheck.on, input:checked + .kmCheck, .mhCasual input:checked + .mBox, .sfxMuteRow input:checked + .sfxBox, .mvSet input:checked + .mvBox { background: var(--goldM); box-shadow: inset 2px 2px 0 var(--goldL), inset -2px -2px 0 var(--goldD); }
+.kmCheck.on::after, input:checked + .kmCheck::after, .mhCasual input:checked + .mBox::after, .sfxMuteRow input:checked + .sfxBox::after, .mvSet input:checked + .mvBox::after {
+  content: ""; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border: 0; transform: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23000' d='M6 1h1v1h-1zM5 2h2v1h-2zM0 3h1v1h-1zM4 3h2v1h-2zM0 4h2v1h-2zM3 4h2v1h-2zM1 5h3v1h-3zM2 6h1v1h-1z'/%3E%3C/svg%3E") 0 0 / 14px 14px no-repeat;
+}
+
+/* ---------------------------------------------------------------- 4. 小部件 */
+/* 小签（Kit.tag：「新」放在图块左上角里面，「已完成」放在名字后面）：12 号深色字、金底、2 像素黑圈、下面一行暗色 */
+.kmTag { display: inline-block; padding: 0 3px; background: var(--goldM); color: #2a1600; font-size: 12px; line-height: 14px; font-weight: 400; text-shadow: none; white-space: nowrap;
+  box-shadow: 0 0 0 2px #000, inset 0 -2px 0 var(--goldD); }
+.kmTag.r-red { background: var(--redM); color: var(--redF); box-shadow: 0 0 0 2px #000, inset 0 -2px 0 var(--redD); }
+.kmTag.r-org { background: var(--orgM); color: var(--orgF); box-shadow: 0 0 0 2px #000, inset 0 -2px 0 var(--orgD); }
+.kmTag.r-cya { background: var(--cyaM); color: var(--cyaF); box-shadow: 0 0 0 2px #000, inset 0 -2px 0 var(--cyaD); }
+/* 进度条（Kit.bar）：凹进去的轨道 + 金色（上一行亮、下一行暗），完成 = 绿；18 像素高、数字在条里（12 号像素加粗）；
+   .thin：列表行底下 8 像素的细条（数字写在名字那一行），完成的行不显示；细条里 4 像素高的金色 = 2 像素浅金 + 2 像素暗金（同一条规则） */
+.kmBar { position: relative; height: 18px; border-style: solid; border-width: 2px; border-color: transparent; border-image: var(--fr-tile0) 4 / 4px stretch;
+  background: #0b1020; background-clip: padding-box; box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.5); }
+.kmBar > i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--goldM); box-shadow: inset 0 2px 0 var(--goldL), inset 0 -2px 0 var(--goldD); }
+.kmBar.done > i { background: #5fbf4a; box-shadow: inset 0 2px 0 #b8f0a0, inset 0 -2px 0 #2f6a24; }
+.kmBar > span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; line-height: 12px; letter-spacing: var(--o); color: #fff; text-shadow: var(--olB); white-space: nowrap; }
+.kmBar.thin { height: 8px; border-image: none; border-color: #000; box-shadow: none; }
+/* 等级格（强化）：15×9 像素的小方块，2 像素黑边，有了就是金色 */
+.kmPips { display: flex; gap: 3px; }
+.kmPips > i { flex: 0 0 15px; height: 9px; border: 2px solid #000; background: #0b1020; }
+.kmPips > i.on { background: var(--goldM); box-shadow: inset 0 2px 0 var(--goldL); }
+/* 提醒点（有东西可以买、有新东西）：9 像素金色方块 + 2 像素黑圈，不发光 */
+.kmDot { display: inline-block; flex: none; width: 9px; height: 9px; border: 2px solid #000; background: var(--goldM); }
+/* 锁：灰色（不要一墙金锁）；锁住的头像灰一点 */
+.kmLock { filter: grayscale(1) brightness(1.2); }
+.kmLockedPic { filter: grayscale(1) brightness(0.72); }
+/* 符文砖（Kit.glyphTile 给 --gc）：深色底 + 彩色的字 + 同色 2 像素内框（盖过图块原来的平涂底色和斜面） */
+.kmGlyph {
+  background-color: #161d36 !important; background-image: linear-gradient(rgba(255, 255, 255, 0.05) 50%, rgba(0, 0, 0, 0.14) 50%) !important;
+  color: var(--gc, #fff) !important; box-shadow: inset 0 0 0 2px var(--gc, #fff), inset 0 0 0 4px rgba(0, 0, 0, 0.5) !important; text-shadow: var(--ol1) !important;
+}
+/* 「标签：内容」一行（骑士介绍）：左边固定 4 个字宽的灰色标签，内容折行时挂在内容下面 */
+.kmL { display: grid; grid-template-columns: 4em minmax(0, 1fr); column-gap: 9px; }
+.kmK { color: var(--muted); white-space: nowrap; }
+.kmV { min-width: 0; text-wrap: balance; }
+/* 局内小签（Kit.slip：成就达成、魔晶提示，放在小地图下面的 #metaToasts 里）：半透明面板 + 左上角金色小签 + 图标 + 名字 18 + 奖励 12 */
+.kmSlip {
+  position: relative; display: flex; align-items: center; gap: 9px; max-width: 280px; margin-top: 9px; padding: 9px 12px 9px 9px; color: #fff; text-align: left;
+  border-style: solid; border-width: 3px; border-color: transparent;
+  border-image: var(--fr-panelT) 8 8 14 8 fill / 8px 8px 14px 8px / 0 0 6px 0 stretch;
+  background: none; box-shadow: none; animation: kmSlipIn 0.15s steps(3, jump-start);
+}
+.kmSlip.out { opacity: 0; transform: translateX(9px); transition: opacity 0.15s steps(3, end), transform 0.15s steps(3, end); }
+.kmSlip > .kmIco { --ip: 3px; }
+.kmSlip.note > .kmIco { --ip: 2px; }
+.kmSlipTab { position: absolute; left: 9px; top: -12px; padding: 0 6px; background: var(--goldM); color: #2a1600; font-size: 12px; line-height: 18px; text-shadow: none;
+  box-shadow: 0 0 0 2px #000, inset 0 -2px 0 var(--goldD); }
+.kmSlipN { font-size: var(--fs-m); line-height: 24px; text-shadow: none; text-wrap: balance; }
+/* 奖励长的（两件物品、「已买过，返还……」）在 280 像素里折成两行：两行一样长，不在下一行只剩「信用卡」」这样一小截 */
+.kmSlipR { font-size: 12px; line-height: 18px; color: var(--goldL); text-shadow: none; text-wrap: balance; }
+/* Kit.parts：并列的一项不在中间折行（只在「、」后面换行；一项比一行还长时才在里面折） */
+.kmNb { display: inline-block; max-width: 100%; }
+@keyframes kmSlipIn { from { transform: translateX(12px); opacity: 0; } }
+/* 成就小签：阵亡、通关的过场里不显示（弹窗打开时 meta.js 自己藏） */
+body.fxDead #metaToasts, body.kmEnd #metaToasts { opacity: 0; }
+
+/* ---------------------------------------------------------------- 5. 像素小图标（Kit.icon：每种颜色一个 class）；大小 = 9 × --ip（--ip 只用整数：2 / 3 / 4 像素一格） */
+.kmIco { flex: none; display: block; width: calc(var(--ip, 2px) * 9); height: calc(var(--ip, 2px) * 9); }
+/* 魔晶是 11×10 的图（2 像素一格 = 22×20，3 像素一格 = 33×30） */
+.kmIco.kmGem { width: calc(var(--ip, 2px) * 11); height: calc(var(--ip, 2px) * 10); }
+.kmIco svg, .kmPx svg { display: block; width: 100%; height: 100%; }
+.kmPx .k { fill: #000; } .kmPx .w { fill: #fff; } .kmPx .g { fill: #b9c2d2; } .kmPx .y { fill: #ffc928; } .kmPx .Y { fill: #fff2a8; } .kmPx .o { fill: #c27a0e; }
+.kmPx .r { fill: #ff5a46; } .kmPx .R { fill: #a3262c; } .kmPx .q { fill: #ffb0a0; } .kmPx .f { fill: #ff9a4a; } .kmPx .F { fill: #b4561a; }
+.kmPx .b { fill: #9a5a26; } .kmPx .B { fill: #5e3412; } .kmPx .p { fill: #c77dff; } .kmPx .P { fill: #f3d2ff; } .kmPx .v { fill: #7a2fc0; }
+.kmPx .c { fill: #6fd0ff; } .kmPx .C { fill: #c8f0ff; }
+
+/* ---------------------------------------------------------------- 6. 局内公告（Kit.announce）：一次一条，排在正上方那一列下面
+   小事 = 文字公告 .kmCall（没有底板）；Boss 和一局结束的大时刻 = 燕尾横幅 .kmRibA。top 由 kit.js 放（#topCenter 下沿 + 12，至少 84） */
+#annLayer { position: fixed; left: 0; right: 0; top: 84px; z-index: 7; pointer-events: none; display: flex; justify-content: center; }
+body.fxCine #annLayer, body.fxDead #annLayer, body.kmEnd #annLayer, body.fxWarping #annLayer, #hud.hidden ~ #annLayer { visibility: hidden; }
+/* 暂停、升级 / 宝箱弹窗打开时（body.fxHold）进场动画也停住，和计时一样 */
+body.fxHold #annLayer .kmAnn, body.fxHold #annLayer .kmAnn * { animation-play-state: paused; }
+.kmAnn { --u: 3px; --n: 12; --ip: 2px; --acL: var(--goldL); --acM: var(--goldM); --acD: var(--goldD); --acF: var(--goldF); --acT: var(--goldM);
+  position: absolute; top: 0; display: flex; flex-direction: column; align-items: center; text-align: center; white-space: nowrap; font-weight: 400; }
+#annLayer .kmAnn { animation: kmAnnIn 0.2s steps(4, jump-start) both; }
+#annLayer .kmAnn.out { animation: kmAnnOut 0.15s steps(3, end) forwards; }
+/* 用途色：金 = 好事、进度；红 = 危险（画面上没有底板的标题用 --redT，红天空上也看得清）；橙 = 强敌；青 = 系统 */
+.kmAnn.r-red { --acL: var(--redL); --acM: var(--redM); --acD: var(--redD); --acF: var(--redF); --acT: var(--redT); }
+.kmAnn.r-org { --acL: var(--orgL); --acM: var(--orgM); --acD: var(--orgD); --acF: var(--orgF); --acT: var(--orgM); }
+.kmAnn.r-cya { --acL: var(--cyaL); --acM: var(--cyaM); --acD: var(--cyaD); --acF: var(--cyaF); --acT: var(--cyaM); }
+/* 文字公告：小标签（18，浅色，描边 + 厚度）→ 标题（24；大的 36；本色，--ol3）→ 一行说明（18，白）；图标在第一行前面 */
+.kmCall .kmKick { display: flex; align-items: center; gap: 6px; font-size: var(--fs-m); line-height: 24px; color: var(--acL); text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
+.kmCall .kmCT { display: flex; align-items: center; gap: 9px; font-size: var(--fs-l); line-height: 30px; color: var(--acT); text-shadow: var(--ol3); }
+.kmCall.big .kmCT { font-size: var(--fs-xl); line-height: 42px; }
+.kmCall .kmCS { font-size: var(--fs-m); line-height: 24px; color: #eef2ff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
+.kmCall .kmIco { --ip: 2px; }
+.kmCall.big .kmCT .kmIco { --ip: 3px; }
+#annLayer .kmCall .kmCT { animation: kmTitleIn 0.16s 0.06s steps(2, jump-start) both; }
+/* 横幅：小标签 + 燕尾横幅（黑边、上一行亮色、两色深蓝、下一行暗色、1 格硬投影）+ 图标 + 标题 + 说明。一格 --u 像素，中间 --n 行 */
+.kmAnn.s-l { --u: 3px; --n: 16; --ip: 3px; }
+.kmAnn.s-xl { --u: 4px; --n: 16; --ip: 4px; }
+.kmTab { margin-bottom: 3px; font-size: var(--fs-m); line-height: 24px; color: var(--acL); text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
+.kmAnn.s-xl .kmTab { font-size: var(--fs-l); line-height: 30px; }
+.kmRibWrap { position: relative; display: flex; align-items: flex-start; height: calc(var(--u) * (var(--n) + 5)); }
+.kmCap { flex: none; position: relative; z-index: 0; display: block; width: calc(var(--u) * 8); height: calc(var(--u) * (var(--n) + 5)); }
+.kmCap.l { margin-right: calc(var(--u) * -2); }
+.kmCap.r { margin-left: calc(var(--u) * -2); transform: scaleX(-1); }
+.kmCap .k { fill: #000; } .kmCap .d { fill: var(--acD); } .kmCap .m { fill: var(--acM); } .kmCap .f { fill: var(--acF); } .kmCap .s { fill: #000; fill-opacity: 0.45; }
+.kmRib { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 2);
+  height: calc(var(--u) * (var(--n) + 3)); padding: 0 calc(var(--u) * 5) var(--u);
+  background:
+    linear-gradient(to bottom, transparent 0 var(--u), #000 var(--u) calc(var(--u) * (var(--n) + 1)), rgba(0, 0, 0, 0.45) calc(var(--u) * (var(--n) + 1)) calc(var(--u) * (var(--n) + 2)), transparent calc(var(--u) * (var(--n) + 2))) left top / var(--u) 100% no-repeat,
+    linear-gradient(to bottom, transparent 0 var(--u), #000 var(--u) calc(var(--u) * (var(--n) + 1)), rgba(0, 0, 0, 0.45) calc(var(--u) * (var(--n) + 1)) calc(var(--u) * (var(--n) + 2)), transparent calc(var(--u) * (var(--n) + 2))) right top / var(--u) 100% no-repeat,
+    linear-gradient(to bottom, #000 0 var(--u), var(--acL) var(--u) calc(var(--u) * 2), var(--navyL) calc(var(--u) * 2) calc(var(--u) * (var(--n) / 2 + 1)),
+      var(--navyD) calc(var(--u) * (var(--n) / 2 + 1)) calc(var(--u) * var(--n)), var(--acD) calc(var(--u) * var(--n)) calc(var(--u) * (var(--n) + 1)),
+      #000 calc(var(--u) * (var(--n) + 1)) calc(var(--u) * (var(--n) + 2)), rgba(0, 0, 0, 0.45) calc(var(--u) * (var(--n) + 2)) calc(var(--u) * (var(--n) + 3))) center top / calc(100% - var(--u) * 2) 100% no-repeat;
+}
+.kmTitle { display: block; font-size: var(--fs-l); line-height: 30px; color: var(--acM); text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
+.kmAnn.s-l .kmTitle { font-size: var(--fs-xl); line-height: 42px; }
+.kmAnn.s-xl .kmTitle { font-size: var(--fs-xxl); line-height: 54px; letter-spacing: var(--o); }
+#annLayer .kmTitle { animation: kmTitleIn 0.16s 0.08s steps(2, jump-start) both; }
+.kmSub { margin-top: 3px; font-size: var(--fs-m); line-height: 24px; color: #eef2ff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
+.kmAnn.s-l .kmSub, .kmAnn.s-xl .kmSub { font-size: var(--fs-l); line-height: 30px; }
+#annLayer .kmRibA { animation-name: kmRibIn; }
+@keyframes kmAnnIn { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes kmAnnOut { to { opacity: 0; transform: translateY(-9px); } }
+@keyframes kmRibIn { from { opacity: 0; transform: scaleX(0.2); } }
+@keyframes kmTitleIn { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes kmPanelIn { from { opacity: 0; transform: translateY(9px); } }
+
+/* ---------------------------------------------------------------- 7. 过场：Boss 出场、阵亡、通关、传送门、低血量、升级和宝箱的卡片
+   这些元素是 feel.js 的：它把横幅（Kit.ribbon）放进 #fxCineT / #fxBig 以后，下面带 :has(> .kmAnn) 的规则才生效 */
+/* 黑边 72 像素（竖屏 96） */
+#fxBars > div { height: 72px; }
+/* Boss 出场：名字横幅放在上面那条黑边下面、天空的位置（不压在 Boss 身上、不压前景） */
+#fxCineT:has(> .kmAnn) { top: calc(72px + 24px); bottom: auto; display: flex; justify-content: center; }
+#fxCineT.off:has(> .kmAnn) { transition: opacity 0.2s steps(2, end); }
+#fxCineT .kmAnn, #fxBig .kmAnn { position: relative; }
+#fxCineT.on .kmAnn { animation: kmRibIn 0.2s 0.05s steps(4, jump-start) both; }
+#fxCineT.on .kmTitle { animation: kmTitleIn 0.16s 0.15s steps(2, jump-start) both; }
+/* 「点击跳过」：18 号灰字，放在下面那条黑边里 */
+#fxCatch .hint { bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); padding: 0 9px; background: none; font-size: var(--fs-m); line-height: 24px; letter-spacing: 0; color: var(--muted); text-shadow: var(--ol1); }
+#fxCatch.chest .hint { bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); }
+#fxCatch.on .hint { animation: kmHint 0.1s 0.45s steps(1, end) forwards; }
+#fxCatch.end .hint { animation-delay: 0.9s; }
+@keyframes kmHint { to { opacity: 1; } }
+/* 阵亡 / 通关：大号横幅（不要 136 像素的系统字、不要转圈的光芒） */
+#fxBig:has(> .kmAnn) { top: calc(env(safe-area-inset-top, 0px) + 168px); }
+#fxBig.on:has(> .kmAnn), #fxBig.off:has(> .kmAnn) { display: flex; justify-content: center; }
+#fxBig.on .kmAnn { animation: kmRibIn 0.24s steps(4, jump-start) both; }
+#fxBig.off:has(> .kmAnn) { opacity: 0; transition: opacity 0.2s steps(2, end); }
+/* 阵亡：画面压暗用一层半透明深色（不给 3D 画布加滤镜，iPad 上每帧都要算）；HUD 收起来（通关 body.kmEnd 也一样） */
+#kmDim { position: fixed; inset: 0; z-index: 4; pointer-events: none; background: rgba(6, 9, 20, 0.55); opacity: 0; }
+body.fxDead #kmDim { opacity: 1; transition: opacity 0.3s steps(3, end); }
+body.fxDead #hud, body.kmEnd #hud { opacity: 0; transition: opacity 0.2s steps(2, end); }
+/* 传送门：不要旋转的光条，换成一格格变密的紫色像素点阵（只动 opacity） */
+#fxWarp .core { background-color: #2c0a56;
+  background-image: linear-gradient(45deg, #13041f 25%, transparent 25%, transparent 75%, #13041f 75%), linear-gradient(45deg, #13041f 25%, transparent 25%, transparent 75%, #13041f 75%);
+  background-size: 12px 12px; background-position: 0 0, 6px 6px; }
+#fxWarp.in { animation: kmWarpIn 0.55s steps(4, end) forwards; }
+#fxWarp.out { animation: kmWarpOut 0.6s steps(4, end) forwards; }
+#fxWarp.in .core { animation: kmWarpCore 0.55s steps(3, end) forwards; }
+@keyframes kmWarpIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes kmWarpOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes kmWarpCore { 0% { opacity: 0.3; } 100% { opacity: 1; } }
+/* 低血量：屏幕边上三圈硬边红框，一格一格地跳（不要大片的红色渐变）；这是唯一一直在动的东西 */
+#fxLow i { box-shadow: inset 0 0 0 6px rgba(205, 45, 45, 0.7), inset 0 0 0 12px rgba(205, 45, 45, 0.32), inset 0 0 0 18px rgba(205, 45, 45, 0.14); }
+#fxLow.on i { animation: kmBeat 1s steps(1, end) infinite; }
+#fxLow.l2 i { animation-duration: 0.85s; } #fxLow.l3 i { animation-duration: 0.7s; } #fxLow.l4 i { animation-duration: 0.55s; }
+@keyframes kmBeat { 0% { opacity: 1; } 18% { opacity: 0.55; } 30% { opacity: 0.9; } 50% { opacity: 0.35; } }
+/* 受伤方向：挨打的那一边屏幕边上一条硬边红带（6 像素亮红 + 12 像素暗红，和低血量的框是同一种），斜着来的打在那个角上（两条半边）。
+   feel.js 只换 .d0~.d7（0 = 正前方 = 上边，顺时针）和放 opacity 的动画；红带在 HUD 下面（z-index 4），不会把 HUD 的字染红 */
+#fxDir { box-shadow: inset 0 0 0 6px var(--redM), inset 0 0 0 18px rgba(163, 38, 44, 0.45); clip-path: inset(0 0 100% 0); }
+#fxDir.d0 { clip-path: inset(0 0 calc(100% - 18px) 0); }
+#fxDir.d2 { clip-path: inset(0 0 0 calc(100% - 18px)); }
+#fxDir.d4 { clip-path: inset(calc(100% - 18px) 0 0 0); }
+#fxDir.d6 { clip-path: inset(0 calc(100% - 18px) 0 0); }
+#fxDir.d1 { clip-path: polygon(50% 0, 100% 0, 100% 50%, calc(100% - 18px) 50%, calc(100% - 18px) 18px, 50% 18px); }
+#fxDir.d3 { clip-path: polygon(100% 50%, 100% 100%, 50% 100%, 50% calc(100% - 18px), calc(100% - 18px) calc(100% - 18px), calc(100% - 18px) 50%); }
+#fxDir.d5 { clip-path: polygon(50% 100%, 0 100%, 0 50%, 18px 50%, 18px calc(100% - 18px), 50% calc(100% - 18px)); }
+#fxDir.d7 { clip-path: polygon(0 50%, 0 0, 50% 0, 50% 18px, 18px 18px, 18px 50%); }
+/* 升级、宝箱：面板往上 9 像素出来；卡片一格格落下来（0.06 秒一张）；选中的卡片往上一跳消失；方形的稀有度框散开（不是圆的光圈） */
+#levelModal.fxLvOpen { animation: kmPanelIn 0.15s 0.06s steps(3, jump-start) backwards; }
+#levelModal .card.fxCard { animation: kmCardIn 0.2s steps(4, jump-start) backwards; animation-delay: calc(0.04s + var(--fi, 0) * 0.06s); }
+#levelModal.fxLvOpen .card.fxCard { animation-delay: calc(0.12s + var(--fi, 0) * 0.06s); }
+@keyframes kmCardIn { from { opacity: 0; transform: translateY(18px); } }
+.fxPop { animation: kmPop 0.24s steps(4, end) forwards; }
+@keyframes kmPop { 0% { transform: none; } 100% { transform: translateY(-36px); opacity: 0; } }
+.fxPopRing { border-radius: 0; border: 3px solid var(--rc, #ffd84a); box-shadow: 0 0 0 2px #000, inset 0 0 0 2px #000; animation: kmRing 0.24s steps(4, end) forwards; }
+@keyframes kmRing { from { transform: scale(0.6); opacity: 1; } to { transform: scale(1.2); opacity: 0; } }
+#itemModal.fxItemIn { animation: kmPanelIn 0.15s steps(3, jump-start) both; }
+#itemModal.fxItemIn .card { animation: kmCardIn 0.2s 0.06s steps(4, jump-start) both; }
+#itemModal.fxItemIn h2 { animation: kmTitleIn 0.16s steps(2, jump-start) both; }
+
+/* ---------------------------------------------------------------- 8. 竖屏、小屏、少动画 */
+@media (orientation: portrait) {
+  #fxBars > div { height: 96px; }
+  #fxCineT:has(> .kmAnn) { top: calc(96px + 24px); }
+  #fxBig:has(> .kmAnn) { top: calc(env(safe-area-inset-top, 0px) + 300px); }
+  /* 公告排在左上那一列和小地图中间（iPad 竖屏约 320 像素宽；文案有字数限制，放得下） */
+  #annLayer > .kmAnn { max-width: calc(100vw - 2 * 256px); }
+}
+/* 小屏：大横幅退一档，大号文字公告的标题 24 号 */
+@media (max-width: 700px) {
+  .kmAnn.s-l { --n: 12; } .kmAnn.s-l .kmTitle { font-size: var(--fs-l); line-height: 30px; }
+  .kmAnn.s-xl { --u: 3px; --n: 16; --ip: 3px; } .kmAnn.s-xl .kmTitle { font-size: var(--fs-xl); line-height: 42px; }
+  .kmCall.big .kmCT { font-size: var(--fs-l); line-height: 30px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #annLayer .kmAnn, #annLayer .kmTitle, #annLayer .kmCT, #fxCineT .kmAnn, #fxCineT .kmTitle, #fxBig .kmAnn, .kmSlip, #fxLow.on i { animation: none !important; }
+}

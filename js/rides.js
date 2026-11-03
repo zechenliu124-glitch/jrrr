@@ -87,7 +87,7 @@ var RIDES = {};
   };
   var nail = function (x, z) { return P.knob(0.018, [x, 0.168, z], RUST, 'metal', [1, 0.6, 1]); };
   RIDES.calcium = {
-    name: '棺材板', desc: '棺材板压不住了！骸骨骑士干脆把棺材板拆下来，装上骨头轮子当滑板——空中也能踩着滑，越滑越快。',
+    name: '棺材板', desc: '棺材板压不住了！拆下来装上骨头轮子当滑板，空中也能踩着滑。',
     stance: 'surf', deck: 0.165, len: 1.25, pivot: 0.13,
     parts: [
       // 深色包边（比盖子大一圈、矮一点），从上面看是一圈描边
@@ -261,7 +261,7 @@ var RIDES = {};
   // ---- 10 闪电骑士：雷光板（悬空的闪电形滑板） ----
   var ZIG = [[0.34, 0.5, 0.06, 0.34, 0.35], [0.34, 0.46, -0.05, -0.02, -0.35], [0.32, 0.42, 0.05, -0.38, 0.35]];
   RIDES.tony = {
-    name: '雷光板', desc: '脚踩一道金色闪电，离地悬空滑行；滑铲时电能积累翻倍。',
+    name: '雷光板', desc: '脚踩一道金色闪电，贴地飞驰。',
     stance: 'surf', deck: 0.08, hover: 0.25, len: 1.3,
     parts: ZIG.map(function (z) { return P.box([z[0], 0.05, z[1]], [z[2], 0.05, z[3]], 0xffd23a, 'gold', [0, z[4], 0]); })
       .concat(ZIG.map(function (z) { return P.box([z[0] * 1.06, 0.02, z[1] * 1.06], [z[2], 0.02, z[3]], 0x8af0ff, '!plain', [0, z[4], 0]); })),
@@ -343,7 +343,7 @@ var RIDES = {};
   // ---- 14 影骑士：影遁（化成一滩影子） ----
   var SHADOW = 0x0c0c14;
   RIDES.ninja = {
-    name: '影遁', desc: '化成一滩影子贴地滑行；滑铲时更容易闪避，闪开的敌人当场被处决。',
+    name: '影遁', desc: '化成一滩影子贴地滑行。',
     stance: 'crouch', deck: 0.02, len: 1.25,
     parts: [
       P.cyl([0.62, 0.62, 0.012, 16], [0, 0.012, 0], SHADOW, 'plain'),
@@ -476,7 +476,7 @@ var RIDES = {};
 
   // ---- 20 鹰骑士：大羽毛 ----
   RIDES.birdo = {
-    name: '大羽毛', desc: '踩着一根比人还长的大羽毛冲浪；在空中按住滑铲就能俯冲，把高度变成速度。',
+    name: '大羽毛', desc: '踩着一根比人还长的大羽毛冲浪。',
     stance: 'surf', deck: 0.08, len: 1.4,
     parts: [
       P.tbox([0.12, 0.44, 0.6, 0.025, 0.03], [0, 0.05, 0.3], 0x4e9ee8, 'ch_feather', [H, 0, 0]),
