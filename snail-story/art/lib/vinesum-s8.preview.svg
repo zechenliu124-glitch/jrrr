@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<defs><linearGradient id="vinesum-pv-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A9CBE2"/><stop offset="0.55" stop-color="#CFE4EF"/><stop offset="1" stop-color="#EAF3F2"/></linearGradient></defs>
+<rect x="-60" y="-60" width="2040" height="1200" fill="url(#vinesum-pv-sky)" filter="url(#wc-wash)"/>
+<path d="M1100 1140 L1100 1010 Q1500 960 1980 990 V1140Z" fill="#B7CFC3" opacity="0.6" filter="url(#wc-blur-far)"/>
+<use href="#vinesum-s8"/>
+<rect x="260" y="440" width="360" height="220" fill="none" stroke="#d33" stroke-width="2" stroke-dasharray="8 6" opacity="0.6"/>
+<g transform="translate(430 660) rotate(0) scale(1.0)" fill="none" stroke="#C9A06E" stroke-width="2.4" stroke-dasharray="8 6" opacity="0.85"><path d="M-150 0 L150 0 Q160 -40 130 -60 L120 -200 M135 -60 L150 -190"/><circle cx="-15" cy="-95" r="82"/></g>
+<rect x="560" y="840" width="800" height="200" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="10 8" opacity="0.6"/>
+</svg>

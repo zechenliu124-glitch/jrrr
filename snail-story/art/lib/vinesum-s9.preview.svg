@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<defs><linearGradient id="vinesum-pv-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B9D6E8"/><stop offset="0.55" stop-color="#CFE4EF"/><stop offset="1" stop-color="#F3EEDD"/></linearGradient></defs>
+<rect x="-60" y="-60" width="2040" height="1200" fill="url(#vinesum-pv-sky)" filter="url(#wc-wash)"/>
+<path d="M-60 700 Q400 600 900 660 T1980 640 V800 H-60Z" fill="#B7CFC3" filter="url(#wc-blur-far)"/>
+<path d="M-60 760 Q700 730 1300 770 T1980 760 V1140 H-60Z" fill="#A9C98B" filter="url(#wc-wash)"/>
+<use href="#vinesum-s9-far"/>
+<ellipse cx="1322" cy="652" rx="16" ry="30" transform="rotate(0 1322 652)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<ellipse cx="1408" cy="664" rx="16" ry="30" transform="rotate(0 1408 664)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<ellipse cx="1546" cy="658" rx="16" ry="30" transform="rotate(0 1546 658)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<ellipse cx="1630" cy="646" rx="16" ry="30" transform="rotate(0 1630 646)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<use href="#vinesum-s9-perch"/>
+<rect x="520" y="300" width="480" height="320" fill="none" stroke="#d33" stroke-width="2" stroke-dasharray="8 6" opacity="0.5"/>
+<g transform="translate(720 620) rotate(0) scale(1.27)" fill="none" stroke="#C9A06E" stroke-width="2.4" stroke-dasharray="8 6" opacity="0.85"><path d="M-150 0 L150 0 Q160 -40 130 -60 L120 -200 M135 -60 L150 -190"/><circle cx="-15" cy="-95" r="82"/></g>
+<rect x="560" y="840" width="800" height="200" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="10 8" opacity="0.6"/>
+</svg>

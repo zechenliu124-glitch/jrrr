@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<defs><linearGradient id="vinesum-pv-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B9D6E8"/><stop offset="0.55" stop-color="#CFE4EF"/><stop offset="1" stop-color="#EAF3F2"/></linearGradient></defs>
+<rect x="-60" y="-60" width="2040" height="1200" fill="url(#vinesum-pv-sky)" filter="url(#wc-wash)"/>
+<path d="M-60 800 Q600 780 1200 790 T1980 800 V1140 H-60Z" fill="#A9C98B" filter="url(#wc-wash)"/>
+<path d="M-60 900 Q900 870 1980 910 V1140 H-60Z" fill="#C5DBA6" opacity="0.6" filter="url(#wc-wash)"/>
+<use href="#vinesum-s7"/>
+<ellipse cx="240" cy="325" rx="58" ry="92" transform="rotate(0 240 325)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<circle cx="240" cy="230" r="4" fill="#d33"/>
+<ellipse cx="520" cy="365" rx="58" ry="92" transform="rotate(0 520 365)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<circle cx="520" cy="270" r="4" fill="#d33"/>
+<ellipse cx="800" cy="325" rx="58" ry="92" transform="rotate(0 800 325)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<circle cx="800" cy="230" r="4" fill="#d33"/>
+<ellipse cx="1560" cy="345" rx="58" ry="92" transform="rotate(0 1560 345)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<circle cx="1560" cy="250" r="4" fill="#d33"/>
+<ellipse cx="1780" cy="315" rx="58" ry="92" transform="rotate(0 1780 315)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<circle cx="1780" cy="220" r="4" fill="#d33"/>
+<ellipse cx="1660" cy="565" rx="58" ry="92" transform="rotate(0 1660 565)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<circle cx="1660" cy="470" r="4" fill="#d33"/>
+<g transform="translate(700 625) rotate(-25) scale(0.87)" fill="none" stroke="#C9A06E" stroke-width="2.4" stroke-dasharray="8 6" opacity="0.85"><path d="M-150 0 L150 0 Q160 -40 130 -60 L120 -200 M135 -60 L150 -190"/><circle cx="-15" cy="-95" r="82"/></g>
+<g transform="translate(1250 350) rotate(-25) scale(0.87)" fill="none" stroke="#C9A06E" stroke-width="2.4" stroke-dasharray="8 6" opacity="0.85"><path d="M-150 0 L150 0 Q160 -40 130 -60 L120 -200 M135 -60 L150 -190"/><circle cx="-15" cy="-95" r="82"/></g>
+<rect x="560" y="840" width="800" height="200" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="10 8" opacity="0.6"/>
+</svg>
