@@ -2,7 +2,7 @@
 <!--
   Oriole library (black-naped oriole, Oriolus chinensis) - perched, facing LEFT, tipped forward, looking down-left.
   Local origin (0,0) = where the feet grip the top of the branch (the branch is NOT included).
-  Beak tip ~(-127,-65), tail tip ~(122,-10): beak->tail ~ 255 px. Bounding box ~ x -129..124, y -107..+13.
+  Beak tip ~(-125.5,-66), tail tip ~(121,-10): beak->tail ~ 253 px. Bounding box ~ x -127..124, y -105..+13.
 
   Parts (all in the same local coordinate system; layer order body < head < wing):
     oriole-body : body, breast, back, tail, legs and feet (no head, no near wing).
@@ -82,7 +82,7 @@
     <path d="M -82,-66 C -90,-54 -86,-36 -70,-25 C -54,-14 -30,-10 -8,-11 C 12,-12 32,-16 48,-23 C 58,-27 63,-32 62,-38 C 61,-45 55,-49 47,-53 C 28,-63 6,-76 -18,-86 C -34,-92 -52,-94 -64,-88 C -74,-83 -80,-76 -82,-66 Z"/>
   </clipPath>
   <clipPath id="oriole-clip-head">
-    <path d="M -103.5,-82 C -103,-91 -96,-100 -86,-103 C -76,-106 -64,-104 -57,-97 C -51,-91 -47,-83 -47,-74 C -47,-64 -54,-56 -64,-53 C -74,-50 -84,-53 -90,-59 C -94,-63 -97,-67 -99,-70.5 C -101,-74 -103,-78 -103.5,-82 Z"/>
+    <path d="M -103.5,-82 C -102,-90 -96,-98.5 -86,-101.5 C -76,-104 -65,-102.6 -57,-96.6 C -51,-91 -47,-83 -47,-74 C -47,-64 -54,-56 -64,-53 C -74,-50 -84,-53 -90,-59 C -94,-63 -97,-67 -99,-70.5 C -101,-74 -103,-78 -103.5,-82 Z"/>
   </clipPath>
   <clipPath id="oriole-clip-tail">
     <path d="M -4,-9 C 22,-9.5 50,-8.5 74,-6.5 C 79,-5.5 81.5,-1 80.5,4 C 79.5,9 76,12 70,12.5 C 48,12 24,10 -4,8.5 Z"/>
@@ -215,22 +215,22 @@
     <g mask="url(#oriole-mask-head)">
       <!-- beak (under the forehead feathers) -->
       <g filter="url(#wc-paint-soft)">
-        <path d="M -100,-74.5 C -109,-71.5 -119,-67.5 -127.5,-65 C -120,-63.6 -109,-64.2 -99,-69.5 Z" fill="url(#oriole-g-beak-lo)"/>
-        <path d="M -102.5,-82.8 C -109,-80.8 -118,-74.8 -127.5,-65 C -119,-67.5 -109,-71.5 -100,-74.5 Z" fill="url(#oriole-g-beak-up)"/>
-        <path d="M -103.5,-81.8 C -110,-79.8 -117,-75 -124.5,-67.8" fill="none" stroke="#F4CCC1" stroke-width="1.2" opacity="0.6" stroke-linecap="round"/>
-        <path d="M -100,-74.5 C -109,-71.5 -119,-67.5 -126.5,-65.3" fill="none" stroke="#9E6258" stroke-width="0.9" opacity="0.6"/>
+        <path d="M -100,-74.5 C -109,-71.6 -118,-68.2 -125.5,-66.2 C -119,-65 -109,-65 -99.5,-70 Z" fill="url(#oriole-g-beak-lo)"/>
+        <path d="M -102.5,-82.4 C -108.5,-80.6 -117,-75.2 -125.5,-66.2 C -118,-68.2 -109,-71.6 -100,-74.5 Z" fill="url(#oriole-g-beak-up)"/>
+        <path d="M -103.5,-81.6 C -109.5,-79.8 -116,-75.4 -122.8,-68.8" fill="none" stroke="#F4CCC1" stroke-width="1.2" opacity="0.6" stroke-linecap="round"/>
+        <path d="M -100,-74.5 C -109,-71.6 -118,-68.2 -124.6,-66.4" fill="none" stroke="#9E6258" stroke-width="0.9" opacity="0.6"/>
         <ellipse cx="-108" cy="-78.6" rx="1.7" ry="0.8" transform="rotate(-30 -108 -78.6)" fill="#9C6157" opacity="0.55"/>
       </g>
       <!-- head -->
       <g filter="url(#wc-paint)">
-        <path d="M -103.5,-82 C -103,-91 -96,-100 -86,-103 C -76,-106 -64,-104 -57,-97 C -51,-91 -47,-83 -47,-74 C -47,-64 -54,-56 -64,-53 C -74,-50 -84,-53 -90,-59 C -94,-63 -97,-67 -99,-70.5 C -101,-74 -103,-78 -103.5,-82 Z" fill="url(#oriole-g-head)"/>
+        <path d="M -103.5,-82 C -102,-90 -96,-98.5 -86,-101.5 C -76,-104 -65,-102.6 -57,-96.6 C -51,-91 -47,-83 -47,-74 C -47,-64 -54,-56 -64,-53 C -74,-50 -84,-53 -90,-59 C -94,-63 -97,-67 -99,-70.5 C -101,-74 -103,-78 -103.5,-82 Z" fill="url(#oriole-g-head)"/>
         <g clip-path="url(#oriole-clip-head)">
           <!-- soft shade on the lower back of the head / side of neck -->
           <ellipse cx="-58" cy="-66" rx="12" ry="16" fill="#D3B35B" opacity="0.45" filter="url(#oriole-f-blur4)"/>
           <!-- throat / under-jaw shade -->
           <ellipse cx="-76" cy="-55" rx="20" ry="8" fill="#D2B25A" opacity="0.5" filter="url(#oriole-f-blur4)"/>
           <!-- crown highlight -->
-          <ellipse cx="-84" cy="-99" rx="12" ry="5" fill="#FBF0C8" opacity="0.6" filter="url(#oriole-f-blur2)"/>
+          <ellipse cx="-84" cy="-97.5" rx="12" ry="4.6" fill="#FBF0C8" opacity="0.6" filter="url(#oriole-f-blur2)"/>
           <!-- black band: lores - eye - nape -->
           <path d="M -105,-80 C -99,-85 -94,-89.5 -88,-91.2 C -81,-93.2 -73,-95.8 -66,-98.6 C -62,-100.2 -58.5,-99.6 -55.5,-97.2 C -53,-95 -52,-91 -53,-87.4 C -53.8,-84 -56,-81.4 -59,-80.4 C -65,-79.4 -71,-79.8 -78,-80 C -84,-80.2 -90,-80.4 -95,-79.8 C -99,-79.2 -102,-77.8 -105,-76 Z" fill="url(#oriole-g-band)"/>
           <!-- soft feathered lower edge of the band -->
@@ -243,10 +243,10 @@
             <path d="M -78,-63 q 4,2 8,0.5"/><path d="M -68,-68 q 4,2 8,0"/><path d="M -64,-60 q 4,2 8,0"/>
           </g>
           <g fill="none" stroke="#FCF3D3" stroke-width="1" opacity="0.55" stroke-linecap="round">
-            <path d="M -99,-92 q 3,-3 7,-4"/><path d="M -88,-101 q 4,-1.5 8,-1"/><path d="M -75,-102 q 4,-0.5 7,1"/>
+            <path d="M -99,-92 q 3,-3 7,-4"/><path d="M -88,-99.6 q 4,-1.5 8,-1"/><path d="M -75,-100.6 q 4,-0.5 7,1"/>
           </g>
           <!-- rim light on forehead/crown -->
-          <path d="M -102.5,-87 C -100,-96 -93,-101.5 -85,-103 C -76,-104.6 -67,-102.6 -60,-98" fill="none" stroke="#FBF2D2" stroke-width="2.4" opacity="0.65" filter="url(#oriole-f-blur1)"/>
+          <path d="M -102.5,-86 C -100,-94.5 -93,-100 -85,-101.5 C -79,-102.6 -73,-102.2 -68.5,-100.9" fill="none" stroke="#FBF2D2" stroke-width="2.4" opacity="0.65" filter="url(#oriole-f-blur1)"/>
         </g>
       </g>
       <!-- eye: small dark bead with a tiny highlight -->

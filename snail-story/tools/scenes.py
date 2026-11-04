@@ -20,7 +20,7 @@ SNAIL_NECK = (58, -48)                # snail-head pivot
 SNAIL_STALK_NEAR = (127, -99)         # eyestalk base pivots
 SNAIL_STALK_FAR = (113, -99)
 ORIOLE_NECK = (-64, -72)              # oriole-head pivot
-ORIOLE_SHOULDER = (-30, -70)          # oriole-wing pivot
+ORIOLE_SHOULDER = (-40, -68)          # oriole-wing pivot (negative rotation lifts the wing)
 
 
 def tf(x, y, rot=0.0, s=1.0, flip=False):
