@@ -79,6 +79,7 @@ def bird(n, x, y, s=1.0, head_rot=0.0):
 # ---- slide geometry -----------------------------------------------------------------------------
 S4_SNAIL = dict(x=654, y=587, rot=-63, length=260)   # on the trunk's upper-left surface near (680,600)
 S4_BIRDS = [(1130, 256, 1.0), (1400, 252, 0.94)]
+S4_BIRD_HEAD = -10      # both orioles look down at the snail (低头看着蜗牛)
 
 
 def s1():
@@ -87,23 +88,29 @@ def s1():
 
 
 def s2():
+    # the new shoot sits BEHIND the vine so the trunk top hides its base (it grows out of the vine)
     return svg(bg('env-bg-s2'),
-               layer('vine', 'el', use('vine-s2')),
                layer('sprout', 'el', use('vine-s2-sprout') + pivot(972, 470)),
+               layer('vine', 'el', use('vine-s2')),
+               # the arm-tip shoots grow out of bud scales that cover their bases, so they sit above the vine
+               layer('shootL', 'el', use('vine-s2-shoot-l') + pivot(868, 541)),
+               layer('shootR', 'el', use('vine-s2-shoot-r') + pivot(1052.5, 493)),
                layer('leafL', 'el', use('vine-s2-leaf-l') + pivot(982, 425)),
                layer('leafR', 'el', use('vine-s2-leaf-r') + pivot(995, 395)))
 
 
 def s3():
+    # the crawl is split per narration beat: snail_b is the same snail drawn where the first part ends
     return svg(bg('env-bg-s3', 'vine-s3'),
-               layer('snail', 'el', snail(380, 800, -6.3, 300)))
+               layer('snail', 'el', snail(380, 800, -6.3, 300)),
+               layer('snail_b', 'el', snail(780, 756, -6.3, 300)))
 
 
 def s4():
     sn = S4_SNAIL
     return svg(bg('env-bg-s45', 'vine-s45'),
                layer('snail', 'el', snail(sn['x'], sn['y'], sn['rot'], sn['length'], shadow=False)),
-               *[l for i, (x, y, s) in enumerate(S4_BIRDS, 1) for l in bird(i, x, y, s)])
+               *[l for i, (x, y, s) in enumerate(S4_BIRDS, 1) for l in bird(i, x, y, s, S4_BIRD_HEAD)])
 
 
 def s5():
@@ -113,7 +120,7 @@ def s5():
     head = layer('snail_head', 'el', f'<g transform="{t}">{use("snail-head")}{pivot(*SNAIL_NECK)}</g>')
     body = layer('snail_body', 'el', f'<g transform="{t}">{use("snail-body")}{use("snail-shell")}</g>')
     return svg(bg('env-bg-s45', 'vine-s45'), head, body,
-               *[l for i, (x, y, s) in enumerate(S4_BIRDS, 1) for l in bird(i, x, y, s)])
+               *[l for i, (x, y, s) in enumerate(S4_BIRDS, 1) for l in bird(i, x, y, s, S4_BIRD_HEAD)])
 
 
 S6_LEAF_PIVOTS = {1: (1237.2, 485.0), 2: (601.6, 697.7), 3: (1229.7, 162.5)}
@@ -126,7 +133,10 @@ def s6():
     return svg(bg('env-bg-s6', 'vine-s6'),
                layer('sun', 'el', f'<g transform="{tf(1690, 175)}">{use("env-sun")}</g>'),
                *leaves, *grass,
-               layer('snail', 'el', snail(965, 690, -90, 300, shadow=False)))
+               # first part of the climb: straight up to just below the twig; snail_b takes over there and
+               # side-steps around the twig on the line 路上有小枝丫挡住它
+               layer('snail', 'el', snail(990, 900, -90, 300, shadow=False)),
+               layer('snail_b', 'el', snail(990, 680, -90, 300, shadow=False)))
 
 
 S7_GRAPES = [((240, 230), 1, 1.0), ((520, 270), 2, 1.05), ((800, 230), 3, 0.95),
@@ -141,15 +151,16 @@ def s7():
 
 
 def s8():
-    clouds = [layer('cloud1', 'el', f'<g transform="{tf(330, 210)}">{use("env-cloud-a")}</g>'),
-              layer('cloud2', 'el', f'<g transform="{tf(150, 440, 0, 0.9)}">{use("env-cloud-b")}</g>'),
-              layer('cloud3', 'el', f'<g transform="{tf(820, 130, 0, 0.8)}" opacity="0.85">{use("env-cloud-c")}</g>')]
-    snail_bg = f'<g transform="{tf(430, 660, 0, 300 / SNAIL_LEN)}">{use("snail-shadow")}{use("snail-headup")}</g>'
-    return svg(layer('bg', 'bg', use('env-bg-s8') + use('vinesum-s8') + snail_bg + use('env-paper')), *clouds)
+    # 淡淡的白云: soft, a little transparent; they drift BEHIND the vine top and the snail (layer 'fg')
+    clouds = [layer('cloud1', 'el', f'<g transform="{tf(330, 200)}" opacity="0.78">{use("env-cloud-a")}</g>'),
+              layer('cloud2', 'el', f'<g transform="{tf(150, 345, 0, 0.85)}" opacity="0.72">{use("env-cloud-b")}</g>'),
+              layer('cloud3', 'el', f'<g transform="{tf(820, 120, 0, 0.8)}" opacity="0.65">{use("env-cloud-c")}</g>')]
+    snail_fg = f'<g transform="{tf(430, 660, 0, 300 / SNAIL_LEN)}">{use("snail-shadow")}{use("snail-headup")}</g>'
+    return svg(bg('env-bg-s8'), *clouds, layer('fg', 'el', use('vinesum-s8') + snail_fg))
 
 
-S9_SMALL_GRAPES = [(1318, 688, 'grape-cluster-small-1'), (1410, 696, 'grape-cluster-small-2'),
-                   (1542, 692, 'grape-cluster-small-2'), (1634, 684, 'grape-cluster-small-1')]
+S9_SMALL_GRAPES = [(1318, 688, 'grape-cluster-small-1', 1.0), (1410, 698, 'grape-cluster-small-2', 0.85),
+                   (1542, 690, 'grape-cluster-small-2', 1.05), (1634, 694, 'grape-cluster-small-1', 0.9)]
 S9_HEAD = -24
 
 
@@ -158,7 +169,9 @@ def s9():
     t = tf(720, 620, 0, s)
     nx, ny = SNAIL_NECK
     hr = f'rotate({S9_HEAD} {nx} {ny})'
-    grapes = ''.join(f'<g transform="{tf(x, y)}">{use(p)}</g>' for x, y, p in S9_SMALL_GRAPES)
+    # far away: as soft and hazy as the distant vine row
+    grapes = ('<g filter="url(#wc-blur-far)" opacity="0.8">' +
+              ''.join(f'<g transform="{tf(x, y, 0, sc)}">{use(p)}</g>' for x, y, p, sc in S9_SMALL_GRAPES) + '</g>')
     body = (f'<g transform="{t}">{use("snail-shadow")}<g transform="{hr}">{use("snail-head-base")}</g>'
             f'{use("snail-body")}{use("snail-shell")}</g>')
     stalk = lambda ref, p: f'<g transform="{t}"><g transform="{hr}">{use(ref)}{pivot(*p)}</g></g>'  # noqa: E731

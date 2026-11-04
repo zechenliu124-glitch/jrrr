@@ -87,6 +87,9 @@ def state(slide, el, t, tl):
             continue
         k, dur = e['kind'], max(1, e['dur'])
         u = (t - t0) / dur
+        if k == 'hide':
+            visible = False
+            continue
         if k in ('fade', 'appear'):
             visible = True
             if k == 'fade':
@@ -99,6 +102,8 @@ def state(slide, el, t, tl):
             sc *= s0 + (1 - s0) * g
             rot += e.get('rot0', 0) * (1 - g)
         elif k == 'path':
+            if e.get('repeat'):
+                u = u % 1.0
             pts = polyline(path_segments(e))
             x, y = along(pts, ease(u, e.get('accel', 0) / 100, e.get('decel', 0) / 100))
             dx, dy = x, y
@@ -162,7 +167,7 @@ def frame(slide, t, tl, bg, layers, scale):
 def slide_length(slide, tl):
     end = 0
     for t0, e in tl:
-        if e['kind'] not in ('sway', 'flap'):
+        if e['kind'] not in ('sway', 'flap') and not e.get('repeat'):
             end = max(end, t0 + e['dur'])
     # long ambient drifts (clouds) may outlast the page; the preview stops a little after the page's budget
     return min(max(end + 1500, slide['budget'] * 1000), slide['budget'] * 1000 + 3000)
@@ -189,7 +194,11 @@ def main():
         scale = float(args[args.index('--scale') + 1])
     keys = [s['key'] for s in story.SLIDES] if args[0] == 'all' else [args[0]]
     if '--frames' in args:
-        times = [int(v) for v in args[args.index('--frames') + 1:] if v.lstrip('-').isdigit()]
+        times = []
+        for v in args[args.index('--frames') + 1:]:
+            if v.startswith('--'):
+                break
+            times.append(int(v))
         s = next(x for x in story.SLIDES if x['key'] == keys[0])
         tl = timeline(s)
         bg, layers = load_layers(s, scale)

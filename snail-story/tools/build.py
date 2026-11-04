@@ -10,6 +10,7 @@ Outputs (in the project root):
     勇敢的小蜗牛-逐句点击版.pptx     one click per narration beat (the adult clicks as the child reaches each line)
     preview/                        final-state PNG of every slide + contact sheet
 """
+import datetime
 import json
 import os
 import subprocess
@@ -85,6 +86,11 @@ def render_captions(slide):
     sf = out / 'spec.json'
     sf.write_text(json.dumps(spec, ensure_ascii=False))
     run('node', 'tools/render.js', 'text', str(sf), str(out), '--scale', str(SCALE))
+    for c in slide['captions']:
+        f = out / f"{c['id']}.png"
+        im = Image.open(f)
+        bbox = im.getchannel('A').point(lambda a: 255 if a > 2 else 0).getbbox()
+        im.crop((bbox[0] - 2, bbox[1] - 2, bbox[2] + 2, bbox[3] + 2)).save(f, optimize=True)
 
 
 def caption_box(slide, cap):
@@ -166,9 +172,12 @@ def effect_xml(e, spid, ids, start, node_type):
                 f'{_tgt(spid)}</p:cBhvr></p:animEffect>' + tail)
     if kind == 'appear':
         return head(1, 'entr') + _set_vis(ids, spid, 'visible') + tail
+    if kind == 'hide':
+        return head(1, 'exit') + _set_vis(ids, spid, 'hidden') + tail
     if kind == 'path':
         ease = (f' accel="{e["accel"] * 1000}"' if e.get('accel') else '') + \
-               (f' decel="{e["decel"] * 1000}"' if e.get('decel') else '')
+               (f' decel="{e["decel"] * 1000}"' if e.get('decel') else '') + \
+               (' repeatCount="indefinite"' if e.get('repeat') else '')
         return (head(0, 'path', ease) +
                 f'<p:animMotion origin="layout" path="{path_string(path_segments(e))}" pathEditMode="relative" '
                 f'rAng="0"><p:cBhvr><p:cTn id="{ids()}" dur="{dur}" fill="hold"/>{_tgt(spid)}<p:attrNameLst>'
@@ -258,7 +267,8 @@ EFFECT_WORDS = {
     'sway': '轻轻摆动（循环）', 'flap': '扇动翅膀（循环）',
 }
 EL_WORDS = {
-    'snail': '小蜗牛', 'vine': '葡萄藤', 'sprout': '嫩芽', 'leafL': '小叶子', 'leafR': '小叶子', 'sun': '太阳',
+    'snail': '小蜗牛', 'snail_b': '小蜗牛', 'vine': '葡萄藤', 'sprout': '嫩芽', 'shootL': '嫩芽', 'shootR': '嫩芽',
+    'leafL': '小叶子', 'leafR': '小叶子', 'sun': '太阳',
     'snail_head': '小蜗牛抬头', 'bird1_head': '黄鹂歪头', 'bird2_head': '黄鹂歪头', 'stalk_near': '触角',
     'stalk_far': '触角',
 }
@@ -269,7 +279,11 @@ def describe(beat, slide):
     parts, seen = [], set()
     for e in beat['fx']:
         el = e['el']
-        if el in caps:
+        if e['kind'] in ('appear', 'hide'):
+            continue
+        if e.get('note'):
+            w = e['note']
+        elif el in caps:
             w = f'字幕「{caps[el]}」淡入'
         elif el.startswith('bird'):
             w = {'flap': '黄鹂扇动翅膀', 'turn': '黄鹂轻轻歪头'}.get(e['kind'], '两只黄鹂鸟缓缓飞到枝头')
@@ -281,10 +295,15 @@ def describe(beat, slide):
             w = '叶子、小草随风轻轻摆动'
         else:
             w = EL_WORDS.get(el, el) + ('' if el in ('snail_head',) else EFFECT_WORDS[e['kind']])
-        if w not in seen and e['kind'] != 'appear':
+        if w not in seen:
             seen.add(w)
             parts.append(w)
     return '，'.join(parts) or '（画面静止，先讲这一句）'
+
+
+def said(b):
+    """The narration of a beat for the notes: a stage direction in （） stays as it is, words get 「」."""
+    return b['say'] if b['say'].startswith('（') else f'「{b["say"]}」'
 
 
 def notes_text(slide, mode, index):
@@ -295,20 +314,23 @@ def notes_text(slide, mode, index):
         lines.append('【画面】翻到本页后，动画按故事顺序自己慢慢播放：')
         for b in slide['beats']:
             if b['fx']:
-                lines.append(f'  · 约第 {b["at"] / 1000:g} 秒（“{b["say"]}”）：{describe(b, slide)}')
+                lines.append(f'  · 约第 {b["at"] / 1000:g} 秒 {said(b)}：{describe(b, slide)}')
         lines += ['', '【翻页】小朋友讲完本页后，单击一次翻到下一页。']
     else:
         lines.append('【画面与点击】')
         n = 0
         for i, b in enumerate(slide['beats']):
             if i == 0 and not b['click']:
-                lines.append(f'  · 翻到本页后自动（“{b["say"]}”）：{describe(b, slide)}')
+                lines.append(f'  · 翻到本页后自动 {said(b)}：{describe(b, slide)}')
             elif b['click']:
                 n += 1
-                lines.append(f'  · 第{n}次单击（讲到“{b["say"]}”时）：{describe(b, slide)}')
+                lines.append(f'  · 第{n}次单击（讲到{said(b)}时）：{describe(b, slide)}')
             else:
-                lines.append(f'  · 紧接着自动（“{b["say"]}”）：{describe(b, slide)}')
-        lines += ['', f'【翻页】本页有 {n} 次单击动画；动画都出来、小朋友讲完后，再单击一次翻到下一页。']
+                lines.append(f'  · 约第 {b["at"] / 1000:g} 秒自动 {said(b)}：{describe(b, slide)}')
+        if n:
+            lines += ['', f'【翻页】本页有 {n} 次单击动画；动画都出来、小朋友讲完后，再单击一次翻到下一页。']
+        else:
+            lines += ['', '【翻页】本页的动画都会自己播放，不用点；小朋友讲完后，单击一次翻到下一页。']
     return '\n'.join(lines)
 
 
@@ -333,7 +355,8 @@ def add_pic(slide, path, box, name, descr):
 
 
 DESCR = {
-    'snail': '小蜗牛', 'vine': '葡萄藤', 'sprout': '嫩芽', 'leafL': '嫩叶', 'leafR': '嫩叶', 'sun': '太阳',
+    'snail': '小蜗牛', 'snail_b': '小蜗牛（接着爬的那一段）', 'fg': '小蜗牛和葡萄藤', 'vine': '葡萄藤', 'sprout': '嫩芽',
+    'shootL': '嫩芽', 'shootR': '嫩芽', 'leafL': '嫩叶', 'leafR': '嫩叶', 'sun': '太阳',
     'snail_head': '小蜗牛的头', 'snail_body': '小蜗牛', 'stalk_near': '小蜗牛的触角', 'stalk_far': '小蜗牛的触角',
 }
 
@@ -364,11 +387,34 @@ def build_deck(mode, out_path):
         if t:
             sld.append(etree.fromstring(t))
         slide.notes_slide.notes_text_frame.text = notes_text(s, mode, idx)
-    prs.core_properties.title = '勇敢的小蜗牛'
-    prs.core_properties.subject = '幼儿园故事比赛 · 故事表演'
-    prs.core_properties.author = ''
+    now = datetime.datetime.now().replace(microsecond=0)
+    cp = prs.core_properties
+    cp.title, cp.subject, cp.author, cp.last_modified_by = '勇敢的小蜗牛', '幼儿园故事比赛 · 故事表演', '', ''
+    cp.comments, cp.keywords, cp.created, cp.modified, cp.revision = '', '', now, now, 1
     prs.save(out_path)
+    fix_package(out_path, len(story.SLIDES))
     print('wrote', out_path.relative_to(ROOT))
+
+
+def fix_package(path, n_slides):
+    """python-pptx's template leaves 4:3 labels in the package; make it say 16:9 widescreen."""
+    import re
+    import shutil
+    import zipfile
+    tmp = path.with_suffix('.tmp')
+    with zipfile.ZipFile(path) as zin, zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename == 'ppt/presentation.xml':
+                data = data.replace(b' type="screen4x3"', b'')
+            elif item.filename == 'docProps/app.xml':
+                t = data.decode('utf-8')
+                t = re.sub(r'<PresentationFormat>[^<]*</PresentationFormat>', '<PresentationFormat>宽屏</PresentationFormat>', t)
+                t = re.sub(r'<Slides>\d+</Slides>', f'<Slides>{n_slides}</Slides>', t)
+                t = re.sub(r'<Notes>\d+</Notes>', f'<Notes>{n_slides}</Notes>', t)
+                data = t.encode('utf-8')
+            zout.writestr(item, data)
+    shutil.move(tmp, path)
 
 
 # ----------------------------------------------------------------------------- previews
@@ -381,6 +427,9 @@ def end_offset(slide, el):
             if e['el'] == el and e['kind'] == 'path':
                 seg = path_segments(resolve(slide, e))[-1]
                 dx, dy = seg[-2], seg[-1]
+                if e.get('repeat'):   # endless drift: where it is when the page's time is up (straight paths)
+                    k = ((slide['budget'] * 1000 - b['at'] - e['start']) / e['dur']) % 1.0
+                    dx, dy = dx * k, dy * k
     return dx, dy
 
 
@@ -398,7 +447,10 @@ def write_previews():
         layers = [(sdir / f'{el}.png', meta['boxes'][el], el) for el in meta['order']]
         layers += [(BUILD / 'captions' / s['key'] / f"{c['id']}.png", caption_box(s, c), c['id'])
                    for c in s['captions']]
+        hidden = {e['el'] for b in s['beats'] for e in b['fx'] if e['kind'] == 'hide'}
         for path, box, el in layers:
+            if el in hidden:
+                continue
             im = Image.open(path).convert('RGBA')
             im = im.resize((max(1, round(box['w'])), max(1, round(box['h']))), Image.LANCZOS)
             rot = end_rotation(s, el)

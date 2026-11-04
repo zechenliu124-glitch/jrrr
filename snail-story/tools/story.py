@@ -15,7 +15,10 @@ Every effect has `start` (ms, relative to its beat) and `dur` (ms).
 Effect kinds (all slow and soft — no flashing, no bouncing):
   fade      fade in (entrance)
   appear    become visible (used together with a path that starts off-screen)
+  hide      become invisible at once (used for a seamless hand-over between two identical pictures, so a long
+            crawl can be split into one movement per narration beat without chaining two motion paths)
   path      move along a straight / smooth path; pts are offsets in slide px from the element's drawn position
+            (repeat=True: endless, very slow ambient drift — a click never fast-forwards it)
   grow      fade in while growing from its pivot (scale `scale0` -> 1) and turning (`rot0` deg -> 0)
   turn      rotate by `deg` around the pivot and stay there
   sway      endless gentle swing ±amp/2 deg around the pivot, one swing per `period` ms (until the slide ends)
@@ -58,7 +61,7 @@ SLIDES = [
                 fade('cap_title', 0, 1200),
                 fade('cap_sub', 900, 1000),
                 fx('appear', 'snail', 1200, 1),
-                fx('path', 'snail', 1200, 6800, pts=[(-1100, 234), (0, 0)], decel=35),
+                fx('path', 'snail', 1200, 5800, pts=[(-1100, 234), (0, 0)], decel=35, note='小蜗牛从左下角慢慢爬进画面'),
             ]),
         ],
     ),
@@ -78,6 +81,8 @@ SLIDES = [
             ]),
             dict(at=3000, click=True, say='嫩嫩的绿芽刚刚冒出来。', fx=[
                 fx('grow', 'sprout', 0, 3200, scale0=20, rot0=-20),
+                fx('grow', 'shootL', 400, 2800, scale0=20, rot0=-25),
+                fx('grow', 'shootR', 1000, 2800, scale0=20, rot0=25),
                 fx('grow', 'leafL', 1800, 2400, scale0=25, rot0=-35),
                 fx('grow', 'leafR', 2600, 2400, scale0=25, rot0=35),
                 fade('cap2', 600, 1000),
@@ -98,9 +103,14 @@ SLIDES = [
             dict(at=0, click=False, say='一只小蜗牛，背着重重的壳，慢慢爬过来啦。', fx=[
                 fade('snail', 0, 1500),
                 fade('cap1', 400, 1000),
-                fx('path', 'snail', 1600, 13000, pts=[(0, 0), (860, -95)]),
+                fx('path', 'snail', 1600, 5200, pts=[(0, 0), (400, -44)], accel=15, decel=10,
+                   note='小蜗牛慢慢向葡萄树爬去'),
             ]),
             dict(at=7000, click=True, say='它心里藏着一个小小的梦想：我要爬到葡萄树上，等到葡萄成熟！', fx=[
+                fx('appear', 'snail_b', 0, 1),
+                fx('hide', 'snail', 100, 1),
+                fx('path', 'snail_b', 150, 7000, pts=[(0, 0), (460, -51)], accel=10, decel=25,
+                   note='小蜗牛继续朝葡萄树爬'),
                 fade('cap2', 0, 1000),
             ]),
         ],
@@ -121,13 +131,13 @@ SLIDES = [
             ]),
             dict(at=1200, click=False, say='树上飞来两只黄鹂鸟，看见慢慢爬的蜗牛，嘻嘻哈哈地笑起来。', fx=[
                 *[fx('appear', e, 0, 1) for e in ('bird1_body', 'bird1_head', 'bird1_wing')],
-                *[fx('path', e, 0, 4800, pts=[(640, -430), (0, 0)], decel=60)
+                *[fx('path', e, 0, 4800, pts=[(640, -430), (0, 0)], decel=60, note='两只黄鹂鸟缓缓飞到枝头')
                   for e in ('bird1_body', 'bird1_head', 'bird1_wing')],
-                fx('flap', 'bird1_wing', 0, 0, deg=-24, period=900),
+                fx('flap', 'bird1_wing', 0, 0, deg=-24, period=900, note='黄鹂一直轻轻扇动翅膀'),
                 *[fx('appear', e, 600, 1) for e in ('bird2_body', 'bird2_head', 'bird2_wing')],
-                *[fx('path', e, 600, 5000, pts=[(560, -470), (0, 0)], decel=60)
+                *[fx('path', e, 600, 5000, pts=[(560, -470), (0, 0)], decel=60, note='两只黄鹂鸟缓缓飞到枝头')
                   for e in ('bird2_body', 'bird2_head', 'bird2_wing')],
-                fx('flap', 'bird2_wing', 600, 0, deg=-24, period=1000),
+                fx('flap', 'bird2_wing', 600, 0, deg=-24, period=1000, note='黄鹂一直轻轻扇动翅膀'),
                 fade('cap1', 1500, 1000),
             ]),
             dict(at=9500, click=True, say='黄鹂鸟说：“蜗牛蜗牛！葡萄成熟还早得很呢，你现在爬上来干什么？”', fx=[
@@ -148,9 +158,9 @@ SLIDES = [
         beats=[
             dict(at=0, click=False, say='小蜗牛听了，心里有一点点难过。可是它没有停下。', fx=[]),
             dict(at=6000, click=True, say='它对黄鹂鸟说：“黄鹂鸟，请你不要笑我。', fx=[
-                fx('turn', 'snail_head', 0, 1800, deg=-14),
-                fx('turn', 'bird1_head', 1400, 1400, deg=-12),
-                fx('turn', 'bird2_head', 2000, 1400, deg=-12),
+                fx('turn', 'snail_head', 0, 1800, deg=10),
+                fx('turn', 'bird1_head', 1400, 1400, deg=-7),
+                fx('turn', 'bird2_head', 2000, 1400, deg=-7),
                 fade('cap1', 300, 1000),
             ]),
             dict(at=13500, click=True, say='我爬得很慢，但是，等我爬上，它就成熟啦！”', fx=[
@@ -165,16 +175,17 @@ SLIDES = [
                   '路上有小枝丫挡住它，绕一绕，还是继续向前。',
         budget=21,
         captions=[
-            dict(id='cap1', text='一步一步往上爬', size=84, color=BROWN, y=CAP_Y2[0]),
-            dict(id='cap2', text='绕一绕，继续向前', size=84, color=BROWN, y=CAP_Y2[1]),
+            dict(id='cap1', text='一步一步往上爬', x=1440, size=80, color=BROWN, y=CAP_Y2[0]),
+            dict(id='cap2', text='绕一绕，继续向前', x=1440, size=80, color=BROWN, y=CAP_Y2[1]),
         ],
         beats=[
             dict(at=0, click=False, say='太阳晒得暖暖的，小蜗牛，一步一步往上爬。', fx=[
                 fade('sun', 0, 2000),
-                fx('path', 'snail', 1800, 17500, path='climb'),
+                fx('path', 'snail', 1800, 9500, pts=[(0, 0), (0, -220)], accel=12, decel=20,
+                   note='小蜗牛沿着树干一步一步往上爬'),
                 fade('cap1', 2600, 1000),
             ]),
-            dict(at=6500, click=True, say='风吹过来，小蜗牛，一步一步往上爬。', fx=[
+            dict(at=6500, click=False, say='风吹过来，小蜗牛，一步一步往上爬。', fx=[
                 fx('sway', 'leaf1', 0, 0, amp=10, period=3000),
                 fx('sway', 'leaf2', 300, 0, amp=9, period=3400),
                 fx('sway', 'leaf3', 600, 0, amp=10, period=3200),
@@ -182,7 +193,10 @@ SLIDES = [
                 fx('sway', 'grass2', 450, 0, amp=8, period=3100),
             ]),
             dict(at=14000, click=True, say='路上有小枝丫挡住它，绕一绕，还是继续向前。', fx=[
-                fade('cap2', 0, 1000),
+                fx('appear', 'snail_b', 0, 1),
+                fx('hide', 'snail', 100, 1),
+                fx('path', 'snail_b', 200, 6500, path='detour', accel=10, decel=25, note='小蜗牛绕过小枝丫，继续向前'),
+                fade('cap2', 400, 1000),
             ]),
         ],
     ),
@@ -201,7 +215,7 @@ SLIDES = [
                 fade('cap1', 2200, 1000),
             ]),
             dict(at=7800, click=True, say='这时候，小蜗牛终于爬到了高高的葡萄树上！', fx=[
-                fx('path', 'snail', 0, 7000, path='branch', decel=45),
+                fx('path', 'snail', 0, 7000, path='branch', accel=15, decel=45, note='小蜗牛缓缓爬到枝头停下'),
                 fade('cap2', 2500, 1000),
             ]),
         ],
@@ -215,13 +229,13 @@ SLIDES = [
         captions=[
             dict(id='cap1', text='小小的天，也可以有大大的梦想', x=1250, size=72, color=BROWN, y=790),
             dict(id='cap2', text='坚持往前走', x=1250, size=72, color=BROWN, y=890),
-            dict(id='cap3', text='总有一天，会拥有属于自己的天！', x=1250, size=72, color=GREEN, y=990),
+            dict(id='cap3', text='总有一天，会拥有属于自己的天！', x=1250, size=72, color=BROWN, y=990),
         ],
         beats=[
             dict(at=0, click=False, say='风吹干它流过的汗，它站在高高的地方，看见了蓝蓝的天。', fx=[
-                fx('path', 'cloud1', 0, 36000, pts=[(0, 0), (1150, 0)]),
-                fx('path', 'cloud2', 0, 44000, pts=[(0, 0), (1250, 0)]),
-                fx('path', 'cloud3', 0, 32000, pts=[(0, 0), (820, 0)]),
+                fx('path', 'cloud1', 0, 60000, pts=[(0, 0), (1900, 0)], repeat=True, note='白云从左向右慢慢飘'),
+                fx('path', 'cloud2', 0, 66000, pts=[(0, 0), (2000, 0)], repeat=True, note='白云从左向右慢慢飘'),
+                fx('path', 'cloud3', 0, 56000, pts=[(0, 0), (1500, 0)], repeat=True, note='白云从左向右慢慢飘'),
             ]),
             dict(at=8500, click=True, say='小蜗牛告诉大家：小小的天，也可以有大大的梦想。', fx=[
                 fade('cap1', 0, 1200),
@@ -240,15 +254,15 @@ SLIDES = [
         narration='我的故事讲完啦，谢谢大家！（鞠躬）',
         budget=8,
         captions=[
-            dict(id='cap1', text='我的故事讲完啦', size=84, color=BROWN, y=835),
-            dict(id='cap2', text='谢谢大家！', size=100, color=GREEN, y=945),
-            dict(id='cap3', text='我要一步一步往上爬', size=46, color=PURPLE, y=1036, spacing=0.2),
+            dict(id='cap1', text='我的故事讲完啦', size=84, color=BROWN, y=812),
+            dict(id='cap2', text='谢谢大家！', size=100, color=GREEN, y=920),
+            dict(id='cap3', text='我要一步一步往上爬', size=46, color=PURPLE, y=1006, spacing=0.2),
         ],
         beats=[
             dict(at=0, click=False, say='我的故事讲完啦，谢谢大家！', fx=[
                 fade('cap1', 300, 1200),
-                fx('sway', 'stalk_far', 900, 0, amp=12, period=2300),
-                fx('sway', 'stalk_near', 1100, 0, amp=14, period=2000),
+                fx('sway', 'stalk_far', 900, 0, amp=12, period=2300, note='小蜗牛轻轻晃动触角（一直轻轻晃）'),
+                fx('sway', 'stalk_near', 1100, 0, amp=14, period=2000, note='小蜗牛轻轻晃动触角（一直轻轻晃）'),
                 fade('cap2', 1800, 1200),
                 fade('cap3', 3600, 1500),
             ]),
@@ -258,9 +272,8 @@ SLIDES = [
 
 # Named motion paths (offsets in slide px from the element's drawn position; 'C' = smooth Bezier).
 PATHS = {
-    # slide 6: straight up the trunk, a smooth detour to the left around the twig, then on up
-    's6.climb': [('M', 0, 0), ('L', 0, -170), ('C', 0, -220, -80, -240, -80, -290),
-                 ('C', -80, -340, 0, -360, 0, -410), ('L', 6, -445)],
+    # slide 6, second part of the climb: side-step left around the twig, then on up beside it
+    's6.detour': [('M', 0, 0), ('C', 0, -20, -70, -25, -70, -70), ('L', -70, -230)],
     # slide 7: along the rising branch to its tip
     's7.branch': [('M', 0, 0), ('L', 550, -248)],
 }

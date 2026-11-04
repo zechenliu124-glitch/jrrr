@@ -2,9 +2,9 @@
 <g id="layer-bg" data-layer="bg"><use href="#env-bg-s45"/><use href="#vine-s45"/><use href="#env-paper"/></g>
 <g id="layer-snail" data-layer="el"><g transform="translate(654.0 587.0) rotate(-63.00) scale(0.8360 0.8360)"><use href="#snail"/></g></g>
 <g id="layer-bird1_body" data-layer="el"><g transform="translate(1130.0 256.0) rotate(0.00) scale(1.0000 1.0000)"><use href="#oriole-body"/></g></g>
-<g id="layer-bird1_head" data-layer="el"><g transform="translate(1130.0 256.0) rotate(0.00) scale(1.0000 1.0000)"><g transform="rotate(0.0 -64 -72)"><use href="#oriole-head"/><circle class="pivot" cx="-64" cy="-72" r="0.5" fill="none"/></g></g></g>
+<g id="layer-bird1_head" data-layer="el"><g transform="translate(1130.0 256.0) rotate(0.00) scale(1.0000 1.0000)"><g transform="rotate(-10 -64 -72)"><use href="#oriole-head"/><circle class="pivot" cx="-64" cy="-72" r="0.5" fill="none"/></g></g></g>
 <g id="layer-bird1_wing" data-layer="el"><g transform="translate(1130.0 256.0) rotate(0.00) scale(1.0000 1.0000)"><use href="#oriole-wing"/><circle class="pivot" cx="-40" cy="-68" r="0.5" fill="none"/></g></g>
 <g id="layer-bird2_body" data-layer="el"><g transform="translate(1400.0 252.0) rotate(0.00) scale(0.9400 0.9400)"><use href="#oriole-body"/></g></g>
-<g id="layer-bird2_head" data-layer="el"><g transform="translate(1400.0 252.0) rotate(0.00) scale(0.9400 0.9400)"><g transform="rotate(0.0 -64 -72)"><use href="#oriole-head"/><circle class="pivot" cx="-64" cy="-72" r="0.5" fill="none"/></g></g></g>
+<g id="layer-bird2_head" data-layer="el"><g transform="translate(1400.0 252.0) rotate(0.00) scale(0.9400 0.9400)"><g transform="rotate(-10 -64 -72)"><use href="#oriole-head"/><circle class="pivot" cx="-64" cy="-72" r="0.5" fill="none"/></g></g></g>
 <g id="layer-bird2_wing" data-layer="el"><g transform="translate(1400.0 252.0) rotate(0.00) scale(0.9400 0.9400)"><use href="#oriole-wing"/><circle class="pivot" cx="-40" cy="-68" r="0.5" fill="none"/></g></g>
 </svg>
