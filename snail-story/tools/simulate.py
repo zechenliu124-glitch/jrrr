@@ -90,6 +90,12 @@ def state(slide, el, t, tl):
         if k == 'hide':
             visible = False
             continue
+        if k == 'fadeout':
+            if u >= 1:
+                visible = False
+            else:
+                op = min(op, 1 - ease(u))
+            continue
         if k in ('fade', 'appear'):
             visible = True
             if k == 'fade':
@@ -103,7 +109,8 @@ def state(slide, el, t, tl):
             rot += e.get('rot0', 0) * (1 - g)
         elif k == 'path':
             if e.get('repeat'):
-                u = u % 1.0
+                u = u % (2.0 if e.get('autorev') else 1.0)
+                u = 2 - u if u > 1 else u
             pts = polyline(path_segments(e))
             x, y = along(pts, ease(u, e.get('accel', 0) / 100, e.get('decel', 0) / 100))
             dx, dy = x, y

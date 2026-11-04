@@ -11,6 +11,7 @@ Outputs (in the project root):
     preview/                        final-state PNG of every slide + contact sheet
 """
 import datetime
+import io
 import json
 import os
 import subprocess
@@ -33,6 +34,7 @@ W, H = story.W, story.H
 EMU = 6350                      # EMU per slide pixel (12192000 / 1920)
 SCALE = 2                       # render scale of layers and captions
 BG_SIZE = (2560, 1440)          # background JPEG size
+THUMB = ROOT / 'preview' / '01-s1.jpg'   # file-browser thumbnail (written by write_previews)
 
 NS = {
     'p': 'http://schemas.openxmlformats.org/presentationml/2006/main',
@@ -172,12 +174,17 @@ def effect_xml(e, spid, ids, start, node_type):
                 f'{_tgt(spid)}</p:cBhvr></p:animEffect>' + tail)
     if kind == 'appear':
         return head(1, 'entr') + _set_vis(ids, spid, 'visible') + tail
+    if kind == 'fadeout':
+        return (head(10, 'exit') +
+                f'<p:animEffect transition="out" filter="fade"><p:cBhvr><p:cTn id="{ids()}" dur="{dur}"/>'
+                f'{_tgt(spid)}</p:cBhvr></p:animEffect>' + _set_vis(ids, spid, 'hidden', delay=max(0, dur - 1)) + tail)
     if kind == 'hide':
         return head(1, 'exit') + _set_vis(ids, spid, 'hidden') + tail
     if kind == 'path':
         ease = (f' accel="{e["accel"] * 1000}"' if e.get('accel') else '') + \
                (f' decel="{e["decel"] * 1000}"' if e.get('decel') else '') + \
-               (' repeatCount="indefinite"' if e.get('repeat') else '')
+               (' repeatCount="indefinite"' if e.get('repeat') else '') + \
+               (' autoRev="1"' if e.get('autorev') else '')
         return (head(0, 'path', ease) +
                 f'<p:animMotion origin="layout" path="{path_string(path_segments(e))}" pathEditMode="relative" '
                 f'rAng="0"><p:cBhvr><p:cTn id="{ids()}" dur="{dur}" fill="hold"/>{_tgt(spid)}<p:attrNameLst>'
@@ -279,7 +286,7 @@ def describe(beat, slide):
     parts, seen = [], set()
     for e in beat['fx']:
         el = e['el']
-        if e['kind'] in ('appear', 'hide'):
+        if e['kind'] in ('appear', 'hide', 'fadeout'):
             continue
         if e.get('note'):
             w = e['note']
@@ -306,16 +313,24 @@ def said(b):
     return b['say'] if b['say'].startswith('（') else f'「{b["say"]}」'
 
 
+LAST_PAGE = ('【结束】这是最后一页：小朋友说完“谢谢大家”鞠躬后，不用再点（再点会出现黑屏“放映结束”）；'
+             '等掌声结束后按 Esc 退出放映。')
+
+
 def notes_text(slide, mode, index):
     lines = [f'第{index}页 · {slide["title"]}', '',
              '【台词】' + slide['narration'], '',
              f'【建议用时】约 {slide["budget"]} 秒（全篇 9 页约 {story.TOTAL_BUDGET // 60} 分 {story.TOTAL_BUDGET % 60} 秒）', '']
+    if any(e['kind'] == 'hide' for b in slide['beats'] for e in b['fx']):
+        lines += ['【注意】编辑时这一页能看到两只小蜗牛：这是为了让小蜗牛分两段慢慢爬（放映时只会看到一只），请不要删除。', '']
+    last = index == len(story.SLIDES)
     if mode == 'auto':
         lines.append('【画面】翻到本页后，动画按故事顺序自己慢慢播放：')
         for b in slide['beats']:
             if b['fx']:
                 lines.append(f'  · 约第 {b["at"] / 1000:g} 秒 {said(b)}：{describe(b, slide)}')
-        lines += ['', '【翻页】小朋友讲完本页后，单击一次翻到下一页。']
+        lines += ['', LAST_PAGE if last else '【翻页】小朋友讲完本页后，单击一次翻到下一页。'
+                  '（如果动画还没放完就单击，第一下会让动画直接放完，再单击一次才翻页。）']
     else:
         lines.append('【画面与点击】')
         n = 0
@@ -327,7 +342,9 @@ def notes_text(slide, mode, index):
                 lines.append(f'  · 第{n}次单击（讲到{said(b)}时）：{describe(b, slide)}')
             else:
                 lines.append(f'  · 约第 {b["at"] / 1000:g} 秒自动 {said(b)}：{describe(b, slide)}')
-        if n:
+        if last:
+            lines += ['', LAST_PAGE]
+        elif n:
             lines += ['', f'【翻页】本页有 {n} 次单击动画；动画都出来、小朋友讲完后，再单击一次翻到下一页。']
         else:
             lines += ['', '【翻页】本页的动画都会自己播放，不用点；小朋友讲完后，单击一次翻到下一页。']
@@ -407,6 +424,10 @@ def fix_package(path, n_slides):
             data = zin.read(item.filename)
             if item.filename == 'ppt/presentation.xml':
                 data = data.replace(b' type="screen4x3"', b'')
+            elif item.filename == 'docProps/thumbnail.jpeg' and THUMB.exists():
+                buf = io.BytesIO()
+                Image.open(THUMB).convert('RGB').resize((256, 144), Image.LANCZOS).save(buf, 'JPEG', quality=88)
+                data = buf.getvalue()
             elif item.filename == 'docProps/app.xml':
                 t = data.decode('utf-8')
                 t = re.sub(r'<PresentationFormat>[^<]*</PresentationFormat>', '<PresentationFormat>宽屏</PresentationFormat>', t)
@@ -428,7 +449,8 @@ def end_offset(slide, el):
                 seg = path_segments(resolve(slide, e))[-1]
                 dx, dy = seg[-2], seg[-1]
                 if e.get('repeat'):   # endless drift: where it is when the page's time is up (straight paths)
-                    k = ((slide['budget'] * 1000 - b['at'] - e['start']) / e['dur']) % 1.0
+                    k = ((slide['budget'] * 1000 - b['at'] - e['start']) / e['dur']) % (2.0 if e.get('autorev') else 1.0)
+                    k = 2 - k if k > 1 else k
                     dx, dy = dx * k, dy * k
     return dx, dy
 
@@ -447,7 +469,7 @@ def write_previews():
         layers = [(sdir / f'{el}.png', meta['boxes'][el], el) for el in meta['order']]
         layers += [(BUILD / 'captions' / s['key'] / f"{c['id']}.png", caption_box(s, c), c['id'])
                    for c in s['captions']]
-        hidden = {e['el'] for b in s['beats'] for e in b['fx'] if e['kind'] == 'hide'}
+        hidden = {e['el'] for b in s['beats'] for e in b['fx'] if e['kind'] in ('hide', 'fadeout')}
         for path, box, el in layers:
             if el in hidden:
                 continue
@@ -477,9 +499,9 @@ def main():
             if only is None or s['key'] in only:
                 render_scene(s['key'])
                 render_captions(s)
+    write_previews()
     build_deck('auto', ROOT / '勇敢的小蜗牛.pptx')
     build_deck('click', ROOT / '勇敢的小蜗牛-逐句点击版.pptx')
-    write_previews()
 
 
 if __name__ == '__main__':

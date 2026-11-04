@@ -15,10 +15,12 @@ Every effect has `start` (ms, relative to its beat) and `dur` (ms).
 Effect kinds (all slow and soft — no flashing, no bouncing):
   fade      fade in (entrance)
   appear    become visible (used together with a path that starts off-screen)
+  fadeout   fade out (exit) — used for the soft hand-over from the flying to the perched orioles
   hide      become invisible at once (used for a seamless hand-over between two identical pictures, so a long
             crawl can be split into one movement per narration beat without chaining two motion paths)
   path      move along a straight / smooth path; pts are offsets in slide px from the element's drawn position
-            (repeat=True: endless, very slow ambient drift — a click never fast-forwards it)
+            (repeat=True: endless, very slow ambient drift — a click never fast-forwards it;
+             autorev=True: it drifts back again after reaching the end, far off-screen, so it never pops)
   grow      fade in while growing from its pivot (scale `scale0` -> 1) and turning (`rot0` deg -> 0)
   turn      rotate by `deg` around the pivot and stay there
   sway      endless gentle swing ±amp/2 deg around the pivot, one swing per `period` ms (until the slide ends)
@@ -60,8 +62,8 @@ SLIDES = [
             dict(at=0, click=False, say='大家好！我今天讲的故事是《勇敢的小蜗牛》', fx=[
                 fade('cap_title', 0, 1200),
                 fade('cap_sub', 900, 1000),
-                fx('appear', 'snail', 1200, 1),
-                fx('path', 'snail', 1200, 5800, pts=[(-1100, 234), (0, 0)], decel=35, note='小蜗牛从左下角慢慢爬进画面'),
+                fx('appear', 'snail', 1000, 1),
+                fx('path', 'snail', 1000, 4800, pts=[(-1100, 234), (0, 0)], decel=35, note='小蜗牛从左下角慢慢爬进画面'),
             ]),
         ],
     ),
@@ -103,13 +105,13 @@ SLIDES = [
             dict(at=0, click=False, say='一只小蜗牛，背着重重的壳，慢慢爬过来啦。', fx=[
                 fade('snail', 0, 1500),
                 fade('cap1', 400, 1000),
-                fx('path', 'snail', 1600, 5200, pts=[(0, 0), (400, -44)], accel=15, decel=10,
+                fx('path', 'snail', 1400, 4000, pts=[(0, 0), (300, -33)], accel=15, decel=10,
                    note='小蜗牛慢慢向葡萄树爬去'),
             ]),
             dict(at=7000, click=True, say='它心里藏着一个小小的梦想：我要爬到葡萄树上，等到葡萄成熟！', fx=[
                 fx('appear', 'snail_b', 0, 1),
                 fx('hide', 'snail', 100, 1),
-                fx('path', 'snail_b', 150, 7000, pts=[(0, 0), (460, -51)], accel=10, decel=25,
+                fx('path', 'snail_b', 150, 7000, pts=[(0, 0), (560, -62)], accel=10, decel=25,
                    note='小蜗牛继续朝葡萄树爬'),
                 fade('cap2', 0, 1000),
             ]),
@@ -157,13 +159,14 @@ SLIDES = [
         ],
         beats=[
             dict(at=0, click=False, say='小蜗牛听了，心里有一点点难过。可是它没有停下。', fx=[]),
-            dict(at=6000, click=True, say='它对黄鹂鸟说：“黄鹂鸟，请你不要笑我。', fx=[
-                fx('turn', 'snail_head', 0, 1800, deg=10),
-                fx('turn', 'bird1_head', 1400, 1400, deg=-7),
-                fx('turn', 'bird2_head', 2000, 1400, deg=-7),
+            dict(at=8500, click=True, say='它对黄鹂鸟说：“黄鹂鸟，请你不要笑我。', fx=[
+                fx('turn', 'stalk_far', 0, 1800, deg=35, note='小蜗牛微微抬头，触角抬起来望向枝头的黄鹂'),
+                fx('turn', 'stalk_near', 150, 1800, deg=35, note='小蜗牛微微抬头，触角抬起来望向枝头的黄鹂'),
+                fx('turn', 'bird1_head', 1600, 1400, deg=12, note='两只黄鹂轻轻歪头'),
+                fx('turn', 'bird2_head', 2200, 1400, deg=12, note='两只黄鹂轻轻歪头'),
                 fade('cap1', 300, 1000),
             ]),
-            dict(at=13500, click=True, say='我爬得很慢，但是，等我爬上，它就成熟啦！”', fx=[
+            dict(at=15000, click=True, say='我爬得很慢，但是，等我爬上，它就成熟啦！”', fx=[
                 fade('cap2', 0, 1000),
             ]),
         ],
@@ -181,7 +184,7 @@ SLIDES = [
         beats=[
             dict(at=0, click=False, say='太阳晒得暖暖的，小蜗牛，一步一步往上爬。', fx=[
                 fade('sun', 0, 2000),
-                fx('path', 'snail', 1800, 9500, pts=[(0, 0), (0, -220)], accel=12, decel=20,
+                fx('path', 'snail', 1800, 8200, pts=[(0, 0), (0, -220)], accel=12, decel=20,
                    note='小蜗牛沿着树干一步一步往上爬'),
                 fade('cap1', 2600, 1000),
             ]),
@@ -192,10 +195,10 @@ SLIDES = [
                 fx('sway', 'grass1', 150, 0, amp=8, period=2800),
                 fx('sway', 'grass2', 450, 0, amp=8, period=3100),
             ]),
-            dict(at=14000, click=True, say='路上有小枝丫挡住它，绕一绕，还是继续向前。', fx=[
+            dict(at=12500, click=True, say='路上有小枝丫挡住它，绕一绕，还是继续向前。', fx=[
                 fx('appear', 'snail_b', 0, 1),
                 fx('hide', 'snail', 100, 1),
-                fx('path', 'snail_b', 200, 6500, path='detour', accel=10, decel=25, note='小蜗牛绕过小枝丫，继续向前'),
+                fx('path', 'snail_b', 200, 5500, path='detour', accel=10, decel=25, note='小蜗牛绕过小枝丫，继续向前'),
                 fade('cap2', 400, 1000),
             ]),
         ],
@@ -214,8 +217,8 @@ SLIDES = [
                 *[fade(f'grape{i}', 600 + (i - 1) * 850, 1400) for i in range(1, 7)],
                 fade('cap1', 2200, 1000),
             ]),
-            dict(at=7800, click=True, say='这时候，小蜗牛终于爬到了高高的葡萄树上！', fx=[
-                fx('path', 'snail', 0, 7000, path='branch', accel=15, decel=45, note='小蜗牛缓缓爬到枝头停下'),
+            dict(at=7000, click=True, say='这时候，小蜗牛终于爬到了高高的葡萄树上！', fx=[
+                fx('path', 'snail', 0, 5500, path='branch', accel=15, decel=45, note='小蜗牛缓缓爬到枝头停下'),
                 fade('cap2', 2500, 1000),
             ]),
         ],
@@ -233,17 +236,17 @@ SLIDES = [
         ],
         beats=[
             dict(at=0, click=False, say='风吹干它流过的汗，它站在高高的地方，看见了蓝蓝的天。', fx=[
-                fx('path', 'cloud1', 0, 60000, pts=[(0, 0), (1900, 0)], repeat=True, note='白云从左向右慢慢飘'),
-                fx('path', 'cloud2', 0, 66000, pts=[(0, 0), (2000, 0)], repeat=True, note='白云从左向右慢慢飘'),
-                fx('path', 'cloud3', 0, 56000, pts=[(0, 0), (1500, 0)], repeat=True, note='白云从左向右慢慢飘'),
+                fx('path', 'cloud1', 0, 60000, pts=[(0, 0), (1900, 0)], repeat=True, autorev=True, note='白云从左向右慢慢飘'),
+                fx('path', 'cloud2', 0, 66000, pts=[(0, 0), (2000, 0)], repeat=True, autorev=True, note='白云从左向右慢慢飘'),
+                fx('path', 'cloud3', 0, 56000, pts=[(0, 0), (1500, 0)], repeat=True, autorev=True, note='白云从左向右慢慢飘'),
             ]),
-            dict(at=8500, click=True, say='小蜗牛告诉大家：小小的天，也可以有大大的梦想。', fx=[
+            dict(at=9000, click=True, say='小蜗牛告诉大家：小小的天，也可以有大大的梦想。', fx=[
                 fade('cap1', 0, 1200),
             ]),
-            dict(at=15500, click=True, say='跑得快不一定厉害，坚持往前走，', fx=[
+            dict(at=16800, click=True, say='跑得快不一定厉害，坚持往前走，', fx=[
                 fade('cap2', 0, 1200),
             ]),
-            dict(at=19500, click=True, say='总有一天，会拥有属于自己的天！', fx=[
+            dict(at=21800, click=True, say='总有一天，会拥有属于自己的天！', fx=[
                 fade('cap3', 0, 1200),
             ]),
         ],

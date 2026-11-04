@@ -164,10 +164,12 @@ async function text(specFile, outDir, scale) {
     const glow = l.glow || '#fffdf7';
     const shadow = [`0 0 2px ${glow}`, `0 0 6px ${glow}`, `0 0 12px ${glow}`, `0 0 22px ${glow}`, `0 0 34px ${glow}`].join(',');
     // full-width ！？。， followed by a closing quote leave a wide hole: pull the quote in
-    const html = esc(l.text).replace(/([！？。，])”/g, '$1<span class="kq">”</span>');
+    // (！？ are centred in their em box, 。， sit at its left, so they need less)
+    const html = esc(l.text).replace(/([！？])”/g, '$1<span class="kq">”</span>').replace(/([。，])”/g, '$1<span class="kq2">”</span>');
     return `<div class="line" id="${l.id}" style="font-size:${l.size}px;color:${l.color};letter-spacing:${l.letterSpacing || 0.04}em;text-shadow:${shadow}">${html}</div>`;
   }).join('\n');
   const css = `.kq { margin-left: -0.45em; }
+.kq2 { margin-left: -0.12em; }
 .line { display: inline-block; font-family: 'MaokenZhuyuanTi'; padding: 0.55em 0.9em; line-height: 1.15; white-space: nowrap; margin: 4px; }
 body { width: 4000px; }`;
   await withPage(scale, 4000, 2400, page(body, css), async p => {

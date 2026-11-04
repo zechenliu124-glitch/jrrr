@@ -63,6 +63,17 @@ def snail(x, y, rot=0.0, length=300, shadow=True, part='snail'):
     return f'<g transform="{tf(x, y, rot, s)}">{inner}</g>'
 
 
+def snail_posed(x, y, rot=0.0, length=300, stalk_rot=0.0, shadow=True):
+    """The assembled snail with its eyestalks swung forward by stalk_rot degrees (looking where it goes)."""
+    s = length / SNAIL_LEN
+    fx_, fy_ = SNAIL_STALK_FAR
+    nx_, ny_ = SNAIL_STALK_NEAR
+    return (f'<g transform="{tf(x, y, rot, s)}">' + (use('snail-shadow') if shadow else '') +
+            f'<g transform="rotate({stalk_rot} {fx_} {fy_})">{use("snail-stalk-far")}</g>{use("snail-head-base")}'
+            f'<g transform="rotate({stalk_rot} {nx_} {ny_})">{use("snail-stalk-near")}</g>'
+            f'{use("snail-body")}{use("snail-shell")}</g>')
+
+
 def bird(n, x, y, s=1.0, head_rot=0.0):
     """Three el layers for oriole n (body, head, wing), facing left, feet at (x,y)."""
     t = tf(x, y, 0, s)
@@ -79,7 +90,8 @@ def bird(n, x, y, s=1.0, head_rot=0.0):
 # ---- slide geometry -----------------------------------------------------------------------------
 S4_SNAIL = dict(x=654, y=587, rot=-63, length=260)   # on the trunk's upper-left surface near (680,600)
 S4_BIRDS = [(1130, 256, 1.0), (1400, 252, 0.94)]
-S4_BIRD_HEAD = -10      # both orioles look down at the snail (低头看着蜗牛)
+S4_BIRD_HEAD = -15      # both orioles look down at the snail (低头看着蜗牛)
+S4_STALKS = 20          # the snail's eyestalks lean forward, up the trunk; on slide 5 they turn up to the birds
 
 
 def s1():
@@ -103,13 +115,13 @@ def s3():
     # the crawl is split per narration beat: snail_b is the same snail drawn where the first part ends
     return svg(bg('env-bg-s3', 'vine-s3'),
                layer('snail', 'el', snail(380, 800, -6.3, 300)),
-               layer('snail_b', 'el', snail(780, 756, -6.3, 300)))
+               layer('snail_b', 'el', snail(680, 767, -6.3, 300)))
 
 
 def s4():
     sn = S4_SNAIL
     return svg(bg('env-bg-s45', 'vine-s45'),
-               layer('snail', 'el', snail(sn['x'], sn['y'], sn['rot'], sn['length'], shadow=False)),
+               layer('snail', 'el', snail_posed(sn['x'], sn['y'], sn['rot'], sn['length'], S4_STALKS)),
                *[l for i, (x, y, s) in enumerate(S4_BIRDS, 1) for l in bird(i, x, y, s, S4_BIRD_HEAD)])
 
 
@@ -117,9 +129,14 @@ def s5():
     sn = S4_SNAIL
     s = sn['length'] / SNAIL_LEN
     t = tf(sn['x'], sn['y'], sn['rot'], s)
-    head = layer('snail_head', 'el', f'<g transform="{t}">{use("snail-head")}{pivot(*SNAIL_NECK)}</g>')
-    body = layer('snail_body', 'el', f'<g transform="{t}">{use("snail-body")}{use("snail-shell")}</g>')
-    return svg(bg('env-bg-s45', 'vine-s45'), head, body,
+    # 抬头望向枝头的黄鹂: the eyestalks (separate pictures, pivots at their bases) turn up toward the birds
+    def stalk(ref, p):
+        return f'<g transform="{t}"><g transform="rotate({S4_STALKS} {p[0]} {p[1]})">{use(ref)}{pivot(*p)}</g></g>'
+    return svg(bg('env-bg-s45', 'vine-s45'),
+               layer('stalk_far', 'el', stalk('snail-stalk-far', SNAIL_STALK_FAR)),
+               layer('snail_head', 'el', f'<g transform="{t}">{use("snail-head-base")}</g>'),
+               layer('stalk_near', 'el', stalk('snail-stalk-near', SNAIL_STALK_NEAR)),
+               layer('snail_body', 'el', f'<g transform="{t}">{use("snail-shadow")}{use("snail-body")}{use("snail-shell")}</g>'),
                *[l for i, (x, y, s) in enumerate(S4_BIRDS, 1) for l in bird(i, x, y, s, S4_BIRD_HEAD)])
 
 
@@ -128,15 +145,16 @@ S6_LEAF_PIVOTS = {1: (1237.2, 485.0), 2: (601.6, 697.7), 3: (1229.7, 162.5)}
 
 def s6():
     leaves = [layer(f'leaf{i}', 'el', use(f'vine-s6-leaf-{i}') + pivot(*p)) for i, p in S6_LEAF_PIVOTS.items()]
-    grass = [layer('grass1', 'el', f'<g transform="{tf(250, 905, 0, 1.0)}">{use("env-grass-tuft-a")}{pivot(0, 0)}</g>'),
-             layer('grass2', 'el', f'<g transform="{tf(1660, 915, 0, 0.9, True)}">{use("env-grass-tuft-b")}{pivot(0, 0)}</g>')]
+    # grass tufts stand on the meadow edge, clear of the captions (which sit right of the trunk)
+    grass = [layer('grass1', 'el', f'<g transform="{tf(250, 1004, 0, 1.0)}">{use("env-grass-tuft-a")}{pivot(0, 0)}</g>'),
+             layer('grass2', 'el', f'<g transform="{tf(640, 1012, 0, 0.9, True)}">{use("env-grass-tuft-b")}{pivot(0, 0)}</g>')]
     return svg(bg('env-bg-s6', 'vine-s6'),
                layer('sun', 'el', f'<g transform="{tf(1690, 175)}">{use("env-sun")}</g>'),
                *leaves, *grass,
                # first part of the climb: straight up to just below the twig; snail_b takes over there and
                # side-steps around the twig on the line 路上有小枝丫挡住它
-               layer('snail', 'el', snail(990, 900, -90, 300, shadow=False)),
-               layer('snail_b', 'el', snail(990, 680, -90, 300, shadow=False)))
+               layer('snail', 'el', snail_posed(990, 900, -90, 300, 40)),
+               layer('snail_b', 'el', snail_posed(990, 680, -90, 300, 40)))
 
 
 S7_GRAPES = [((240, 230), 1, 1.0), ((520, 270), 2, 1.05), ((800, 230), 3, 0.95),
@@ -147,7 +165,7 @@ def s7():
     grapes = [layer(f'grape{i}', 'el', f'<g transform="{tf(x, y, 0, s)}">{use(f"grape-cluster-{c}")}</g>')
               for i, ((x, y), c, s) in enumerate(S7_GRAPES, 1)]
     return svg(bg('env-bg-s7', 'vinesum-s7'), *grapes,
-               layer('snail', 'el', snail(700, 628, -24, 260, shadow=False)))
+               layer('snail', 'el', snail_posed(700, 628, -24, 260, 15)))
 
 
 def s8():
