@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <!-- placeholder backdrop: bright sky, warm light top-right (sun at 1690,175), soft grass at the bottom -->
+  <defs>
+    <linearGradient id="vine-pv6-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#B9D6E8"/><stop offset="0.55" stop-color="#CFE4EF"/><stop offset="0.85" stop-color="#EAF3F2"/>
+    </linearGradient>
+    <radialGradient id="vine-pv6-sun" cx="1690" cy="175" r="320" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FBE7B5"/><stop offset="0.3" stop-color="#F7D98E" stop-opacity="0.5"/><stop offset="1" stop-color="#F7D98E" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="-60" y="-60" width="2040" height="1200" fill="url(#vine-pv6-sky)"/>
+  <rect x="-60" y="-60" width="2040" height="1200" fill="url(#vine-pv6-sun)"/>
+  <rect x="-60" y="900" width="2040" height="240" fill="#A9C98B" filter="url(#wc-wash)"/>
+  <use href="#vine-s6"/>
+  <use href="#vine-s6-leaf-1"/>
+  <use href="#vine-s6-leaf-2"/>
+  <use href="#vine-s6-leaf-3"/>
+  <g fill="none" stroke="#c0504d" stroke-width="2" opacity="0.5">
+    <path d="M780 0V1080M1060 0V1080" stroke-dasharray="8 8"/>
+  </g>
+</svg>

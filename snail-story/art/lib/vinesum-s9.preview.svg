@@ -4,10 +4,10 @@
 <path d="M-60 700 Q400 600 900 660 T1980 640 V800 H-60Z" fill="#B7CFC3" filter="url(#wc-blur-far)"/>
 <path d="M-60 760 Q700 730 1300 770 T1980 760 V1140 H-60Z" fill="#A9C98B" filter="url(#wc-wash)"/>
 <use href="#vinesum-s9-far"/>
-<ellipse cx="1322" cy="652" rx="16" ry="30" transform="rotate(0 1322 652)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
-<ellipse cx="1408" cy="664" rx="16" ry="30" transform="rotate(0 1408 664)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
-<ellipse cx="1546" cy="658" rx="16" ry="30" transform="rotate(0 1546 658)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
-<ellipse cx="1630" cy="646" rx="16" ry="30" transform="rotate(0 1630 646)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<ellipse cx="1318" cy="718" rx="17" ry="30" transform="rotate(0 1318 718)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<ellipse cx="1410" cy="726" rx="17" ry="30" transform="rotate(0 1410 726)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<ellipse cx="1542" cy="722" rx="17" ry="30" transform="rotate(0 1542 722)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
+<ellipse cx="1634" cy="714" rx="17" ry="30" transform="rotate(0 1634 714)" fill="none" stroke="#8572A8" stroke-width="2" stroke-dasharray="7 6" opacity="0.7"/>
 <use href="#vinesum-s9-perch"/>
 <rect x="520" y="300" width="480" height="320" fill="none" stroke="#d33" stroke-width="2" stroke-dasharray="8 6" opacity="0.5"/>
 <g transform="translate(720 620) rotate(0) scale(1.27)" fill="none" stroke="#C9A06E" stroke-width="2.4" stroke-dasharray="8 6" opacity="0.85"><path d="M-150 0 L150 0 Q160 -40 130 -60 L120 -200 M135 -60 L150 -190"/><circle cx="-15" cy="-95" r="82"/></g>

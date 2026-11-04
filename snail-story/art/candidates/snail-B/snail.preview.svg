@@ -11,25 +11,25 @@
 <rect x="20" y="800" width="1760" height="290" rx="18" fill="#F7F3EA" opacity="0.82"/>
 <g transform="translate(230 400)"><use href="#snail-shadow"/><use href="#snail"/></g>
 <text x="230" y="440" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">(a) snail, scale 1, with snail-shadow</text>
-<g transform="translate(610 300) rotate(-63)"><rect x="-175" y="-2" width="460" height="74" rx="34" fill="url(#snail-pv-bark)" filter="url(#wc-paint)"/></g>
-<g transform="translate(610 300) rotate(-63)"><use href="#snail-shadow"/><use href="#snail"/></g>
+<g transform="translate(585 300) rotate(-63)"><rect x="-118" y="-2" width="400" height="74" rx="34" fill="url(#snail-pv-bark)" filter="url(#wc-paint)"/></g>
+<g transform="translate(585 300) rotate(-63)"><use href="#snail-shadow"/><use href="#snail"/></g>
 <text x="560" y="440" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">(b) rotate -63</text>
-<rect x="983" y="-60" width="84" height="470" fill="url(#snail-pv-barkv)" filter="url(#wc-paint)"/>
-<g transform="translate(985 255) rotate(-90)"><use href="#snail-shadow"/><use href="#snail"/></g>
+<rect x="1008" y="-60" width="84" height="455" fill="url(#snail-pv-barkv)" filter="url(#wc-paint)"/>
+<g transform="translate(1010 255) rotate(-90)"><use href="#snail-shadow"/><use href="#snail"/></g>
 <text x="900" y="440" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">(c) rotate -90</text>
 <g transform="translate(1270 400)"><use href="#snail-shadow"/><use href="#snail-headup"/></g>
 <text x="1270" y="440" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">(d) snail-headup</text>
 <g transform="translate(1625 400) scale(0.6)"><use href="#snail-shadow"/><use href="#snail"/></g>
 <text x="1625" y="440" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">(h) scale 0.6</text>
-<g transform="translate(220 735)"><use href="#snail-shadow"/><use href="#snail-head" transform="rotate(-25 55 -42)"/><use href="#snail-body"/><use href="#snail-shell"/></g>
+<g transform="translate(220 735)"><use href="#snail-shadow"/><use href="#snail-head" transform="rotate(-25 55 -38)"/><use href="#snail-body"/><use href="#snail-shell"/></g>
 <text x="220" y="775" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">(e) head rotate -25 around neck pivot</text>
-<g transform="translate(590 735)"><use href="#snail-shadow"/><use href="#snail-head" transform="rotate(10 55 -42)"/><use href="#snail-body"/><use href="#snail-shell"/></g>
+<g transform="translate(590 735)"><use href="#snail-shadow"/><use href="#snail-head" transform="rotate(10 55 -38)"/><use href="#snail-body"/><use href="#snail-shell"/></g>
 <text x="590" y="775" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">(e) head rotate +10 around neck pivot</text>
-<g transform="translate(990 735)"><use href="#snail-shadow"/><use href="#snail-stalk-far" transform="rotate(-8 110 -94)"/><use href="#snail-head-base"/><use href="#snail-stalk-near" transform="rotate(-8 124 -95)"/><use href="#snail-body"/><use href="#snail-shell"/></g>
+<g transform="translate(990 735)"><use href="#snail-shadow"/><use href="#snail-stalk-far" transform="rotate(-8 104 -81)"/><use href="#snail-head-base"/><use href="#snail-stalk-near" transform="rotate(-8 118 -84)"/><use href="#snail-body"/><use href="#snail-shell"/></g>
 <text x="990" y="775" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">(f) eyestalks rotate -8</text>
-<g transform="translate(1360 735)"><use href="#snail-shadow"/><use href="#snail-stalk-far" transform="rotate(8 110 -94)"/><use href="#snail-head-base"/><use href="#snail-stalk-near" transform="rotate(8 124 -95)"/><use href="#snail-body"/><use href="#snail-shell"/></g>
+<g transform="translate(1360 735)"><use href="#snail-shadow"/><use href="#snail-stalk-far" transform="rotate(8 104 -81)"/><use href="#snail-head-base"/><use href="#snail-stalk-near" transform="rotate(8 118 -84)"/><use href="#snail-body"/><use href="#snail-shell"/></g>
 <text x="1360" y="775" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">(f) eyestalks rotate +8</text>
-<g transform="translate(1660 735)"><use href="#snail-shadow"/><g transform="rotate(-25 55 -42)"><use href="#snail-stalk-far" transform="rotate(-8 110 -94)"/><use href="#snail-head-base"/><use href="#snail-stalk-near" transform="rotate(8 124 -95)"/></g><use href="#snail-body"/><use href="#snail-shell"/></g>
+<g transform="translate(1660 735)"><use href="#snail-shadow"/><g transform="rotate(-25 55 -38)"><use href="#snail-stalk-far" transform="rotate(-8 104 -81)"/><use href="#snail-head-base"/><use href="#snail-stalk-near" transform="rotate(8 118 -84)"/></g><use href="#snail-body"/><use href="#snail-shell"/></g>
 <text x="1660" y="775" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">head -25 + stalks -8/+8</text>
 <g transform="translate(170 1062)"><use href="#snail-shell"/></g>
 <path d="M 164 1062 L 176 1062 M 170 1056 L 170 1068" stroke="#6A6A6A" stroke-width="1"/>
@@ -37,25 +37,25 @@
 <path d="M 424 1062 L 436 1062 M 430 1056 L 430 1068" stroke="#6A6A6A" stroke-width="1"/>
 <g transform="translate(545 1062)"><use href="#snail-head-base"/></g>
 <path d="M 539 1062 L 551 1062 M 545 1056 L 545 1068" stroke="#6A6A6A" stroke-width="1"/>
-<circle cx="600" cy="1020" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="600" cy="1020" r="1.2" fill="#E0302A"/>
+<circle cx="600" cy="1024" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="600" cy="1024" r="1.2" fill="#E0302A"/>
 <g transform="translate(640 1062)"><use href="#snail-stalk-far"/></g>
 <path d="M 634 1062 L 646 1062 M 640 1056 L 640 1068" stroke="#6A6A6A" stroke-width="1"/>
-<circle cx="750" cy="968" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="750" cy="968" r="1.2" fill="#E0302A"/>
+<circle cx="744" cy="981" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="744" cy="981" r="1.2" fill="#E0302A"/>
 <g transform="translate(700 1062)"><use href="#snail-stalk-near"/></g>
 <path d="M 694 1062 L 706 1062 M 700 1056 L 700 1068" stroke="#6A6A6A" stroke-width="1"/>
-<circle cx="824" cy="967" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="824" cy="967" r="1.2" fill="#E0302A"/>
+<circle cx="818" cy="978" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="818" cy="978" r="1.2" fill="#E0302A"/>
 <g transform="translate(830 1062)"><use href="#snail-head"/></g>
 <path d="M 824 1062 L 836 1062 M 830 1056 L 830 1068" stroke="#6A6A6A" stroke-width="1"/>
-<circle cx="885" cy="1020" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="885" cy="1020" r="1.2" fill="#E0302A"/>
-<circle cx="940" cy="968" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="940" cy="968" r="1.2" fill="#E0302A"/>
-<circle cx="954" cy="967" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="954" cy="967" r="1.2" fill="#E0302A"/>
+<circle cx="885" cy="1024" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="885" cy="1024" r="1.2" fill="#E0302A"/>
+<circle cx="934" cy="981" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="934" cy="981" r="1.2" fill="#E0302A"/>
+<circle cx="948" cy="978" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="948" cy="978" r="1.2" fill="#E0302A"/>
 <g transform="translate(1165 1062)"><use href="#snail-shadow"/></g>
 <path d="M 1159 1062 L 1171 1062 M 1165 1056 L 1165 1068" stroke="#6A6A6A" stroke-width="1"/>
 <g transform="translate(1520 1062)"><use href="#snail"/></g>
 <path d="M 1514 1062 L 1526 1062 M 1520 1056 L 1520 1068" stroke="#6A6A6A" stroke-width="1"/>
-<circle cx="1575" cy="1020" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="1575" cy="1020" r="1.2" fill="#E0302A"/>
-<circle cx="1630" cy="968" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="1630" cy="968" r="1.2" fill="#E0302A"/>
-<circle cx="1644" cy="967" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="1644" cy="967" r="1.2" fill="#E0302A"/>
+<circle cx="1575" cy="1024" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="1575" cy="1024" r="1.2" fill="#E0302A"/>
+<circle cx="1624" cy="981" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="1624" cy="981" r="1.2" fill="#E0302A"/>
+<circle cx="1638" cy="978" r="4.5" fill="none" stroke="#E0302A" stroke-width="1.6"/><circle cx="1638" cy="978" r="1.2" fill="#E0302A"/>
 <text x="135" y="1086" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">shell</text>
 <text x="430" y="1086" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">body</text>
 <text x="640" y="1086" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">head-base</text>
@@ -64,5 +64,5 @@
 <text x="930" y="1086" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">head</text>
 <text x="1165" y="1086" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">shadow</text>
 <text x="1520" y="1086" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">snail (assembled)</text>
-<text x="900" y="822" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">(g) exploded parts — grey cross = local origin (0,0), red circle = pivot   neck (55,-42) · stalk-near (124,-95) · stalk-far (110,-94)</text>
+<text x="900" y="822" font-family="sans-serif" font-size="15" fill="#5B5750" text-anchor="middle">(g) exploded parts — grey cross = local origin (0,0), red circle = pivot   neck (55,-38) · stalk-near (118,-84) · stalk-far (104,-81)</text>
 </svg>

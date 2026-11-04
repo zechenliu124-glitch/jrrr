@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <!-- Preview of the env- parts. Red dots = local origin (sun/clouds: centre; tufts: base centre = sway pivot). -->
+  <defs>
+    <linearGradient id="env-pv-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B9D6E8"/><stop offset="0.6" stop-color="#CFE4EF"/><stop offset="1" stop-color="#EAF3F2"/></linearGradient>
+    <linearGradient id="env-pv-grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C5DBA6"/><stop offset="1" stop-color="#A9C98B"/></linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1920" height="760" fill="url(#env-pv-sky)"/>
+  <rect x="0" y="760" width="1920" height="320" fill="url(#env-pv-grass)"/>
+  <use href="#env-sun" transform="translate(300 300)"/>
+  <use href="#env-cloud-a" transform="translate(860 200)"/>
+  <use href="#env-cloud-b" transform="translate(1340 330)"/>
+  <use href="#env-cloud-c" transform="translate(1700 170)"/>
+  <use href="#env-cloud-a" transform="translate(900 560) scale(0.6)" opacity="0.6"/>
+  <use href="#env-grass-tuft-a" transform="translate(500 960)"/>
+  <use href="#env-grass-tuft-b" transform="translate(800 960)"/>
+  <use href="#env-grass-tuft-c" transform="translate(1100 960)"/>
+  <use href="#env-grass-tuft-a" transform="translate(1400 960) rotate(-5)"/>
+  <use href="#env-grass-tuft-b" transform="translate(1640 960) rotate(5)"/>
+  <use href="#env-paper"/>
+  <g fill="#c33" opacity="0.7">
+    <circle cx="300" cy="300" r="3"/><circle cx="860" cy="200" r="3"/><circle cx="1340" cy="330" r="3"/><circle cx="1700" cy="170" r="3"/>
+    <circle cx="500" cy="960" r="3"/><circle cx="800" cy="960" r="3"/><circle cx="1100" cy="960" r="3"/><circle cx="1400" cy="960" r="3"/><circle cx="1640" cy="960" r="3"/>
+  </g>
+  <g font-family="sans-serif" font-size="20" fill="#4a5a66" text-anchor="middle">
+    <text x="300" y="560">env-sun (r 85, glow ~240)</text>
+    <text x="860" y="330">env-cloud-a (~420)</text>
+    <text x="1340" y="420">env-cloud-b (~340)</text>
+    <text x="1700" y="250">env-cloud-c (~260)</text>
+    <text x="900" y="640">env-cloud-a, scale 0.6, opacity 0.6</text>
+    <text x="500" y="1000">tuft-a (~124)</text>
+    <text x="800" y="1000">tuft-b (~98)</text>
+    <text x="1100" y="1000">tuft-c (~76)</text>
+    <text x="1400" y="1000">tuft-a rotate -5</text>
+    <text x="1640" y="1000">tuft-b rotate +5</text>
+  </g>
+</svg>
