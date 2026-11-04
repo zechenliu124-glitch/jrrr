@@ -119,7 +119,8 @@ async function layers(svgFile, outDir, scale) {
         let pivot = k.getAttribute('data-pivot');
         const m = k.querySelector('.pivot');
         if (m) { const r = m.getBoundingClientRect(); pivot = `${r.x + r.width / 2 - stage.x} ${r.y + r.height / 2 - stage.y}`; }
-        return { id: k.id, layer: k.getAttribute('data-layer'), pivot };
+        // layer groups are named "layer-<name>" so they never clash with library part ids
+        return { id: k.id, name: k.id.replace(/^layer-/, ''), layer: k.getAttribute('data-layer'), pivot };
       });
     });
     const els = info.filter(k => k.layer === 'el');
@@ -143,11 +144,11 @@ async function layers(svgFile, outDir, scale) {
     await p.screenshot({ path: path.join(outDir, 'bg.png'), clip: { x: 0, y: 0, width: w, height: h } });
     for (const k of els) {
       await show(k.id);
-      await p.screenshot({ path: path.join(outDir, `${k.id}.full.png`), clip: { x: 0, y: 0, width: w, height: h }, omitBackground: true });
+      await p.screenshot({ path: path.join(outDir, `${k.name}.full.png`), clip: { x: 0, y: 0, width: w, height: h }, omitBackground: true });
     }
     const manifest = {
       scene: path.relative(ROOT, svgFile), width: w, height: h, scale,
-      elements: els.map(k => ({ id: k.id, pivot: k.pivot ? k.pivot.trim().split(/[\s,]+/).map(Number) : null })),
+      elements: els.map(k => ({ id: k.name, pivot: k.pivot ? k.pivot.trim().split(/[\s,]+/).map(Number) : null })),
     };
     fs.writeFileSync(path.join(outDir, 'layers.json'), JSON.stringify(manifest, null, 2));
     console.log(`layers ${path.relative(ROOT, svgFile)} -> bg + ${els.length} elements`);

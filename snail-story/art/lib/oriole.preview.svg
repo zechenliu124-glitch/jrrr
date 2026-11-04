@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1800" height="1000" viewBox="0 0 1800 1000">
+<defs>
+  <linearGradient id="oriole-pv-sky" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#B9D6E8"/>
+    <stop offset="0.55" stop-color="#CFE4EF"/>
+    <stop offset="1" stop-color="#EAF3F2"/>
+  </linearGradient>
+  <linearGradient id="oriole-pv-bark" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#CDB89D"/>
+    <stop offset="0.3" stop-color="#B49A7C"/>
+    <stop offset="0.7" stop-color="#94785D"/>
+    <stop offset="1" stop-color="#6F5844"/>
+  </linearGradient>
+  <!-- a painted branch bar, top surface at y=0, from x=-L/2.. (drawn per use with a transform) -->
+  <g id="oriole-pv-branch">
+    <g filter="url(#wc-paint)">
+      <path d="M -430,6 C -300,-2 -150,1 0,0 C 150,-1 300,-3 430,2 C 436,10 436,26 428,34 C 300,36 150,35 0,35 C -150,35 -300,36 -428,38 C -436,28 -436,14 -430,6 Z" fill="url(#oriole-pv-bark)"/>
+      <path d="M -400,4 C -250,0 -100,1 60,0.5 C 200,0 320,-1 410,2" fill="none" stroke="#DCCBB2" stroke-width="3" opacity="0.7"/>
+      <path d="M -380,20 c 30,2 60,1 90,3 M -200,26 c 40,1 70,0 100,2 M -60,18 c 30,1 60,1 85,2 M 120,24 c 40,1 70,0 110,2 M 260,16 c 30,1 50,2 80,2" fill="none" stroke="#6F5844" stroke-width="1.6" opacity="0.4"/>
+      <path d="M -330,12 c 20,0 40,1 55,1 M 10,10 c 25,0 45,0 60,1 M 300,10 c 20,0 40,1 50,1" fill="none" stroke="#F0E4D2" stroke-width="1.4" opacity="0.45"/>
+    </g>
+  </g>
+  <g id="oriole-pv-stub">
+    <g filter="url(#wc-paint)">
+      <path d="M -150,5 C -80,0 0,0 80,-0.5 C 120,-1 140,0 152,3 C 157,12 157,25 150,33 C 100,34 40,34 -20,34 C -80,35 -120,36 -150,37 C -157,28 -157,14 -150,5 Z" fill="url(#oriole-pv-bark)"/>
+      <path d="M -140,3.5 C -60,0 30,0.5 145,2" fill="none" stroke="#DCCBB2" stroke-width="2.6" opacity="0.7"/>
+      <path d="M -120,20 c 30,2 60,1 90,3 M 20,24 c 40,1 70,0 100,2" fill="none" stroke="#6F5844" stroke-width="1.5" opacity="0.4"/>
+    </g>
+  </g>
+</defs>
+
+<!-- soft sky backdrop (overhangs 60 px) -->
+<rect x="-60" y="-60" width="1920" height="1120" fill="url(#oriole-pv-sky)" filter="url(#wc-wash)"/>
+
+<g font-family="sans-serif" font-size="17" fill="#5F7480">
+  <text x="40" y="44">(a) two orioles on a branch — scale 1 and 0.94 (head −8°)</text>
+  <text x="960" y="44">(b) wing at 0° and lifted (rotate −28° about shoulder −40,−68)</text>
+  <text x="40" y="470">(c) head tilted −15° and +15° about neck pivot (−64,−72)</text>
+  <text x="960" y="470">(d) exploded parts, red = pivots, + = local origin (scale 1.3)</text>
+  <text x="40" y="800">(e) scale 0.6</text>
+</g>
+
+<!-- (a) -->
+<g transform="translate(470 330)"><use href="#oriole-pv-branch"/></g>
+<g transform="translate(300 330)">
+  <use href="#oriole-shadow"/>
+  <use href="#oriole"/>
+</g>
+<g transform="translate(640 330) scale(0.94)">
+  <use href="#oriole-shadow"/>
+  <use href="#oriole-body"/>
+  <use href="#oriole-head" transform="rotate(-8 -64 -72)"/>
+  <use href="#oriole-wing"/>
+</g>
+
+<!-- (b) -->
+<g transform="translate(1160 330)"><use href="#oriole-pv-stub"/></g>
+<g transform="translate(1160 330)">
+  <use href="#oriole-shadow"/>
+  <use href="#oriole"/>
+</g>
+<g transform="translate(1540 330)"><use href="#oriole-pv-stub"/></g>
+<g transform="translate(1540 330)">
+  <use href="#oriole-shadow"/>
+  <use href="#oriole-body"/>
+  <use href="#oriole-head"/>
+  <use href="#oriole-wing" transform="rotate(-28 -40 -68)"/>
+</g>
+<g font-family="sans-serif" font-size="15" fill="#6B7F8A">
+  <text x="1160" y="400" text-anchor="middle">wing 0°</text>
+  <text x="1540" y="400" text-anchor="middle">wing −28° (lifted)</text>
+</g>
+
+<!-- (c) -->
+<g transform="translate(250 650)"><use href="#oriole-pv-stub"/></g>
+<g transform="translate(250 650)">
+  <use href="#oriole-shadow"/>
+  <use href="#oriole-body"/>
+  <use href="#oriole-head" transform="rotate(-15 -64 -72)"/>
+  <use href="#oriole-wing"/>
+</g>
+<g transform="translate(620 650)"><use href="#oriole-pv-stub"/></g>
+<g transform="translate(620 650)">
+  <use href="#oriole-shadow"/>
+  <use href="#oriole-body"/>
+  <use href="#oriole-head" transform="rotate(15 -64 -72)"/>
+  <use href="#oriole-wing"/>
+</g>
+<g font-family="sans-serif" font-size="15" fill="#6B7F8A">
+  <text x="250" y="720" text-anchor="middle">head −15° (looks further down)</text>
+  <text x="620" y="720" text-anchor="middle">head +15° (beak up)</text>
+</g>
+
+<!-- (d) exploded: body at origin, head shifted (-70,-30), wing shifted (60,-55) -->
+<g transform="translate(1330 760) scale(1.3)">
+  <use href="#oriole-body"/>
+  <g transform="translate(-70 -30)">
+    <use href="#oriole-head"/>
+    <circle cx="-64" cy="-72" r="3.2" fill="none" stroke="#D0342C" stroke-width="1.4"/>
+    <circle cx="-64" cy="-72" r="0.9" fill="#D0342C"/>
+  </g>
+  <g transform="translate(60 -55)">
+    <use href="#oriole-wing"/>
+    <circle cx="-40" cy="-68" r="3.2" fill="none" stroke="#D0342C" stroke-width="1.4"/>
+    <circle cx="-40" cy="-68" r="0.9" fill="#D0342C"/>
+  </g>
+  <path d="M -6,0 H 6 M 0,-6 V 6" stroke="#D0342C" stroke-width="1"/>
+  <g font-family="sans-serif" font-size="11" fill="#7A3A34">
+    <text x="-128" y="-108">oriole-head  pivot (−64,−72)</text>
+    <text x="10" y="-140">oriole-wing  pivot (−40,−68)</text>
+    <text x="10" y="22">oriole-body  origin (0,0) = feet on branch top</text>
+  </g>
+</g>
+
+<!-- (e) small 0.6 version -->
+<g transform="translate(250 920) scale(0.6)"><use href="#oriole-pv-stub"/></g>
+<g transform="translate(250 920) scale(0.6)">
+  <use href="#oriole-shadow"/>
+  <use href="#oriole"/>
+</g>
+</svg>

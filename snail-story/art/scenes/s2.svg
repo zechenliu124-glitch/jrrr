@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1920" height="1080" viewBox="0 0 1920 1080">
+<g id="layer-bg" data-layer="bg"><use href="#env-bg-s2"/><use href="#env-paper"/></g>
+<g id="layer-vine" data-layer="el"><use href="#vine-s2"/></g>
+<g id="layer-sprout" data-layer="el"><use href="#vine-s2-sprout"/><circle class="pivot" cx="972" cy="470" r="0.5" fill="none"/></g>
+<g id="layer-leafL" data-layer="el"><use href="#vine-s2-leaf-l"/><circle class="pivot" cx="982" cy="425" r="0.5" fill="none"/></g>
+<g id="layer-leafR" data-layer="el"><use href="#vine-s2-leaf-r"/><circle class="pivot" cx="995" cy="395" r="0.5" fill="none"/></g>
+</svg>

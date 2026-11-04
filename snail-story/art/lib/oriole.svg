@@ -67,8 +67,8 @@
     <stop offset="1" stop-color="#312E2C"/>
   </linearGradient>
   <linearGradient id="oriole-g-wing" gradientUnits="userSpaceOnUse" x1="0" y1="-19" x2="8" y2="18">
-    <stop offset="0" stop-color="#5C5752"/>
-    <stop offset="0.45" stop-color="#443F3C"/>
+    <stop offset="0" stop-color="#67615A"/>
+    <stop offset="0.45" stop-color="#48433F"/>
     <stop offset="1" stop-color="#322F2D"/>
   </linearGradient>
   <linearGradient id="oriole-g-carpal" gradientUnits="userSpaceOnUse" x1="4" y1="5" x2="8" y2="17">
@@ -275,28 +275,35 @@
             <path d="M 123,2.6 C 112,5.6 96,8 80,9.6" fill="none" stroke="#C9B88C" stroke-width="1" opacity="0.5"/>
             <path d="M 115.6,0 C 104,3 90,4.6 72,5.8" fill="none" stroke="#CDBA88" stroke-width="1" opacity="0.55"/>
             <path d="M 107.6,-3 C 96,-0.2 82,1.4 68,2.2" fill="none" stroke="#CDBA88" stroke-width="1" opacity="0.55"/>
+            <!-- sheen on the primaries -->
+            <path d="M 40,-3.4 C 66,-4 90,-5 108,-4.2" fill="none" stroke="#625C56" stroke-width="1.4" opacity="0.5"/>
             <!-- secondaries: black with yellow outer edges (lower middle of the folded wing) -->
             <path d="M -4,4 C 20,4 46,3.6 68,3 C 72,3.6 72.5,6.4 69.5,8 C 48,10.2 26,12.4 -4,14 Z" fill="#3A3735"/>
-            <path d="M 2,13.6 C 26,12.2 48,10.1 69.5,8 C 72.5,6.4 72,3.6 68,3" fill="none" stroke="#E8CF85" stroke-width="1.7" opacity="0.8"/>
-            <path d="M -4,0 C 22,0 44,-0.4 63,-0.8 C 67,-0.2 67.5,2.6 64.5,3.8 C 44,5.6 24,6.8 -4,7.6 Z" fill="#403C3A"/>
-            <path d="M 2,7.4 C 24,6.7 44,5.5 64.5,3.8 C 67.5,2.6 67,-0.2 63,-0.8" fill="none" stroke="#E8CF85" stroke-width="1.7" opacity="0.8"/>
+            <path d="M 4,13.4 C 26,12.1 48,10.1 69.5,8 C 72.5,6.4 72,3.6 68,3 C 69.4,4.6 69,5.8 67,6.1 C 48,8 26,10.4 4,13.4 Z" fill="#E8CF85" opacity="0.85"/>
+            <path d="M -4,0 C 22,0 44,-0.4 63,-0.8 C 67,-0.2 67.5,2.6 64.5,3.8 C 44,5.6 24,6.8 -4,7.6 Z" fill="#413D3A"/>
+            <path d="M 4,7.3 C 24,6.6 44,5.5 64.5,3.8 C 67.5,2.6 67,-0.2 63,-0.8 C 64.4,0.8 64,2 62,2.2 C 44,3.6 24,5 4,7.3 Z" fill="#E8CF85" opacity="0.85"/>
+            <path d="M 6,2.2 C 26,2 44,1.4 60,0.8" fill="none" stroke="#5E5853" stroke-width="1.3" opacity="0.5"/>
             <!-- tertials: broad yellow edges, on top at the upper rear -->
             <path d="M -2,-12.5 C 26,-12.6 52,-11 72,-8 C 78,-6.8 78.5,-3 73,-2 C 52,-1.2 28,-1.8 -2,-2.4 Z" fill="#403C39"/>
-            <path d="M 8,-2.2 C 30,-1.8 52,-1.2 73,-2 C 78.5,-3 78,-6.8 72,-8" fill="none" stroke="#E8CF85" stroke-width="2.3" opacity="0.85"/>
-            <path d="M -2,-18.5 C 30,-19 58,-15.5 82,-10.5 C 88,-9 88.5,-5.4 83,-4.4 C 60,-4.4 30,-6.4 -2,-7.6 Z" fill="#47433F"/>
-            <path d="M 10,-7.2 C 34,-6.2 60,-4.4 83,-4.4 C 88.5,-5.4 88,-9 82,-10.5" fill="none" stroke="#E8CF85" stroke-width="2.6" opacity="0.88"/>
-            <!-- top sheen along the tertials -->
-            <path d="M 6,-16.5 C 32,-17 58,-14 80,-9.6" fill="none" stroke="#7D7770" stroke-width="1.6" opacity="0.5"/>
+            <path d="M 10,-2.2 C 30,-1.8 52,-1.2 73,-2 C 78.5,-3 78,-6.8 72,-8 C 73.8,-6.2 73.6,-4.8 71,-4.6 C 52,-4.2 30,-4.4 10,-2.2 Z" fill="#E8CF85" opacity="0.9"/>
+            <path d="M 8,-6.6 C 30,-6.8 52,-6 68,-5.4" fill="none" stroke="#5F5953" stroke-width="1.4" opacity="0.5"/>
+            <path d="M -2,-18.5 C 30,-19 58,-15.5 82,-10.5 C 88,-9 88.5,-5.4 83,-4.4 C 60,-4.4 30,-6.4 -2,-7.6 Z" fill="#48443F"/>
+            <path d="M 12,-7.1 C 36,-6 60,-4.4 83,-4.4 C 88.5,-5.4 88,-9 82,-10.5 C 84,-8.4 83.6,-7.2 80.6,-7.3 C 60,-7.6 36,-8.6 12,-7.1 Z" fill="#EBD48E" opacity="0.92"/>
+            <path d="M 30,-6.6 C 50,-5.6 66,-4.8 80,-4.8" fill="none" stroke="#F6E6B4" stroke-width="0.9" opacity="0.6"/>
+            <!-- top light along the tertials (light from upper left) -->
+            <path d="M 4,-16.6 C 32,-17.2 58,-14.4 80,-9.8" fill="none" stroke="#857E76" stroke-width="2" opacity="0.5" filter="url(#oriole-f-blur1)"/>
+            <path d="M 10,-12.6 C 32,-12.8 54,-11.4 70,-9.2" fill="none" stroke="#615B55" stroke-width="1.3" opacity="0.55"/>
             <!-- greater coverts: black, rounded tips with a narrow pale fringe -->
             <path d="M -10,-13 C 6,-13.6 20,-12.6 30,-10.6 C 34,-7.6 34,-3.6 31,-0.6 C 34,1.6 34,5.6 30.5,8.4 C 33,10.4 32,13.6 28,14.4 L -10,15 Z" fill="#3D3A37"/>
-            <path d="M 30,-10.6 C 34,-7.6 34,-3.6 31,-0.6 C 34,1.6 34,5.6 30.5,8.4 C 33,10.4 32,13.6 28,14.4" fill="none" stroke="#D9C07A" stroke-width="1.2" opacity="0.6"/>
+            <path d="M 30,-10.6 C 34,-7.6 34,-3.6 31,-0.6 C 34,1.6 34,5.6 30.5,8.4 C 33,10.4 32,13.6 28,14.4" fill="none" stroke="#CDB574" stroke-width="1.1" opacity="0.45"/>
+            <path d="M 2,-9 C 12,-9.6 20,-9 27,-7.6 M 4,3 C 12,2.4 20,2.6 27,3.6" fill="none" stroke="#5C5651" stroke-width="1.2" opacity="0.45"/>
             <!-- primary coverts: the yellow carpal patch at the bend of the wing -->
             <path d="M 5,9.6 C 10,8 15.5,7.8 19.5,9 C 22,10 22.1,12 20.1,12.8 C 21.7,13.8 21.1,15.6 18.5,16.2 C 13.5,17.2 8,17 4.5,15.8 C 3,14 3.2,11 5,9.6 Z" fill="url(#oriole-g-carpal)"/>
-            <path d="M 19.5,9 C 22,10 22.1,12 20.1,12.8 C 21.7,13.8 21.1,15.6 18.5,16.2" fill="none" stroke="#C2A659" stroke-width="0.9" opacity="0.65"/>
+            <path d="M 19.5,9 C 22,10 22.1,12 20.1,12.8 C 21.7,13.8 21.1,15.6 18.5,16.2" fill="none" stroke="#C2A659" stroke-width="0.9" opacity="0.6"/>
             <path d="M 7,10.4 C 11,9.2 15,9.1 18,9.8" fill="none" stroke="#F8EBC0" stroke-width="0.9" opacity="0.55"/>
-            <!-- median coverts: a row of short black feathers with yellow tips -->
-            <path d="M -8,-15 C 2,-15.8 10,-15.2 15,-13.4 C 18,-11.2 18,-8.4 15.5,-6.8 C 18,-5 18,-2 15,-0.4 L -8,1 Z" fill="#433F3C"/>
-            <path d="M 15,-13.4 C 18,-11.2 18,-8.4 15.5,-6.8 C 18,-5 18,-2 15,-0.4" fill="none" stroke="#E3C97E" stroke-width="1.5" opacity="0.75"/>
+            <!-- median coverts (black) under the shoulder feathers -->
+            <path d="M -8,-15 C 2,-15.8 10,-15.2 15,-13.4 C 18,-11.2 18,-8.4 15.5,-6.8 C 18,-5 18,-2 15,-0.4 L -8,1 Z" fill="#45413D"/>
+            <path d="M 15,-13.4 C 18,-11.2 18,-8.4 15.5,-6.8 C 18,-5 18,-2 15,-0.4" fill="none" stroke="#B9A574" stroke-width="1" opacity="0.35"/>
           </g>
         </g>
         <!-- lesser coverts / shoulder: body-coloured feathers over the wing root (they fade into the body via the mask) -->

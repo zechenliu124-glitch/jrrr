@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1920" height="1080" viewBox="0 0 1920 1080">
+<g id="layer-bg" data-layer="bg"><use href="#env-bg-s9"/><use href="#vinesum-s9-far"/><use href="#vinesum-s9-perch"/><g transform="translate(720.0 620.0) rotate(0.00) scale(1.2378 1.2378)"><use href="#snail-shadow"/><g transform="rotate(-24 58 -48)"><use href="#snail-head-base"/></g><use href="#snail-body"/><use href="#snail-shell"/></g><use href="#env-paper"/></g>
+<g id="layer-stalk_far" data-layer="el"><g transform="translate(720.0 620.0) rotate(0.00) scale(1.2378 1.2378)"><g transform="rotate(-24 58 -48)"><use href="#snail-stalk-far"/><circle class="pivot" cx="113" cy="-99" r="0.5" fill="none"/></g></g></g>
+<g id="layer-stalk_near" data-layer="el"><g transform="translate(720.0 620.0) rotate(0.00) scale(1.2378 1.2378)"><g transform="rotate(-24 58 -48)"><use href="#snail-stalk-near"/><circle class="pivot" cx="127" cy="-99" r="0.5" fill="none"/></g></g></g>
+</svg>

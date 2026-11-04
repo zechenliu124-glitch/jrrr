@@ -37,7 +37,8 @@ def pivot(x, y):
 
 
 def layer(id_, kind, inner):
-    return f'<g id="{id_}" data-layer="{kind}">{inner}</g>'
+    # DOM id gets a "layer-" prefix so it can never clash with a library part id (e.g. the part "snail")
+    return f'<g id="layer-{id_}" data-layer="{kind}">{inner}</g>'
 
 
 def svg(*layers):
