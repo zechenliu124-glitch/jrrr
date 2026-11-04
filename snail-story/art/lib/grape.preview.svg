@@ -136,21 +136,21 @@
 </g>
 </g>
 <use href="#grape-cluster-1" transform="translate(110 83.5)"/>
-<text x="110" y="300.4" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">1 (108x191)</text>
+<text x="110" y="300.2" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">1 (108x191)</text>
 <use href="#grape-cluster-2" transform="translate(300 81)"/>
-<text x="300" y="263.8" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">2 (112x157)</text>
+<text x="300" y="264.3" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">2 (112x157)</text>
 <use href="#grape-cluster-3" transform="translate(490 83.9)"/>
-<text x="490" y="322.2" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">3 (130x212)</text>
+<text x="490" y="319.6" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">3 (125x210)</text>
 <use href="#grape-cluster-4" transform="translate(680 78.4)"/>
-<text x="680" y="283.8" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">4 (125x179)</text>
+<text x="680" y="283" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">4 (124x179)</text>
 <use href="#grape-cluster-5" transform="translate(870 78.3)"/>
-<text x="870" y="271.6" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">5 (91x167)</text>
+<text x="870" y="272" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">5 (91x168)</text>
 <use href="#grape-cluster-6" transform="translate(1060 76.9)"/>
-<text x="1060" y="288.4" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">6 (136x185)</text>
+<text x="1060" y="287.5" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">6 (136x185)</text>
 <use href="#grape-cluster-small-1" transform="translate(1190 76.5)"/>
-<text x="1190" y="156" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">small-1 (32x54)</text>
+<text x="1190" y="156.2" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">small-1 (33x54)</text>
 <use href="#grape-cluster-small-2" transform="translate(1290 80.4)"/>
-<text x="1290" y="164.3" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">small-2 (36x58)</text>
+<text x="1290" y="164.5" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">small-2 (37x58)</text>
 <use href="#grape-cluster-3" transform="translate(1560 80.8) scale(2)"/>
-<text x="1560" y="533.4" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">3 at 2x</text>
+<text x="1560" y="528.3" font-family="sans-serif" font-size="14" fill="#5E7482" text-anchor="middle">3 at 2x</text>
 </svg>
