@@ -21,6 +21,8 @@ SNAIL_STALK_NEAR = (123.6, -76)         # eyestalk base pivots
 SNAIL_STALK_FAR = (112, -73.5)
 ORIOLE_NECK = (-64, -72)              # oriole-head pivot
 ORIOLE_SHOULDER = (-40, -68)          # oriole-wing pivot (negative rotation lifts the wing)
+ORIOLE_FLY_NEAR = (-36, -76)          # oriole-fly-wing-near shoulder (spread wing, flaps ±22°)
+ORIOLE_FLY_FAR = (-20, -74)           # oriole-fly-wing-far shoulder (rotates with the near wing)
 
 
 def tf(x, y, rot=0.0, s=1.0, flip=False):
@@ -87,6 +89,16 @@ def bird(n, x, y, s=1.0, head_rot=0.0):
     ]
 
 
+def bird_flying(n, x, y, s=1.0):
+    """Three el layers for oriole n in flight (far wing, body, near wing), drawn at its landing spot."""
+    t = tf(x, y, 0, s)
+    return [
+        layer(f'bird{n}_fwfar', 'el', f'<g transform="{t}">{use("oriole-fly-wing-far")}{pivot(*ORIOLE_FLY_FAR)}</g>'),
+        layer(f'bird{n}_fbody', 'el', f'<g transform="{t}">{use("oriole-fly-body")}</g>'),
+        layer(f'bird{n}_fwnear', 'el', f'<g transform="{t}">{use("oriole-fly-wing-near")}{pivot(*ORIOLE_FLY_NEAR)}</g>'),
+    ]
+
+
 # ---- slide geometry -----------------------------------------------------------------------------
 S4_SNAIL = dict(x=654, y=587, rot=-63, length=260)   # on the trunk's upper-left surface near (680,600)
 S4_BIRDS = [(1130, 256, 1.0), (1400, 252, 0.94)]
@@ -122,6 +134,8 @@ def s4():
     sn = S4_SNAIL
     return svg(bg('env-bg-s45', 'vine-s45'),
                layer('snail', 'el', snail_posed(sn['x'], sn['y'], sn['rot'], sn['length'], S4_STALKS)),
+               # each oriole flies in spread-winged, then soft-fades into its perched pose on landing
+               *[l for i, (x, y, s) in enumerate(S4_BIRDS, 1) for l in bird_flying(i, x, y, s)],
                *[l for i, (x, y, s) in enumerate(S4_BIRDS, 1) for l in bird(i, x, y, s, S4_BIRD_HEAD)])
 
 

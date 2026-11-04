@@ -48,6 +48,24 @@ def fade(el, start=0, dur=1000):
     return fx('fade', el, start, dur)
 
 
+def bird_arrival(n, t0):
+    """Oriole n flies in from the upper right with its wings beating, lands on the branch (the flying
+    drawing soft-fades into the perched one), then keeps fluttering its folded wing gently."""
+    fly = [f'bird{n}_fwfar', f'bird{n}_fbody', f'bird{n}_fwnear']
+    perched = [f'bird{n}_body', f'bird{n}_head', f'bird{n}_wing']
+    start = (640, -430) if n == 1 else (560, -470)
+    land = t0 + 4800
+    return [
+        *[fx('appear', e, t0, 1) for e in fly],
+        *[fx('path', e, t0, 4800, pts=[start, (0, 0)], decel=60, note='两只黄鹂鸟扇着翅膀缓缓飞到枝头') for e in fly],
+        fx('sway', f'bird{n}_fwnear', t0, 0, amp=40, period=900, note='黄鹂扇动翅膀'),
+        fx('sway', f'bird{n}_fwfar', t0, 0, amp=40, period=900, note='黄鹂扇动翅膀'),
+        *[fx('fade', e, land, 600, note='黄鹂落在枝头') for e in perched],
+        *[fx('fadeout', e, land, 600) for e in fly],
+        fx('flap', f'bird{n}_wing', land + 600, 0, deg=-18, period=1200, note='黄鹂一直轻轻扇动翅膀'),
+    ]
+
+
 SLIDES = [
     # ------------------------------------------------------------------ 1
     dict(
@@ -132,14 +150,7 @@ SLIDES = [
                 fade('snail', 0, 1000),
             ]),
             dict(at=1200, click=False, say='树上飞来两只黄鹂鸟，看见慢慢爬的蜗牛，嘻嘻哈哈地笑起来。', fx=[
-                *[fx('appear', e, 0, 1) for e in ('bird1_body', 'bird1_head', 'bird1_wing')],
-                *[fx('path', e, 0, 4800, pts=[(640, -430), (0, 0)], decel=60, note='两只黄鹂鸟缓缓飞到枝头')
-                  for e in ('bird1_body', 'bird1_head', 'bird1_wing')],
-                fx('flap', 'bird1_wing', 0, 0, deg=-24, period=900, note='黄鹂一直轻轻扇动翅膀'),
-                *[fx('appear', e, 600, 1) for e in ('bird2_body', 'bird2_head', 'bird2_wing')],
-                *[fx('path', e, 600, 5000, pts=[(560, -470), (0, 0)], decel=60, note='两只黄鹂鸟缓缓飞到枝头')
-                  for e in ('bird2_body', 'bird2_head', 'bird2_wing')],
-                fx('flap', 'bird2_wing', 600, 0, deg=-24, period=1000, note='黄鹂一直轻轻扇动翅膀'),
+                *[fx for n, t0 in ((1, 0), (2, 600)) for fx in bird_arrival(n, t0)],
                 fade('cap1', 1500, 1000),
             ]),
             dict(at=9500, click=True, say='黄鹂鸟说：“蜗牛蜗牛！葡萄成熟还早得很呢，你现在爬上来干什么？”', fx=[
