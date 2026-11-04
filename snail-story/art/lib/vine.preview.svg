@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="760" viewBox="0 0 1400 760">
+  <defs>
+    <linearGradient id="vine-pv-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#CFE4EF"/><stop offset="1" stop-color="#EAF3F2"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1400" height="760" fill="url(#vine-pv-bg)"/>
+  <g font-family="sans-serif" font-size="15" fill="#6b6b6b">
+    <text x="20" y="28">vine.svg parts — 1x (top row); bottom row = 3x close-up (raw geometry painted in slide space, as used in slide 6). Cross = local origin (petiole / tendril base).</text>
+    <text x="40" y="250">leaf-young-a</text><text x="190" y="250">leaf-young-b</text>
+    <text x="340" y="250">leaf-young-c</text><text x="490" y="250">leaf-unfold</text>
+    <text x="640" y="250">tendril-a</text><text x="790" y="250">tendril-b</text>
+  </g>
+  <g>
+    <use href="#vine-leaf-young-a" transform="translate(90 200)"/>
+    <use href="#vine-leaf-young-b" transform="translate(240 200)"/>
+    <use href="#vine-leaf-young-c" transform="translate(390 200)"/>
+    <use href="#vine-leaf-unfold" transform="translate(540 200)"/>
+    <use href="#vine-tendril-a" transform="translate(680 200)"/>
+    <use href="#vine-tendril-b" transform="translate(830 200)"/>
+    <use href="#vine-leaf-young-a" transform="translate(1000 200) rotate(-30)"/>
+    <use href="#vine-leaf-young-b" transform="translate(1100 200) rotate(25) scale(0.8)"/>
+    <use href="#vine-leaf-young-c" transform="translate(1200 200) rotate(-60) scale(0.9)"/>
+    <use href="#vine-leaf-unfold" transform="translate(1300 200) rotate(40) scale(0.6)"/>
+  </g>
+  <g>
+    <g filter="url(#wc-paint)"><use href="#vine-leaf-young-a-raw" transform="translate(160 640) scale(3)"/></g>
+    <g filter="url(#wc-paint)"><use href="#vine-leaf-young-b-raw" transform="translate(440 640) scale(3)"/></g>
+    <g filter="url(#wc-paint)"><use href="#vine-leaf-young-c-raw" transform="translate(700 640) scale(3)"/></g>
+    <g filter="url(#wc-paint)"><use href="#vine-leaf-unfold-raw" transform="translate(940 640) scale(3)"/></g>
+    <use href="#vine-tendril-a" transform="translate(1110 640) scale(3)"/>
+    <use href="#vine-tendril-b" transform="translate(1270 640) scale(3)"/>
+  </g>
+  <g stroke="#c0504d" stroke-width="1" opacity="0.8">
+    <path d="M84 200h12M90 194v12M234 200h12M240 194v12M384 200h12M390 194v12M534 200h12M540 194v12M674 200h12M680 194v12M824 200h12M830 194v12"/>
+  </g>
+</svg>

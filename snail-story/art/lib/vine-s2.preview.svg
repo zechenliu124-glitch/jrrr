@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <!-- placeholder backdrop: pale sky + flat meadow at y 795 + soil patch around the vine base (960,800) -->
+  <defs>
+    <linearGradient id="vine-pv2-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#B9D6E8"/><stop offset="0.5" stop-color="#CFE4EF"/><stop offset="0.74" stop-color="#EAF3F2"/>
+    </linearGradient>
+  </defs>
+  <rect x="-60" y="-60" width="2040" height="1200" fill="url(#vine-pv2-sky)"/>
+  <rect x="-60" y="795" width="2040" height="345" fill="#A9C98B" filter="url(#wc-wash)"/>
+  <ellipse cx="960" cy="804" rx="130" ry="16" fill="#B89B7E" opacity="0.8"/>
+  <use href="#vine-s2"/>
+  <use href="#vine-s2-sprout"/>
+  <use href="#vine-s2-leaf-l"/>
+  <use href="#vine-s2-leaf-r"/>
+</svg>

@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!--
+  Shared watercolour picture-book filters. Every art file may use these; do not redefine them.
+  IDs are prefixed "wc-".
+
+  wc-paint  : main filter for painted objects (characters, leaves, grapes, trunk).
+              organic edge wobble + pigment pooling at the rim + soft blotchy wash + fine granulation.
+  wc-paint-soft : same idea, gentler (small or distant objects, thin parts like antennae).
+  wc-wash   : for big background washes (sky, hills, meadow): low-frequency blotches, soft wobbly edge, no hard rim.
+  wc-line   : for linework (pencil-like outlines, spiral lines, veins): slight wobble + softness.
+  wc-blur-far : atmospheric softness for far background shapes.
+  wc-paper  : paper grain; apply to a full-size <rect> with style="mix-blend-mode:multiply".
+-->
+<filter id="wc-paint" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="7" result="wob"/>
+  <feDisplacementMap in="SourceGraphic" in2="wob" scale="4.5" xChannelSelector="R" yChannelSelector="G" result="shape"/>
+  <!-- blotchy wash: low-frequency noise soft-light blended into the paint -->
+  <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="3" seed="11" result="blot"/>
+  <feColorMatrix in="blot" type="matrix" values="0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0 0 0 0 1" result="blotGray"/>
+  <feBlend in="blotGray" in2="shape" mode="soft-light" result="blotted0"/>
+  <feComposite in="blotted0" in2="shape" operator="in" result="blotted"/>
+  <!-- rim darkening: pigment collects at the edge of the wash -->
+  <feColorMatrix in="shape" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="A"/>
+  <feMorphology in="A" operator="erode" radius="1.6" result="Ae"/>
+  <feGaussianBlur in="Ae" stdDeviation="3" result="Aeb"/>
+  <feComposite in="A" in2="Aeb" operator="out" result="rim"/>
+  <feComponentTransfer in="shape" result="dark">
+    <feFuncR type="linear" slope="0.72"/><feFuncG type="linear" slope="0.72"/><feFuncB type="linear" slope="0.76"/>
+  </feComponentTransfer>
+  <feComposite in="dark" in2="rim" operator="in" result="rimDark0"/>
+  <feComponentTransfer in="rimDark0" result="rimDark"><feFuncA type="linear" slope="0.55"/></feComponentTransfer>
+  <!-- fine granulation -->
+  <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="3" result="gn"/>
+  <feColorMatrix in="gn" type="matrix" values="0 0 0 0 0.22  0 0 0 0 0.18  0 0 0 0 0.14  1.5 0 0 0 -0.62" result="gA"/>
+  <feComposite in="gA" in2="shape" operator="in" result="grain0"/>
+  <feComponentTransfer in="grain0" result="grain"><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
+  <feMerge><feMergeNode in="blotted"/><feMergeNode in="rimDark"/><feMergeNode in="grain"/></feMerge>
+</filter>
+
+<filter id="wc-paint-soft" x="-8%" y="-8%" width="116%" height="116%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="5" result="wob"/>
+  <feDisplacementMap in="SourceGraphic" in2="wob" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="shape"/>
+  <feColorMatrix in="shape" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="A"/>
+  <feMorphology in="A" operator="erode" radius="1" result="Ae"/>
+  <feGaussianBlur in="Ae" stdDeviation="1.6" result="Aeb"/>
+  <feComposite in="A" in2="Aeb" operator="out" result="rim"/>
+  <feComponentTransfer in="shape" result="dark">
+    <feFuncR type="linear" slope="0.78"/><feFuncG type="linear" slope="0.78"/><feFuncB type="linear" slope="0.8"/>
+  </feComponentTransfer>
+  <feComposite in="dark" in2="rim" operator="in" result="rimDark0"/>
+  <feComponentTransfer in="rimDark0" result="rimDark"><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
+  <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="9" result="gn"/>
+  <feColorMatrix in="gn" type="matrix" values="0 0 0 0 0.22  0 0 0 0 0.18  0 0 0 0 0.14  1.5 0 0 0 -0.62" result="gA"/>
+  <feComposite in="gA" in2="shape" operator="in" result="grain0"/>
+  <feComponentTransfer in="grain0" result="grain"><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
+  <feMerge><feMergeNode in="shape"/><feMergeNode in="rimDark"/><feMergeNode in="grain"/></feMerge>
+</filter>
+
+<filter id="wc-wash" x="-3%" y="-3%" width="106%" height="106%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="21" result="wob"/>
+  <feDisplacementMap in="SourceGraphic" in2="wob" scale="14" xChannelSelector="R" yChannelSelector="G" result="shape"/>
+  <feTurbulence type="fractalNoise" baseFrequency="0.006 0.012" numOctaves="4" seed="4" result="blot"/>
+  <feColorMatrix in="blot" type="matrix" values="0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0 0 0 0 1" result="blotGray"/>
+  <feBlend in="blotGray" in2="shape" mode="soft-light" result="b0"/>
+  <feComposite in="b0" in2="shape" operator="in" result="blotted"/>
+  <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="2" seed="13" result="gn"/>
+  <feColorMatrix in="gn" type="matrix" values="0 0 0 0 0.2  0 0 0 0 0.18  0 0 0 0 0.16  1.5 0 0 0 -0.66" result="gA"/>
+  <feComposite in="gA" in2="shape" operator="in" result="grain0"/>
+  <feComponentTransfer in="grain0" result="grain"><feFuncA type="linear" slope="0.14"/></feComponentTransfer>
+  <feMerge><feMergeNode in="blotted"/><feMergeNode in="grain"/></feMerge>
+</filter>
+
+<filter id="wc-line" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="2" seed="17" result="wob"/>
+  <feDisplacementMap in="SourceGraphic" in2="wob" scale="2" xChannelSelector="R" yChannelSelector="G" result="d"/>
+  <feGaussianBlur in="d" stdDeviation="0.35"/>
+</filter>
+
+<filter id="wc-blur-far" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="2" seed="31" result="wob"/>
+  <feDisplacementMap in="SourceGraphic" in2="wob" scale="10" xChannelSelector="R" yChannelSelector="G" result="d"/>
+  <feGaussianBlur in="d" stdDeviation="2.2"/>
+</filter>
+
+<filter id="wc-glow" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+  <feGaussianBlur in="SourceGraphic" stdDeviation="28"/>
+</filter>
+
+<filter id="wc-paper" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="4" seed="2" result="n"/>
+  <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.45  0 0 0 0 0.40  0 0 0 0 0.34  -1.2 0 0 0 0.75" result="fib"/>
+  <feComponentTransfer in="fib"><feFuncA type="linear" slope="0.2"/></feComponentTransfer>
+</filter>
+</svg>

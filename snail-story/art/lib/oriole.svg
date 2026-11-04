@@ -1,0 +1,322 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!--
+  Oriole library (black-naped oriole, Oriolus chinensis) - perched, facing LEFT, tipped forward, looking down-left.
+  Local origin (0,0) = where the feet grip the top of the branch (the branch is NOT included).
+  Beak tip ~(-127,-65), tail tip ~(122,-10): beak->tail ~ 255 px. Bounding box ~ x -129..124, y -107..+13.
+
+  Parts (all in the same local coordinate system; layer order body < head < wing):
+    oriole-body : body, breast, back, tail, legs and feet (no head, no near wing).
+    oriole-head : head, beak, eye, eye-stripe, part of the neck (neck fades out softly over the body).
+                  PIVOT = neck (-64,-72).  Positive rotation lifts the beak, negative lowers it.  Safe +-15 deg.
+    oriole-wing : near-side folded wing (root melts into the body at the shoulder).
+                  PIVOT = shoulder (-40,-68).  NEGATIVE rotation lifts the wing tip: rotate(-28 -40 -68).
+                  Safe range -30..0 deg.
+    oriole      : assembled = oriole-body + oriole-head + oriole-wing.
+    oriole-shadow (extra, optional): soft contact shadow for the branch under the feet, centred on (0,0).
+-->
+<defs>
+  <!-- ===== local helper filters (blur only; texture comes from the shared wc-* filters) ===== -->
+  <filter id="oriole-f-blur1" filterUnits="userSpaceOnUse" x="-240" y="-240" width="480" height="400"><feGaussianBlur stdDeviation="1"/></filter>
+  <filter id="oriole-f-blur2" filterUnits="userSpaceOnUse" x="-240" y="-240" width="480" height="400"><feGaussianBlur stdDeviation="2.2"/></filter>
+  <filter id="oriole-f-blur4" filterUnits="userSpaceOnUse" x="-240" y="-240" width="480" height="400"><feGaussianBlur stdDeviation="4.5"/></filter>
+  <filter id="oriole-f-blur7" filterUnits="userSpaceOnUse" x="-240" y="-240" width="480" height="400"><feGaussianBlur stdDeviation="7"/></filter>
+
+  <!-- ===== gradients ===== -->
+  <radialGradient id="oriole-g-body" gradientUnits="userSpaceOnUse" cx="-52" cy="-74" r="125" fx="-62" fy="-80">
+    <stop offset="0" stop-color="#F7E6AC"/>
+    <stop offset="0.25" stop-color="#F2D98C"/>
+    <stop offset="0.52" stop-color="#EBCB72"/>
+    <stop offset="0.78" stop-color="#DCBB60"/>
+    <stop offset="1" stop-color="#CBA952"/>
+  </radialGradient>
+  <!-- same gradient expressed in the wing frame (for the shoulder feathers, so they match the body) -->
+  <radialGradient id="oriole-g-body-w" href="#oriole-g-body" xlink:href="#oriole-g-body" gradientUnits="userSpaceOnUse" gradientTransform="rotate(-18) translate(40 68)"/>
+  <radialGradient id="oriole-g-head" gradientUnits="userSpaceOnUse" cx="-86" cy="-96" r="56" fx="-90" fy="-100">
+    <stop offset="0" stop-color="#F8E9B4"/>
+    <stop offset="0.38" stop-color="#F2D98C"/>
+    <stop offset="0.75" stop-color="#EBCB72"/>
+    <stop offset="1" stop-color="#E0BF64"/>
+  </radialGradient>
+  <linearGradient id="oriole-g-band" gradientUnits="userSpaceOnUse" x1="0" y1="-100" x2="0" y2="-78">
+    <stop offset="0" stop-color="#57524D"/>
+    <stop offset="0.5" stop-color="#423E3B"/>
+    <stop offset="1" stop-color="#363331"/>
+  </linearGradient>
+  <linearGradient id="oriole-g-beak-up" gradientUnits="userSpaceOnUse" x1="-110" y1="-83" x2="-114" y2="-69">
+    <stop offset="0" stop-color="#EAB3A7"/>
+    <stop offset="0.5" stop-color="#DE9A8E"/>
+    <stop offset="1" stop-color="#CC8476"/>
+  </linearGradient>
+  <linearGradient id="oriole-g-beak-lo" gradientUnits="userSpaceOnUse" x1="-110" y1="-73" x2="-112" y2="-64">
+    <stop offset="0" stop-color="#D28C7F"/>
+    <stop offset="1" stop-color="#B8736A"/>
+  </linearGradient>
+  <linearGradient id="oriole-g-leg" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#A8A6A8"/>
+    <stop offset="0.5" stop-color="#8E8C8E"/>
+    <stop offset="1" stop-color="#727072"/>
+  </linearGradient>
+  <linearGradient id="oriole-g-tip" gradientUnits="userSpaceOnUse" x1="70" y1="-10" x2="74" y2="18">
+    <stop offset="0" stop-color="#F0DB98"/>
+    <stop offset="0.55" stop-color="#E8CF85"/>
+    <stop offset="1" stop-color="#D3B566"/>
+  </linearGradient>
+  <linearGradient id="oriole-g-tail" gradientUnits="userSpaceOnUse" x1="0" y1="-10" x2="0" y2="18">
+    <stop offset="0" stop-color="#5A554F"/>
+    <stop offset="0.45" stop-color="#433F3C"/>
+    <stop offset="1" stop-color="#312E2C"/>
+  </linearGradient>
+  <linearGradient id="oriole-g-wing" gradientUnits="userSpaceOnUse" x1="0" y1="-19" x2="8" y2="18">
+    <stop offset="0" stop-color="#5C5752"/>
+    <stop offset="0.45" stop-color="#443F3C"/>
+    <stop offset="1" stop-color="#322F2D"/>
+  </linearGradient>
+  <linearGradient id="oriole-g-carpal" gradientUnits="userSpaceOnUse" x1="4" y1="5" x2="8" y2="17">
+    <stop offset="0" stop-color="#F2DE9E"/>
+    <stop offset="0.6" stop-color="#E8CF85"/>
+    <stop offset="1" stop-color="#D4B868"/>
+  </linearGradient>
+
+  <!-- ===== clip paths ===== -->
+  <clipPath id="oriole-clip-body">
+    <path d="M -82,-66 C -90,-54 -86,-36 -70,-25 C -54,-14 -30,-10 -8,-11 C 12,-12 32,-16 48,-23 C 58,-27 63,-32 62,-38 C 61,-45 55,-49 47,-53 C 28,-63 6,-76 -18,-86 C -34,-92 -52,-94 -64,-88 C -74,-83 -80,-76 -82,-66 Z"/>
+  </clipPath>
+  <clipPath id="oriole-clip-head">
+    <path d="M -103.5,-82 C -103,-91 -96,-100 -86,-103 C -76,-106 -64,-104 -57,-97 C -51,-91 -47,-83 -47,-74 C -47,-64 -54,-56 -64,-53 C -74,-50 -84,-53 -90,-59 C -94,-63 -97,-67 -99,-70.5 C -101,-74 -103,-78 -103.5,-82 Z"/>
+  </clipPath>
+  <clipPath id="oriole-clip-tail">
+    <path d="M -4,-9 C 22,-9.5 50,-8.5 74,-6.5 C 79,-5.5 81.5,-1 80.5,4 C 79.5,9 76,12 70,12.5 C 48,12 24,10 -4,8.5 Z"/>
+    <path d="M 0,3 C 24,7 50,11 70,13 C 75,14 76,17 72,18 C 50,17.5 25,14.5 0,11 Z"/>
+  </clipPath>
+  <clipPath id="oriole-clip-wing">
+    <path d="M -1,-18.5 C 25,-19 55,-15.5 84,-9.5 C 101,-6 114,-3 122,-0.6 C 125,0.6 124.5,2.4 121,3.6 C 110,6 96,8 80,9.6 C 56,12 32,15.5 10,18 C -6,19.5 -18,10 -18,0 C -18,-10 -11,-18 -1,-18.5 Z"/>
+  </clipPath>
+
+  <!-- ===== masks ===== -->
+  <!-- neck fade (local coords): opaque over beak/eye/crown/band, fades out towards the body (down-right) -->
+  <linearGradient id="oriole-g-headfade" gradientUnits="userSpaceOnUse" x1="-62.1" y1="-69.7" x2="-53.1" y2="-58.9">
+    <stop offset="0" stop-color="#fff"/>
+    <stop offset="1" stop-color="#000"/>
+  </linearGradient>
+  <mask id="oriole-mask-head" maskUnits="userSpaceOnUse" x="-170" y="-150" width="180" height="150">
+    <rect x="-170" y="-150" width="180" height="150" fill="url(#oriole-g-headfade)"/>
+  </mask>
+  <!-- shoulder fade (wing-frame coords): the front/top of the wing root melts into the body -->
+  <linearGradient id="oriole-g-wingfade" gradientUnits="userSpaceOnUse" x1="-6.4" y1="-4.8" x2="-15.2" y2="-11.4">
+    <stop offset="0" stop-color="#fff"/>
+    <stop offset="1" stop-color="#000"/>
+  </linearGradient>
+  <mask id="oriole-mask-wing" maskUnits="userSpaceOnUse" x="-70" y="-70" width="230" height="140">
+    <rect x="-70" y="-70" width="230" height="140" fill="url(#oriole-g-wingfade)"/>
+  </mask>
+
+  <!-- ================================================================== -->
+  <!-- BODY                                                                -->
+  <!-- ================================================================== -->
+  <g id="oriole-body">
+    <!-- far leg (in shadow) -->
+    <g filter="url(#wc-paint-soft)">
+      <path d="M 7,-16 C 6.5,-11 5.5,-6 4,-1" fill="none" stroke="#7B797B" stroke-width="4.2" stroke-linecap="round"/>
+      <path d="M 4,-1 C 9,-1.5 13,0.5 15,4.5 C 15.6,6 15.4,7.5 14.6,8.6" fill="none" stroke="#7B797B" stroke-width="2.7" stroke-linecap="round"/>
+      <path d="M 4,-1 C -1,-1.4 -6,0 -9,3.4 C -10.2,5 -10.4,6.8 -10,8.4" fill="none" stroke="#7B797B" stroke-width="2.7" stroke-linecap="round"/>
+      <path d="M 14.6,8.4 C 14,10 13,11 11.8,11.4 M -10,8.2 C -9.8,9.8 -9,10.9 -8,11.3" fill="none" stroke="#5E5C5E" stroke-width="1.3" stroke-linecap="round"/>
+    </g>
+    <!-- near leg -->
+    <g filter="url(#wc-paint-soft)">
+      <path d="M -1,-17 C -1.5,-11 -2,-6 -2,-1" fill="none" stroke="url(#oriole-g-leg)" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M -3.6,-9.5 l 2.9,0.6 M -3.8,-6 l 3,0.6 M -3.9,-2.8 l 2.8,0.5" stroke="#6C6A6C" stroke-width="0.7" opacity="0.6"/>
+      <!-- front toes wrapping over the branch -->
+      <path d="M -2,-1 C -7,-1.6 -12,-0.6 -15.5,2.6 C -17.4,4.4 -18.2,6.6 -18,8.8" fill="none" stroke="#8E8C8E" stroke-width="3.1" stroke-linecap="round"/>
+      <path d="M -2,-0.5 C -6,0 -9.5,2 -11.4,5 C -12.4,6.7 -12.6,8.4 -12.2,10" fill="none" stroke="#858385" stroke-width="2.9" stroke-linecap="round"/>
+      <!-- hind toe -->
+      <path d="M -1,-1 C 4,-1.6 9,-0.4 12,2.8 C 13.3,4.3 13.6,6 13.2,7.6" fill="none" stroke="#8A888A" stroke-width="3.1" stroke-linecap="round"/>
+      <!-- claws -->
+      <path d="M -18,8.6 C -17.8,10.4 -16.8,11.6 -15.6,12" fill="none" stroke="#5E5C5E" stroke-width="1.4" stroke-linecap="round"/>
+      <path d="M -12.2,9.8 C -12,11.4 -11.1,12.5 -10,12.9" fill="none" stroke="#5E5C5E" stroke-width="1.3" stroke-linecap="round"/>
+      <path d="M 13.2,7.4 C 12.9,9 12,10.2 10.8,10.7" fill="none" stroke="#5E5C5E" stroke-width="1.3" stroke-linecap="round"/>
+      <!-- toe highlights -->
+      <path d="M -4,-2 C -8,-2.4 -11.5,-1.6 -14.5,1" fill="none" stroke="#B8B6B8" stroke-width="0.9" opacity="0.7" stroke-linecap="round"/>
+      <path d="M 0,-2.2 C 4,-2.6 8,-1.8 10.5,0.6" fill="none" stroke="#B8B6B8" stroke-width="0.9" opacity="0.6" stroke-linecap="round"/>
+    </g>
+
+    <!-- tail + body, one painted group -->
+    <g filter="url(#wc-paint)">
+      <!-- TAIL (tail frame: base at (46,-41), pointing down-right 22 deg) -->
+      <g transform="translate(46 -41) rotate(22)">
+        <!-- lower (outer) feather, peeking below -->
+        <path d="M 0,3 C 24,7 50,11 70,13 C 75,14 76,17 72,18 C 50,17.5 25,14.5 0,11 Z" fill="#353230"/>
+        <!-- main tail -->
+        <path d="M -4,-9 C 22,-9.5 50,-8.5 74,-6.5 C 79,-5.5 81.5,-1 80.5,4 C 79.5,9 76,12 70,12.5 C 48,12 24,10 -4,8.5 Z" fill="url(#oriole-g-tail)"/>
+        <g clip-path="url(#oriole-clip-tail)">
+          <!-- yellow tips (broad on the outer feathers) -->
+          <path d="M 66,-14 C 64.5,-9 65.5,-5.5 67.5,-2.6 C 65.8,0.5 65.8,3.8 67,6.6 C 64,9.5 62.5,12.5 61,15.5 C 60,18 59.5,20 59,22 L 96,22 L 96,-14 Z" fill="url(#oriole-g-tip)"/>
+          <!-- feather separations and shafts -->
+          <path d="M 6,-2.8 C 30,-2.8 52,-2.2 80,-1.4" fill="none" stroke="#625D58" stroke-width="0.9" opacity="0.65"/>
+          <path d="M 6,3.2 C 30,4.6 54,6.4 78,8" fill="none" stroke="#2A2827" stroke-width="1" opacity="0.55"/>
+          <path d="M 6,10.2 C 30,12.6 52,14.8 72,16.4" fill="none" stroke="#2B2928" stroke-width="0.9" opacity="0.6"/>
+          <path d="M 67.5,-2.6 C 71,-1.8 75,-1.5 81,-1.4 M 67,6.6 C 70,7.4 73.5,7.8 79,8" fill="none" stroke="#C3A75B" stroke-width="0.8" opacity="0.7"/>
+          <path d="M 10,-6.2 C 34,-6.4 56,-5.6 72,-4.2" fill="none" stroke="#6E6862" stroke-width="0.8" opacity="0.5"/>
+          <!-- top sheen -->
+          <path d="M 0,-7.6 C 24,-8 48,-7.4 64,-6" fill="none" stroke="#7D7770" stroke-width="1.6" opacity="0.45"/>
+          <path d="M 69,-6.4 C 73,-6 76.5,-5 79,-3.4" fill="none" stroke="#FAEFC6" stroke-width="1.1" opacity="0.7"/>
+        </g>
+        <!-- undertail coverts (yellow), covering the tail base from below -->
+        <path d="M -12,2 C 6,5 18,8.5 28,10 C 31,10.6 31,13 27.5,14 C 14,16 2,15.5 -12,12.5 Z" fill="#DFBF64"/>
+        <path d="M 0,8 C 9,10 18,11 25,11.6" fill="none" stroke="#C4A44F" stroke-width="0.9" opacity="0.5"/>
+      </g>
+
+      <!-- BODY silhouette -->
+      <path d="M -82,-66 C -90,-54 -86,-36 -70,-25 C -54,-14 -30,-10 -8,-11 C 12,-12 32,-16 48,-23 C 58,-27 63,-32 62,-38 C 61,-45 55,-49 47,-53 C 28,-63 6,-76 -18,-86 C -34,-92 -52,-94 -64,-88 C -74,-83 -80,-76 -82,-66 Z" fill="url(#oriole-g-body)"/>
+      <g clip-path="url(#oriole-clip-body)">
+        <!-- faint olive tinge along the back -->
+        <path d="M -60,-100 C -30,-100 10,-86 60,-62 L 60,-52 C 20,-70 -20,-84 -60,-86 Z" fill="#CDBB68" opacity="0.3" filter="url(#oriole-f-blur4)"/>
+        <!-- core shadow on the belly and under side -->
+        <ellipse cx="0" cy="-8" rx="86" ry="17" fill="#C3A14D" opacity="0.55" filter="url(#oriole-f-blur7)"/>
+        <!-- rear / vent shade -->
+        <ellipse cx="56" cy="-34" rx="18" ry="14" fill="#C6A550" opacity="0.4" filter="url(#oriole-f-blur4)"/>
+        <!-- shade on the flank just under the wing -->
+        <path d="M -54,-50 C -20,-46 20,-38 62,-32 L 62,-24 C 20,-29 -20,-36 -54,-41 Z" fill="#C9A852" opacity="0.38" filter="url(#oriole-f-blur4)"/>
+        <!-- warm light on the breast -->
+        <ellipse cx="-70" cy="-52" rx="12" ry="19" fill="#FAEDC4" opacity="0.6" filter="url(#oriole-f-blur4)"/>
+        <!-- bounce light at the very bottom edge -->
+        <path d="M -66,-24 C -50,-14 -26,-10.5 -8,-11.5 C 12,-12.5 30,-16 46,-22" fill="none" stroke="#E5CA7C" stroke-width="2.2" opacity="0.55" filter="url(#oriole-f-blur1)"/>
+        <!-- feather texture: soft scallops on breast, belly and flank -->
+        <g fill="none" stroke="#C2A24E" stroke-width="1" opacity="0.36" stroke-linecap="round">
+          <path d="M -80,-50 q 4,3 8,1.5"/><path d="M -76,-40 q 4,3 9,1.5"/><path d="M -68,-47 q 4,3 8,1"/>
+          <path d="M -64,-34 q 5,3 10,1"/><path d="M -58,-43 q 4,3 9,1"/><path d="M -52,-24 q 5,2.5 10,0.5"/>
+          <path d="M -48,-34 q 5,3 10,1"/><path d="M -36,-20 q 5,2.5 10,0.5"/><path d="M -34,-30 q 5,2.5 11,0.5"/>
+          <path d="M -20,-21 q 6,2.5 12,0"/><path d="M -2,-19 q 6,2 12,0"/><path d="M 16,-22 q 6,2 12,-0.5"/>
+          <path d="M 4,-29 q 6,2 12,0"/><path d="M 30,-26 q 5,2 11,-0.5"/><path d="M -16,-32 q 6,2.5 12,0.5"/>
+          <path d="M -40,-42 q 5,2.5 10,0.5"/>
+        </g>
+        <g fill="none" stroke="#FBF1CC" stroke-width="1.1" opacity="0.5" stroke-linecap="round">
+          <path d="M -83,-58 q 2,-4 6,-6"/><path d="M -78,-46 q 2,-3 6,-4.5"/><path d="M -72,-62 q 3,-3 7,-4"/>
+          <path d="M -62,-54 q 3,-2.5 7,-3"/><path d="M -44,-82 q 6,-3 12,-3"/><path d="M -10,-78 q 6,-2 12,-1.5"/>
+        </g>
+        <!-- rim light along the back (light from upper left) -->
+        <path d="M -64,-90 C -50,-95 -34,-93 -18,-87.5 C 4,-79 26,-66 46,-55" fill="none" stroke="#FBF2D2" stroke-width="3" opacity="0.6" filter="url(#oriole-f-blur1)"/>
+        <!-- rim light on breast front -->
+        <path d="M -84,-62 C -88,-50 -84,-38 -74,-29" fill="none" stroke="#FBF2D2" stroke-width="2.6" opacity="0.55" filter="url(#oriole-f-blur1)"/>
+      </g>
+      <!-- thigh fluff over the top of the legs -->
+      <path d="M -11,-17 C -8,-9 3,-8 10,-12 C 12.5,-14 11.5,-18 8,-19 C 1,-21 -8,-21 -11,-17 Z" fill="#D2B158" opacity="0.85"/>
+      <path d="M -8,-13 q 4,3 9,1 M -1,-16 q 4,2.5 9,1" fill="none" stroke="#BE9E4B" stroke-width="0.9" opacity="0.5"/>
+    </g>
+  </g>
+
+  <!-- ================================================================== -->
+  <!-- HEAD   pivot = neck (-64,-72)                                       -->
+  <!-- ================================================================== -->
+  <g id="oriole-head">
+    <g mask="url(#oriole-mask-head)">
+      <!-- beak (under the forehead feathers) -->
+      <g filter="url(#wc-paint-soft)">
+        <path d="M -100,-74.5 C -109,-71.5 -119,-67.5 -127.5,-65 C -120,-63.6 -109,-64.2 -99,-69.5 Z" fill="url(#oriole-g-beak-lo)"/>
+        <path d="M -102.5,-82.8 C -109,-80.8 -118,-74.8 -127.5,-65 C -119,-67.5 -109,-71.5 -100,-74.5 Z" fill="url(#oriole-g-beak-up)"/>
+        <path d="M -103.5,-81.8 C -110,-79.8 -117,-75 -124.5,-67.8" fill="none" stroke="#F4CCC1" stroke-width="1.2" opacity="0.6" stroke-linecap="round"/>
+        <path d="M -100,-74.5 C -109,-71.5 -119,-67.5 -126.5,-65.3" fill="none" stroke="#9E6258" stroke-width="0.9" opacity="0.6"/>
+        <ellipse cx="-108" cy="-78.6" rx="1.7" ry="0.8" transform="rotate(-30 -108 -78.6)" fill="#9C6157" opacity="0.55"/>
+      </g>
+      <!-- head -->
+      <g filter="url(#wc-paint)">
+        <path d="M -103.5,-82 C -103,-91 -96,-100 -86,-103 C -76,-106 -64,-104 -57,-97 C -51,-91 -47,-83 -47,-74 C -47,-64 -54,-56 -64,-53 C -74,-50 -84,-53 -90,-59 C -94,-63 -97,-67 -99,-70.5 C -101,-74 -103,-78 -103.5,-82 Z" fill="url(#oriole-g-head)"/>
+        <g clip-path="url(#oriole-clip-head)">
+          <!-- throat / under-jaw shade -->
+          <ellipse cx="-76" cy="-55" rx="20" ry="8" fill="#D2B25A" opacity="0.5" filter="url(#oriole-f-blur4)"/>
+          <!-- crown highlight -->
+          <ellipse cx="-84" cy="-99" rx="12" ry="5" fill="#FBF0C8" opacity="0.6" filter="url(#oriole-f-blur2)"/>
+          <!-- black band: lores - eye - nape -->
+          <path d="M -105,-80 C -99,-85 -94,-89.5 -88,-91 C -81,-93 -73,-95.5 -65,-98.5 C -60,-100 -55,-98.5 -52,-95 C -49,-91 -48,-86 -50,-82 C -56,-80 -63,-79.5 -71,-79.5 C -78,-79.5 -84,-80 -90,-80 C -96,-79.5 -100,-78 -105,-76 Z" fill="url(#oriole-g-band)"/>
+          <!-- feathery band edges -->
+          <path d="M -80,-92.4 l 1.5,-1.8 M -74,-94.4 l 1.6,-1.9 M -68,-96.8 l 1.4,-2 M -61,-99.2 l 1.2,-1.8" stroke="#45413E" stroke-width="1.1" stroke-linecap="round" opacity="0.8"/>
+          <path d="M -82,-80 l 1.2,2 M -75,-79.6 l 1.4,2.2 M -68,-79.6 l 1.4,2.2 M -60,-80 l 1.6,2" stroke="#45413E" stroke-width="1.1" stroke-linecap="round" opacity="0.75"/>
+          <!-- sheen on band top behind the eye -->
+          <path d="M -82,-90 C -76,-91.6 -70,-93.8 -63,-96.4" fill="none" stroke="#6C6661" stroke-width="1.4" opacity="0.6" stroke-linecap="round"/>
+          <!-- feather texture -->
+          <g fill="none" stroke="#D2B25A" stroke-width="0.9" opacity="0.45" stroke-linecap="round">
+            <path d="M -95,-72 q 3,2 7,1"/><path d="M -90,-66 q 4,2 8,1"/><path d="M -82,-72 q 4,2 8,0.5"/>
+            <path d="M -78,-63 q 4,2 8,0.5"/><path d="M -68,-68 q 4,2 8,0"/><path d="M -64,-60 q 4,2 8,0"/>
+          </g>
+          <g fill="none" stroke="#FCF3D3" stroke-width="1" opacity="0.55" stroke-linecap="round">
+            <path d="M -99,-92 q 3,-3 7,-4"/><path d="M -88,-101 q 4,-1.5 8,-1"/><path d="M -75,-102 q 4,-0.5 7,1"/>
+          </g>
+          <!-- rim light on forehead/crown -->
+          <path d="M -102.5,-87 C -100,-96 -93,-101.5 -85,-103 C -76,-104.6 -67,-102.6 -60,-98" fill="none" stroke="#FBF2D2" stroke-width="2.4" opacity="0.65" filter="url(#oriole-f-blur1)"/>
+        </g>
+      </g>
+      <!-- eye: small dark bead with a tiny highlight -->
+      <g>
+        <circle cx="-88" cy="-85.6" r="4.1" fill="#2A2725" filter="url(#wc-paint-soft)"/>
+        <circle cx="-88" cy="-85.6" r="3.2" fill="#4E3933"/>
+        <circle cx="-88" cy="-85.6" r="2.1" fill="#1C1918"/>
+        <path d="M -91.4,-83.3 A 4 4 0 0 0 -84.6,-83.3" fill="none" stroke="#6E6863" stroke-width="0.8" opacity="0.55"/>
+        <circle cx="-89.2" cy="-86.8" r="0.95" fill="#FFFFFF" opacity="0.92"/>
+        <circle cx="-86.8" cy="-84.4" r="0.45" fill="#FFFFFF" opacity="0.35"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- ================================================================== -->
+  <!-- WING   pivot = shoulder (-40,-68); wing frame = translate(-40 -68) rotate(18) -->
+  <!-- ================================================================== -->
+  <g id="oriole-wing">
+    <g transform="translate(-40 -68) rotate(18)">
+      <g mask="url(#oriole-mask-wing)">
+        <g filter="url(#wc-paint)">
+          <!-- base silhouette -->
+          <path d="M -1,-18.5 C 25,-19 55,-15.5 84,-9.5 C 101,-6 114,-3 122,-0.6 C 125,0.6 124.5,2.4 121,3.6 C 110,6 96,8 80,9.6 C 56,12 32,15.5 10,18 C -6,19.5 -18,10 -18,0 C -18,-10 -11,-18 -1,-18.5 Z" fill="url(#oriole-g-wing)"/>
+          <g clip-path="url(#oriole-clip-wing)">
+            <!-- primaries: long, narrow, pale-edged -->
+            <path d="M 36,2 C 66,1.4 98,-0.6 121,-0.4 C 125,0.6 124.5,2.4 121,3.6 C 110,6 96,8 80,9.6 C 62,10.6 48,11 36,11 Z" fill="#383533"/>
+            <path d="M 36,-1.6 C 66,-2.2 96,-3.8 114,-2.8 C 117,-2 117,-0.4 114,0.6 C 104,3 90,4.6 72,5.8 C 58,6.4 46,6.6 36,6.6 Z" fill="#3E3A38"/>
+            <path d="M 36,-5.2 C 64,-5.8 90,-6.8 106,-5.6 C 109,-4.8 109,-3.4 106,-2.4 C 96,-0.2 82,1.4 68,2.2 C 56,2.8 46,3 36,3 Z" fill="#433F3C"/>
+            <path d="M 123,2.6 C 112,5.6 96,8 80,9.6" fill="none" stroke="#C9B88C" stroke-width="1" opacity="0.5"/>
+            <path d="M 115.6,0 C 104,3 90,4.6 72,5.8" fill="none" stroke="#CDBA88" stroke-width="1" opacity="0.55"/>
+            <path d="M 107.6,-3 C 96,-0.2 82,1.4 68,2.2" fill="none" stroke="#CDBA88" stroke-width="1" opacity="0.55"/>
+            <!-- secondaries: black with yellow outer edges (lower middle of the folded wing) -->
+            <path d="M -4,4 C 20,4 46,3.6 68,3 C 72,3.6 72.5,6.4 69.5,8 C 48,10.2 26,12.4 -4,14 Z" fill="#3A3735"/>
+            <path d="M 2,13.6 C 26,12.2 48,10.1 69.5,8 C 72.5,6.4 72,3.6 68,3" fill="none" stroke="#E8CF85" stroke-width="1.7" opacity="0.8"/>
+            <path d="M -4,0 C 22,0 44,-0.4 63,-0.8 C 67,-0.2 67.5,2.6 64.5,3.8 C 44,5.6 24,6.8 -4,7.6 Z" fill="#403C3A"/>
+            <path d="M 2,7.4 C 24,6.7 44,5.5 64.5,3.8 C 67.5,2.6 67,-0.2 63,-0.8" fill="none" stroke="#E8CF85" stroke-width="1.7" opacity="0.8"/>
+            <!-- tertials: broad yellow edges, on top at the upper rear -->
+            <path d="M -2,-12.5 C 26,-12.6 52,-11 72,-8 C 78,-6.8 78.5,-3 73,-2 C 52,-1.2 28,-1.8 -2,-2.4 Z" fill="#403C39"/>
+            <path d="M 8,-2.2 C 30,-1.8 52,-1.2 73,-2 C 78.5,-3 78,-6.8 72,-8" fill="none" stroke="#E8CF85" stroke-width="2.3" opacity="0.85"/>
+            <path d="M -2,-18.5 C 30,-19 58,-15.5 82,-10.5 C 88,-9 88.5,-5.4 83,-4.4 C 60,-4.4 30,-6.4 -2,-7.6 Z" fill="#47433F"/>
+            <path d="M 10,-7.2 C 34,-6.2 60,-4.4 83,-4.4 C 88.5,-5.4 88,-9 82,-10.5" fill="none" stroke="#E8CF85" stroke-width="2.6" opacity="0.88"/>
+            <!-- top sheen along the tertials -->
+            <path d="M 6,-16.5 C 32,-17 58,-14 80,-9.6" fill="none" stroke="#7D7770" stroke-width="1.6" opacity="0.5"/>
+            <!-- greater coverts: black, rounded tips with a narrow pale fringe -->
+            <path d="M -10,-13 C 6,-13.6 20,-12.6 30,-10.6 C 34,-7.6 34,-3.6 31,-0.6 C 34,1.6 34,5.6 30.5,8.4 C 33,10.4 32,13.6 28,14.4 L -10,15 Z" fill="#3D3A37"/>
+            <path d="M 30,-10.6 C 34,-7.6 34,-3.6 31,-0.6 C 34,1.6 34,5.6 30.5,8.4 C 33,10.4 32,13.6 28,14.4" fill="none" stroke="#D9C07A" stroke-width="1.2" opacity="0.6"/>
+            <!-- primary coverts: the yellow carpal patch at the bend of the wing -->
+            <path d="M -3,7 C 5,5.2 15,5.6 21,8.2 C 24,10.4 23,13.8 19,15.4 C 11,17.4 2,17.6 -4,15.4 Z" fill="url(#oriole-g-carpal)"/>
+            <path d="M 21,8.2 C 24,10.4 23,13.8 19,15.4" fill="none" stroke="#C2A659" stroke-width="0.9" opacity="0.7"/>
+            <path d="M 0,8.4 C 6,7.2 12,7.2 17,8.4" fill="none" stroke="#F8EBC0" stroke-width="1" opacity="0.6"/>
+            <!-- median coverts: a row of short black feathers with yellow tips -->
+            <path d="M -8,-15 C 2,-15.8 10,-15.2 15,-13.4 C 18,-11.2 18,-8.4 15.5,-6.8 C 18,-5 18,-2 15,-0.4 L -8,1 Z" fill="#433F3C"/>
+            <path d="M 15,-13.4 C 18,-11.2 18,-8.4 15.5,-6.8 C 18,-5 18,-2 15,-0.4" fill="none" stroke="#E3C97E" stroke-width="1.5" opacity="0.75"/>
+          </g>
+        </g>
+        <!-- lesser coverts / shoulder: body-coloured feathers over the wing root (they fade into the body via the mask) -->
+        <g filter="url(#wc-paint-soft)">
+          <path d="M -26,-8 C -26,-20 -16,-25 -4,-24 C 4,-23.4 9,-20 9.5,-15.5 C 12.5,-13 12.5,-9.4 9.6,-7.4 C 12,-5 11.4,-1.6 8,0 C 4,2.6 -2,3.6 -8,4 C -18,4.6 -26,2 -26,-8 Z" fill="url(#oriole-g-body-w)"/>
+          <path d="M 9.5,-15.5 C 12.5,-13 12.5,-9.4 9.6,-7.4 C 12,-5 11.4,-1.6 8,0" fill="none" stroke="#C9A852" stroke-width="0.9" opacity="0.55"/>
+          <path d="M -6,-13 q 5,-1.6 10,-0.6 M -8,-5 q 5,-1.6 10,-0.6" fill="none" stroke="#CFAE55" stroke-width="0.9" opacity="0.45"/>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <!-- ================================================================== -->
+  <g id="oriole">
+    <use href="#oriole-body" xlink:href="#oriole-body"/>
+    <use href="#oriole-head" xlink:href="#oriole-head"/>
+    <use href="#oriole-wing" xlink:href="#oriole-wing"/>
+  </g>
+
+  <!-- optional contact shadow on the branch under the feet (not part of "oriole") -->
+  <g id="oriole-shadow">
+    <ellipse cx="-2" cy="3" rx="26" ry="4.5" fill="#6F5844" opacity="0.22" filter="url(#oriole-f-blur2)"/>
+  </g>
+</defs>
+</svg>

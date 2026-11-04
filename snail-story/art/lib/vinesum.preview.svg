@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="760" viewBox="0 0 1500 760">
+<defs><linearGradient id="vinesum-pv-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B9D6E8"/><stop offset="0.6" stop-color="#CFE4EF"/><stop offset="1" stop-color="#EAF3F2"/></linearGradient></defs>
+<rect x="-60" y="-60" width="1620" height="880" fill="url(#vinesum-pv-sky)" filter="url(#wc-wash)"/>
+<use href="#vinesum-leaf-a" transform="translate(130 300) scale(1)"/>
+<circle cx="130" cy="300" r="3" fill="none" stroke="#d33" stroke-width="1.2"/>
+<text x="130" y="340" font-size="15" text-anchor="middle" fill="#557" font-family="sans-serif">vinesum-leaf-a</text>
+<use href="#vinesum-leaf-b" transform="translate(330 300) scale(1)"/>
+<circle cx="330" cy="300" r="3" fill="none" stroke="#d33" stroke-width="1.2"/>
+<text x="330" y="340" font-size="15" text-anchor="middle" fill="#557" font-family="sans-serif">vinesum-leaf-b</text>
+<use href="#vinesum-leaf-c" transform="translate(530 300) scale(1)"/>
+<circle cx="530" cy="300" r="3" fill="none" stroke="#d33" stroke-width="1.2"/>
+<text x="530" y="340" font-size="15" text-anchor="middle" fill="#557" font-family="sans-serif">vinesum-leaf-c</text>
+<use href="#vinesum-tendril" transform="translate(680 280) scale(1)"/>
+<circle cx="680" cy="280" r="3" fill="none" stroke="#d33" stroke-width="1.2"/>
+<text x="680" y="320" font-size="15" text-anchor="middle" fill="#557" font-family="sans-serif">vinesum-tendril</text>
+<use href="#vinesum-leaf-a" transform="translate(960 650) scale(2)"/>
+<use href="#vinesum-leaf-c" transform="translate(1300 650) scale(2)"/>
+<use href="#vinesum-tendril" transform="translate(720 700) scale(2.4)"/>
+<g transform="translate(110 520) rotate(-60) scale(0.7 0.7)" filter="url(#wc-paint)"><use href="#vinesum-leaf-a-body" fill="url(#vinesum-lg10)" stroke="url(#vinesum-rim10)"/></g>
+<g transform="translate(260 520) rotate(60) scale(0.7 0.7)" filter="url(#wc-paint)"><use href="#vinesum-leaf-a-body" fill="url(#vinesum-lg6)" stroke="url(#vinesum-rim6)"/></g>
+<g transform="translate(410 520) rotate(150) scale(0.7 0.7)" filter="url(#wc-paint)"><use href="#vinesum-leaf-a-body" fill="url(#vinesum-lg3)" stroke="url(#vinesum-rim3)"/></g>
+<g transform="translate(560 520) rotate(200) scale(0.7 0.7)" filter="url(#wc-paint)"><use href="#vinesum-leaf-a-body" fill="url(#vinesum-lg1)" stroke="url(#vinesum-rim1)"/></g>
+</svg>
