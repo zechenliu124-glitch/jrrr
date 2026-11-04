@@ -15,10 +15,10 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / 'art' / 'scenes'
 
 # ---- library facts (local coordinates documented in the art files) -----------------------------
-SNAIL_LEN = 307                       # tail tip -> head front at scale 1
-SNAIL_NECK = (58, -48)                # snail-head pivot
-SNAIL_STALK_NEAR = (127, -99)         # eyestalk base pivots
-SNAIL_STALK_FAR = (113, -99)
+SNAIL_LEN = 311                       # tail tip -> head front at scale 1
+SNAIL_NECK = (80, -38)                # snail-head pivot
+SNAIL_STALK_NEAR = (123.6, -76)         # eyestalk base pivots
+SNAIL_STALK_FAR = (112, -73.5)
 ORIOLE_NECK = (-64, -72)              # oriole-head pivot
 ORIOLE_SHOULDER = (-40, -68)          # oriole-wing pivot (negative rotation lifts the wing)
 

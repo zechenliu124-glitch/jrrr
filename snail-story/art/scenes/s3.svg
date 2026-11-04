@@ -1,4 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1920" height="1080" viewBox="0 0 1920 1080">
 <g id="layer-bg" data-layer="bg"><use href="#env-bg-s3"/><use href="#vine-s3"/><use href="#env-paper"/></g>
-<g id="layer-snail" data-layer="el"><g transform="translate(380.0 800.0) rotate(-6.30) scale(0.9772 0.9772)"><use href="#snail-shadow"/><use href="#snail"/></g></g>
+<g id="layer-snail" data-layer="el"><g transform="translate(380.0 800.0) rotate(-6.30) scale(0.9646 0.9646)"><use href="#snail-shadow"/><use href="#snail"/></g></g>
 </svg>

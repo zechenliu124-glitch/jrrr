@@ -6,5 +6,5 @@
 <g id="layer-leaf3" data-layer="el"><use href="#vine-s6-leaf-3"/><circle class="pivot" cx="1080" cy="250" r="0.5" fill="none"/></g>
 <g id="layer-grass1" data-layer="el"><g transform="translate(250.0 905.0) rotate(0.00) scale(1.0000 1.0000)"><use href="#env-grass-tuft-a"/><circle class="pivot" cx="0" cy="0" r="0.5" fill="none"/></g></g>
 <g id="layer-grass2" data-layer="el"><g transform="translate(1660.0 915.0) rotate(0.00) scale(-0.9000 0.9000)"><use href="#env-grass-tuft-b"/><circle class="pivot" cx="0" cy="0" r="0.5" fill="none"/></g></g>
-<g id="layer-snail" data-layer="el"><g transform="translate(965.0 760.0) rotate(-90.00) scale(0.9772 0.9772)"><use href="#snail"/></g></g>
+<g id="layer-snail" data-layer="el"><g transform="translate(965.0 760.0) rotate(-90.00) scale(0.9646 0.9646)"><use href="#snail"/></g></g>
 </svg>

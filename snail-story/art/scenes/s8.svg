@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1920" height="1080" viewBox="0 0 1920 1080">
-<g id="layer-bg" data-layer="bg"><use href="#env-bg-s8"/><use href="#vinesum-s8"/><g transform="translate(430.0 660.0) rotate(0.00) scale(0.9772 0.9772)"><use href="#snail-shadow"/><use href="#snail-headup"/></g><use href="#env-paper"/></g>
+<g id="layer-bg" data-layer="bg"><use href="#env-bg-s8"/><use href="#vinesum-s8"/><g transform="translate(430.0 660.0) rotate(0.00) scale(0.9646 0.9646)"><use href="#snail-shadow"/><use href="#snail-headup"/></g><use href="#env-paper"/></g>
 <g id="layer-cloud1" data-layer="el"><g transform="translate(330.0 210.0) rotate(0.00) scale(1.0000 1.0000)"><use href="#env-cloud-a"/></g></g>
 <g id="layer-cloud2" data-layer="el"><g transform="translate(150.0 440.0) rotate(0.00) scale(0.9000 0.9000)"><use href="#env-cloud-b"/></g></g>
 <g id="layer-cloud3" data-layer="el"><g transform="translate(820.0 130.0) rotate(0.00) scale(0.8000 0.8000)" opacity="0.85"><use href="#env-cloud-c"/></g></g>
