@@ -2,3 +2,6 @@ build/
 node_modules/
 __pycache__/
 *.pdf
+# final decks/previews are committed once, at the end (avoid 30 MB per rebuild in history)
+/*.pptx
+/preview/

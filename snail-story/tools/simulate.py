@@ -164,7 +164,8 @@ def slide_length(slide, tl):
     for t0, e in tl:
         if e['kind'] not in ('sway', 'flap'):
             end = max(end, t0 + e['dur'])
-    return max(end + 1500, slide['budget'] * 1000)
+    # long ambient drifts (clouds) may outlast the page; the preview stops a little after the page's budget
+    return min(max(end + 1500, slide['budget'] * 1000), slide['budget'] * 1000 + 3000)
 
 
 def encode(frames_iter, size, fps, out):

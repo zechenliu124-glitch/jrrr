@@ -98,7 +98,7 @@ SLIDES = [
             dict(at=0, click=False, say='一只小蜗牛，背着重重的壳，慢慢爬过来啦。', fx=[
                 fade('snail', 0, 1500),
                 fade('cap1', 400, 1000),
-                fx('path', 'snail', 1600, 12500, pts=[(0, 0), (800, -88)]),
+                fx('path', 'snail', 1600, 13000, pts=[(0, 0), (860, -95)]),
             ]),
             dict(at=7000, click=True, say='它心里藏着一个小小的梦想：我要爬到葡萄树上，等到葡萄成熟！', fx=[
                 fade('cap2', 0, 1000),
@@ -112,8 +112,8 @@ SLIDES = [
                   '黄鹂鸟说：“蜗牛蜗牛！葡萄成熟还早得很呢，你现在爬上来干什么？”',
         budget=21,
         captions=[
-            dict(id='cap1', text='两只黄鹂鸟，嘻嘻哈哈', size=80, color=BROWN, y=CAP_Y2[0]),
-            dict(id='cap2', text='“你现在爬上来干什么？”', size=80, color=GOLD, y=CAP_Y2[1]),
+            dict(id='cap1', text='两只黄鹂鸟，嘻嘻哈哈', x=1170, size=80, color=BROWN, y=CAP_Y2[0]),
+            dict(id='cap2', text='“你现在爬上来干什么？”', x=1170, size=80, color=GOLD, y=CAP_Y2[1]),
         ],
         beats=[
             dict(at=0, click=False, say='（画面：小蜗牛已经在树干上）', fx=[
@@ -142,8 +142,8 @@ SLIDES = [
                   '“黄鹂鸟，请你不要笑我。我爬得很慢，但是，等我爬上，它就成熟啦！”',
         budget=22,
         captions=[
-            dict(id='cap1', text='“黄鹂鸟，请你不要笑我。”', size=80, color=GREEN, y=CAP_Y2[0]),
-            dict(id='cap2', text='“等我爬上，它就成熟啦！”', size=80, color=GREEN, y=CAP_Y2[1]),
+            dict(id='cap1', text='“黄鹂鸟，请你不要笑我。”', x=1170, size=80, color=GREEN, y=CAP_Y2[0]),
+            dict(id='cap2', text='“等我爬上，它就成熟啦！”', x=1170, size=80, color=GREEN, y=CAP_Y2[1]),
         ],
         beats=[
             dict(at=0, click=False, say='小蜗牛听了，心里有一点点难过。可是它没有停下。', fx=[]),
@@ -213,9 +213,9 @@ SLIDES = [
                   '小小的天，也可以有大大的梦想。跑得快不一定厉害，坚持往前走，总有一天，会拥有属于自己的天！',
         budget=27,
         captions=[
-            dict(id='cap1', text='小小的天，也可以有大大的梦想', size=72, color=BROWN, y=790),
-            dict(id='cap2', text='坚持往前走', size=72, color=BROWN, y=890),
-            dict(id='cap3', text='总有一天，会拥有属于自己的天！', size=72, color=GREEN, y=990),
+            dict(id='cap1', text='小小的天，也可以有大大的梦想', x=1250, size=72, color=BROWN, y=790),
+            dict(id='cap2', text='坚持往前走', x=1250, size=72, color=BROWN, y=890),
+            dict(id='cap3', text='总有一天，会拥有属于自己的天！', x=1250, size=72, color=GREEN, y=990),
         ],
         beats=[
             dict(at=0, click=False, say='风吹干它流过的汗，它站在高高的地方，看见了蓝蓝的天。', fx=[
@@ -259,8 +259,8 @@ SLIDES = [
 # Named motion paths (offsets in slide px from the element's drawn position; 'C' = smooth Bezier).
 PATHS = {
     # slide 6: straight up the trunk, a smooth detour to the left around the twig, then on up
-    's6.climb': [('M', 0, 0), ('L', 0, -180), ('C', 0, -230, -80, -250, -80, -300),
-                 ('C', -80, -350, 0, -370, 0, -420), ('L', 10, -530)],
+    's6.climb': [('M', 0, 0), ('L', 0, -170), ('C', 0, -220, -80, -240, -80, -290),
+                 ('C', -80, -340, 0, -360, 0, -410), ('L', 6, -445)],
     # slide 7: along the rising branch to its tip
     's7.branch': [('M', 0, 0), ('L', 550, -248)],
 }

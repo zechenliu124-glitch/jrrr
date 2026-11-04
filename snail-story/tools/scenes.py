@@ -77,7 +77,7 @@ def bird(n, x, y, s=1.0, head_rot=0.0):
 
 
 # ---- slide geometry -----------------------------------------------------------------------------
-S4_SNAIL = dict(x=643, y=581, rot=-63, length=260)   # on the trunk's upper-left surface near (680,600)
+S4_SNAIL = dict(x=654, y=587, rot=-63, length=260)   # on the trunk's upper-left surface near (680,600)
 S4_BIRDS = [(1130, 256, 1.0), (1400, 252, 0.94)]
 
 
@@ -116,7 +116,7 @@ def s5():
                *[l for i, (x, y, s) in enumerate(S4_BIRDS, 1) for l in bird(i, x, y, s)])
 
 
-S6_LEAF_PIVOTS = {1: (1100, 640), 2: (760, 420), 3: (1080, 250)}
+S6_LEAF_PIVOTS = {1: (1237.2, 485.0), 2: (601.6, 697.7), 3: (1229.7, 162.5)}
 
 
 def s6():
@@ -126,7 +126,7 @@ def s6():
     return svg(bg('env-bg-s6', 'vine-s6'),
                layer('sun', 'el', f'<g transform="{tf(1690, 175)}">{use("env-sun")}</g>'),
                *leaves, *grass,
-               layer('snail', 'el', snail(965, 760, -90, 300, shadow=False)))
+               layer('snail', 'el', snail(965, 690, -90, 300, shadow=False)))
 
 
 S7_GRAPES = [((240, 230), 1, 1.0), ((520, 270), 2, 1.05), ((800, 230), 3, 0.95),
