@@ -17,8 +17,8 @@
 <g transform="translate(1050 350)"><use href="#snail-shadow"/><use href="#snail-head" transform="rotate(-25 80 -38)"/><use href="#snail-body"/><use href="#snail-shell"/></g>
 <g transform="translate(1430 350)"><use href="#snail-shadow"/><use href="#snail-head" transform="rotate(10 80 -38)"/><use href="#snail-body"/><use href="#snail-shell"/></g>
 <text x="870" y="408" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#6F5844" opacity="0.85">(e) head -25° / +10° around the neck pivot, layered below body + shell</text>
-<rect x="1630" y="340" width="150" height="44" rx="18" fill="url(#snail-pv-grass)" filter="url(#wc-wash)"/>
-<g transform="translate(1705 350) scale(0.6)"><use href="#snail-shadow"/><use href="#snail"/></g>
+<rect x="1625" y="340" width="160" height="44" rx="18" fill="url(#snail-pv-grass)" filter="url(#wc-wash)"/>
+<g transform="translate(1688 350) scale(0.6)"><use href="#snail-shadow"/><use href="#snail"/></g>
 <text x="1640" y="408" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#6F5844" opacity="0.85">(h) scale 0.6</text>
 
 <!-- row 2 : ground y = 760 -->
@@ -30,12 +30,12 @@
   <rect x="-185" y="-1" width="380" height="58" rx="26" fill="url(#snail-pv-bark)" filter="url(#wc-paint)"/>
   <use href="#snail-shadow"/><use href="#snail"/>
 </g>
-<text x="850" y="818" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#6F5844" opacity="0.85">(b) rotated -63° (climbing)</text>
+<text x="1010" y="818" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#6F5844" opacity="0.85">(b) rotated -63° (climbing)</text>
 <g transform="translate(1470 615) rotate(-90)">
   <rect x="-175" y="-1" width="350" height="76" rx="30" fill="url(#snail-pv-bark)" filter="url(#wc-paint)"/>
   <use href="#snail-shadow"/><use href="#snail"/>
 </g>
-<text x="1290" y="818" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#6F5844" opacity="0.85">(c) rotated -90° on a vertical trunk</text>
+<text x="1340" y="818" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#6F5844" opacity="0.85">(c) rotated -90° on a vertical trunk</text>
 
 <!-- row 3 : exploded view, baseline y = 1100 -->
 <text x="50" y="868" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" fill="#6F5844" opacity="0.85">(g) exploded parts, red = pivot:  body · shell · head-base · stalk-far · stalk-near · head · shadow · assembled</text>

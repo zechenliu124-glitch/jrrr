@@ -262,7 +262,7 @@ PATHS = {
     's6.climb': [('M', 0, 0), ('L', 0, -180), ('C', 0, -230, -80, -250, -80, -300),
                  ('C', -80, -350, 0, -370, 0, -420), ('L', 10, -530)],
     # slide 7: along the rising branch to its tip
-    's7.branch': [('M', 0, 0), ('L', 550, -275)],
+    's7.branch': [('M', 0, 0), ('L', 550, -248)],
 }
 
 TOTAL_BUDGET = sum(s['budget'] for s in SLIDES)

@@ -137,7 +137,7 @@ def s7():
     grapes = [layer(f'grape{i}', 'el', f'<g transform="{tf(x, y, 0, s)}">{use(f"grape-cluster-{c}")}</g>')
               for i, ((x, y), c, s) in enumerate(S7_GRAPES, 1)]
     return svg(bg('env-bg-s7', 'vinesum-s7'), *grapes,
-               layer('snail', 'el', snail(700, 625, -25, 260, shadow=False)))
+               layer('snail', 'el', snail(700, 628, -24, 260, shadow=False)))
 
 
 def s8():
@@ -148,7 +148,8 @@ def s8():
     return svg(layer('bg', 'bg', use('env-bg-s8') + use('vinesum-s8') + snail_bg + use('env-paper')), *clouds)
 
 
-S9_SMALL_GRAPES = []   # (x, y, part) on the far vine — filled from the summer-vine report
+S9_SMALL_GRAPES = [(1318, 688, 'grape-cluster-small-1'), (1410, 696, 'grape-cluster-small-2'),
+                   (1542, 692, 'grape-cluster-small-2'), (1634, 684, 'grape-cluster-small-1')]
 S9_HEAD = -24
 
 
