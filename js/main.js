@@ -98,7 +98,7 @@ Game.start = function (charId) {
   UI.show('hud', true);
   UI.closeModal();
   Game.state = 'play';
-  UI.toast('第 1 关 · ' + Game.stageDef.name + '：找到 Boss 传送门！', '#fff');
+  UI.toast('第 1 关 · ' + Game.stageDef.name + '：找到 Boss 传送门！', Kit.color('gold'));
 };
 
 Game.buildStage = function (menuOnly) {
@@ -185,7 +185,7 @@ Game.summonBoss = function (portal) {
     b.state = 'intro'; b.st = 1.5;
   }
   Game.bossX = a.x; Game.bossZ = a.z;
-  UI.toast(ENEMIES[sd.boss].name + ' 降临！', '#ff4b5a');
+  UI.toast(ENEMIES[sd.boss].name + ' 降临！', Kit.color('red'));
   Game.shake(0.8);
   Interact.consume(a);
   // Boss 战期间定时刷小魔像
@@ -211,7 +211,7 @@ Game.startChallenge = function (o) {
     list.push(Enemies.spawn(pick(Director.currentPool().types), o.x + Math.cos(a) * 9, o.z + Math.sin(a) * 9, { elite: true, hpMult: Director.hpMult() * 0.8, dmgMult: Director.dmgMult() * 1.3, drop: true }));
   }
   Game.challenges.push({ x: o.x, z: o.z, list: list });
-  UI.toast('挑战开始！击败所有精英', '#c46bff');
+  UI.toast('挑战开始！击败所有精英', Kit.color('org'));
 };
 
 // ---------------- 弹窗队列 ----------------

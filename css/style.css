@@ -214,7 +214,7 @@ body.touch #touchBtns { display: block; }
 
 /* ---------- 弹窗：深色面板（缺角黑边 + 两色斜面 + 硬投影，边框和底色在 kit.css 的「面板」） ---------- */
 #modalBg { position: fixed; inset: 0; background: rgba(3, 7, 16, 0.6); z-index: 10; }
-.modal { position: fixed; inset: 0; margin: auto; z-index: 11; width: min(940px, calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); height: -webkit-fit-content; height: fit-content; max-height: calc(100vh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-x: hidden; overflow-y: auto; padding: 16px 18px 20px; text-align: center; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.modal { position: fixed; inset: 0; margin: auto; z-index: 11; width: min(940px, calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); height: -webkit-fit-content; height: fit-content; max-height: calc(100vh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-x: hidden; overflow-y: auto; padding: 11px 13px 15px; text-align: center; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 .modal h2 { margin: 3px 0 12px; font-size: var(--fs-xl); line-height: 42px; color: var(--accent); text-shadow: var(--ol3); }
 /* 面板里的小标题和正文不描边（只有大标题、按钮、卡片名字描边） */
 .modal h3 { margin: 12px 0 6px; font-size: var(--fs-m); line-height: 24px; color: var(--muted); }
@@ -252,14 +252,16 @@ body.touch .cardTop { padding-right: 0; }
 body.touch .cardKey { display: none; }
 .banishing .card { border-style: dashed; }
 .row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
-/* 弹窗最下面的按钮行：内容太高要滚动时（矮屏、手机）钉在弹窗底部，按钮一直看得到（下边距挪到按钮行里，钉住时贴着边框） */
-#levelModal, #shopModal, #pauseModal, #endModal { padding-bottom: 8px; }
-.modal > .row:last-child { position: sticky; bottom: -8px; z-index: 1; margin-top: 8px; padding: 8px 0 12px; background: var(--panel-solid); }
-/* 按钮行下面还压着内容（还能往下滚，ui.js 的 UI.modalMore 加 .kmMore）：按钮行上面一条硬边分隔线（3 像素黑 + 2 像素亮边），不会看起来把字切成两半 */
+/* 弹窗最下面的按钮行：内容太高要滚动时（矮屏、手机）钉在弹窗底部，按钮一直看得到（下边距挪到按钮行里，钉住时贴着边框）。
+   边框是 8 像素（kit.css），这里的内边距都比框 3 像素时少 5 像素 */
+#levelModal, #shopModal, #pauseModal, #endModal { padding-bottom: 3px; }
+.modal > .row:last-child { position: sticky; bottom: -3px; z-index: 1; margin-top: 8px; padding: 8px 0 12px; background: var(--panel-solid); }
+/* 弹窗的内容要滚动（ui.js 的 UI.modalMore 加 .kmMore，滚到哪里都一直在）：按钮行上面一条硬边分隔线（3 像素黑 + 2 像素亮边），
+   滚过去的字在框边上停住，不会看起来被按钮行切成两半；放得下的弹窗没有这条线 */
 .modal.kmMore > .row:last-child { box-shadow: 0 -3px 0 #000, 0 -5px 0 var(--edgeHi); }
 /* 暂停的按钮行：横屏（不是矮屏）上下边距收 13 像素，按钮还在原来钉在底部时的位置，iPad 横屏开局（背包很空）不用滚动；
-   钉住时停在内边距的上沿，下面 8 像素用同色的投影盖住（往上滚的内容不会从按钮下面露出来）。竖屏少 1 像素，开局正好放得下 */
-@media (orientation: landscape) and (min-height: 701px) { #pauseModal > .row:last-child { bottom: 0; padding: 3px 0 4px; box-shadow: 0 8px 0 var(--panel-solid); } #pauseModal.kmMore > .row:last-child { box-shadow: 0 8px 0 var(--panel-solid), 0 -3px 0 #000, 0 -5px 0 var(--edgeHi); } }
+   钉住时停在内边距的上沿，下面 3 像素用同色的投影盖住（往上滚的内容不会从按钮下面露出来）。竖屏少 1 像素，开局正好放得下 */
+@media (orientation: landscape) and (min-height: 701px) { #pauseModal > .row:last-child { bottom: 0; padding: 3px 0 4px; box-shadow: 0 3px 0 var(--panel-solid); } #pauseModal.kmMore > .row:last-child { box-shadow: 0 3px 0 var(--panel-solid), 0 -3px 0 #000, 0 -5px 0 var(--edgeHi); } }
 @media (orientation: portrait) { #pauseModal > .row:last-child { padding-bottom: 11px; } }
 /* 像素按钮：这里是大小和底色（只用 background-color，background 简写会冲掉 kit.css 的缺角）；边框、斜面、按下去、选中、不能按的样子在 kit.css */
 .sbtn { min-height: 48px; padding: 9px 18px; background-color: var(--panel2); color: #fff; font-size: var(--fs-m); line-height: 24px; cursor: pointer; }
@@ -368,7 +370,7 @@ select { min-height: 36px; padding: 4px 10px; border: 3px solid #000; border-rad
   #charDesc { padding: 6px 10px; font-size: var(--fs-s); line-height: 18px; }
   .menuInner .keys, .menuHead { display: none; }
   /* 矮屏（笔记本浏览器窗口）：暂停界面紧凑一点，按钮不用往下翻就看得到；操作说明在主菜单里有 */
-  #pauseModal { padding-top: 10px; }
+  #pauseModal { padding-top: 5px; }
   #pauseModal h2 { margin: 0 0 6px; font-size: var(--fs-l); line-height: 30px; }
   #pauseModal h3 { margin: 8px 0 4px; }
   #pauseModal .statRow { padding: 1px 9px; line-height: 21px; }

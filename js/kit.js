@@ -399,11 +399,13 @@ Kit.parts = function (el, list, sep) {
 };
 // 一行说明按短语排（窄卡片里不会折成「…剑 / 气」「5 / 米」「攻速 / +25%」「… / · 范围」）：只在「，；：。、！？」、「——」「……」后面、
 // 「 · 」后面、汉字和后面的数字之间（前面至少 3 个字：不会剩下「掷出 /」「每 /」）、英文词和后面的汉字之间换行，每一段是一个 .kmNb；
-// 一段比一行还长时才在它里面按词折行（Kit.piece）
+// 一段比一行还长时才在它里面按词折行（Kit.piece）。
+// 「 · 」：点和后面的空格是前一段末尾的 .kmSep（算进这一段的宽度，换行的位置和以前一样）；这一段正好在行末时把点藏起来
+// （Kit.sepFix，排好版以后量；只改 visibility，不重新排版），一行不会以「·」结尾（「攻速 +25% · / 范围 +25%」）
 Kit.phrase = function (el, t) {
   t = t == null ? '' : String(t);
   el.textContent = '';
-  var u = '', i, c, n, pv;
+  var u = '', i, c, n, pv, seps = false;
   var cut = function (sep) {
     if (u) el.appendChild(Kit.piece(u + sep));
     else if (sep) el.appendChild(document.createTextNode(sep));
@@ -411,12 +413,82 @@ Kit.phrase = function (el, t) {
   };
   for (i = 0; i < t.length; i++) {
     c = t.charAt(i); n = t.charAt(i + 1); pv = t.charAt(i - 1);
+    if (c === '·' && pv === ' ' && n === ' ' && u) {
+      var sp = Kit.piece(u);
+      sp.appendChild(Kit.el('span', 'kmSep', '· '));
+      el.appendChild(Kit.exact(sp, u + '· '));
+      u = ''; seps = true; i++;
+      continue;
+    }
     if (c === ' ' && (pv === '·' || (/[㐀-鿿]/.test(pv) && /[0-9]/.test(n) && u.length >= 3) || (/[A-Za-z]/.test(pv) && /[㐀-鿿]/.test(n)))) { cut(' '); continue; }
     u += c;
     if (n && ('，；：。、！？'.indexOf(c) >= 0 || ((c === '—' || c === '…') && n !== c && Kit.CLOSE.indexOf(n) < 0))) cut('');
   }
   cut('');
+  if (seps) Kit.sepWatch(el);
   return el;
+};
+// 行末的「·」藏起来：一段后面那一段在下一行（它的上沿不高于这个点的下沿）就是行末。排版变了（放进页面、字体到了、换横竖屏）时
+// ResizeObserver 再量一次；元素从页面上拿掉以后不再观察
+Kit.sepRO = null;
+Kit.sepFix = function (el) {
+  var s = el.querySelectorAll('.kmSep');
+  for (var i = 0; i < s.length; i++) {
+    var nx = s[i].parentNode.nextElementSibling;
+    s[i].classList.toggle('kmEnd', !nx || nx.getBoundingClientRect().top >= s[i].getBoundingClientRect().bottom - 1);
+  }
+};
+Kit.sepWatch = function (el) {
+  if (typeof ResizeObserver === 'function') {
+    if (!Kit.sepRO) Kit.sepRO = new ResizeObserver(function (es) {
+      for (var i = 0; i < es.length; i++) { if (es[i].target.isConnected) Kit.sepFix(es[i].target); else Kit.sepRO.unobserve(es[i].target); }
+    });
+    Kit.sepRO.observe(el);
+  } else if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { Kit.sepFix(el); });
+};
+// 居中的标题（弹窗标题「微波炉 · 复制一件物品 · …」）：几段用「 · 」连起来，每一段不在中间折行（Kit.piece）；一行放不下时只在「 · 」处换行，
+// 而且行末不留点、行首也没有点。先算好在哪儿换行：每一段的宽度是它整数个字体像素（Kit.exact 写死的那个），一段一段往一行里放，
+// 这一段（不带末尾的「 · 」）放不下就在前一段后面换行；行末那一段不带「 · 」、后面放一个 <br>，别的段带着「 · 」。
+// 点是真的没了（不像 Kit.sepFix 只藏起来、还占着宽度），居中的那一行不往左偏；只按标题的宽度算一次，不量排好的版、不来回改。
+// 标题的宽度只跟窗口有关（不跟字走）：窗口宽度变了（转屏、分屏）从头再算一次（Kit.titleRe）。量不到（没显示、字体还没到）时
+// 先让浏览器自己折，窗口一变再算。
+// parts：几段字的数组（一段里的「 · 」不在那里折行），或者一个字符串（按「 · 」切开）；只有一段时就是 textContent
+Kit.titleEls = [];
+Kit.title = function (el, parts) {
+  if (!Array.isArray(parts)) parts = String(parts == null ? '' : parts).split(' · ');
+  el._kmTitle = null;
+  if (parts.length < 2) { el.textContent = parts.join(''); return el; }
+  el.textContent = '';
+  el.classList.add('kmTitle');
+  var n = parts.length, W = el.clientWidth, i, x = 0, cut = [];
+  try { if (!Kit.fontReady) Kit.fontReady = !document.fonts || document.fonts.check('12px "KM Pixel 12"'); } catch (e) { Kit.fontReady = true; }
+  var ok = W > 0 && Kit.fontReady, k = ok ? (parseFloat(getComputedStyle(el).fontSize) || 24) / 12 : 0;
+  for (i = 0; i < n; i++) {
+    cut.push(false);
+    if (!ok) continue;
+    if (x > 0 && x + Kit.fpw(parts[i]) * k > W + 0.5) { cut[i - 1] = true; x = 0; }
+    x += Kit.fpw(i < n - 1 ? parts[i] + ' · ' : parts[i]) * k;
+  }
+  for (i = 0; i < n; i++) {
+    var sp;
+    if (i === n - 1 || cut[i]) sp = Kit.piece(parts[i]);
+    else { sp = Kit.piece(parts[i] + ' '); sp.appendChild(Kit.el('span', 'kmSep', '· ')); Kit.exact(sp, parts[i] + ' · '); }
+    el.appendChild(sp);
+    if (cut[i]) el.appendChild(document.createElement('br'));
+  }
+  el._kmTitle = parts; el._kmText = el.textContent; el._kmW = ok ? W : -1;
+  if (Kit.titleEls.indexOf(el) < 0) {
+    Kit.titleEls.push(el);
+    if (Kit.titleEls.length === 1) window.addEventListener('resize', Kit.titleRe);
+  }
+  return el;
+};
+// 窗口变了：还是 Kit.title 排的那个标题（别处没改过它的字）、宽度也变了，就从头再排
+Kit.titleRe = function () {
+  for (var i = 0; i < Kit.titleEls.length; i++) {
+    var el = Kit.titleEls[i];
+    if (el._kmTitle && el.isConnected && el.textContent === el._kmText && el.clientWidth !== el._kmW) Kit.title(el, el._kmTitle);
+  }
 };
 // 局内小签（成就达成 / 魔晶提示，放进 #metaToasts）：o = { kind: 'ach'|'note', tab, name, reward（字，或者几项奖励的数组：用 Kit.parts 排）, icon（图标名或元素） }
 // 根元素也带 .mToast：meta.js 的排队、清空照样找得到；进出场：加 .out 是退场

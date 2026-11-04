@@ -438,7 +438,7 @@ Interact.update = function (dt) {
       continue;
     }
     if (o.kind === 'bossportal') {
-      if (!o.found && d2 < 30 * 30) { o.found = true; UI.toast('发现了 Boss 传送门！', '#ff4b5a'); }
+      if (!o.found && d2 < 30 * 30) { o.found = true; UI.toast('发现了 Boss 传送门！', Kit.color('red')); }
       if (!o.found && Math.random() < dt * 6) FX.burst(o.x + rand(-6, 6), o.y + rand(1, 6), o.z + rand(-6, 6), 1, 0xffffff, 2, 0.25);
       o.swirl.rotation.z += dt * 2;
     }
@@ -477,7 +477,7 @@ Interact.use = function () {
   var o = Interact.near;
   if (!o || o.used || Game.state !== 'play') return;
   var K = Interact.KINDS[o.kind];
-  if (!Interact.canUse(o)) { UI.toast(Interact.denied(o), '#ff6b6b'); return; }
+  if (!Interact.canUse(o)) { UI.toast(Interact.denied(o), Kit.color('red')); return; }
   if (K) { K.use(o); return; }
   switch (o.kind) {
     case 'chest': {
@@ -488,7 +488,7 @@ Interact.use = function () {
         if (Math.random() < x / (1 + x)) { free = true; UI.toast('钥匙生效：免费打开！', '#ffd84a'); }
       }
       if (!free) {
-        if (P.gold < Interact.chestCost()) { UI.toast('金币不够', '#ff6b6b'); return; }
+        if (P.gold < Interact.chestCost()) { UI.toast('金币不够', Kit.color('red')); return; }
         P.gold -= Interact.chestCost(); Interact.chestsOpened++;
       }
       Interact.consume(o);
@@ -519,17 +519,17 @@ Interact.use = function () {
       P.gold += g;
       P.addMod('difficulty', 0.05);
       FX.burst(o.x, o.y + 2, o.z, 20, 0xffd23a, 6, 0.3);
-      UI.toast('+' + g + ' 金币，难度 +5%', '#ffd23a');
+      UI.toast('+' + g + ' 金币，难度 +5%', Kit.color('gold'));
       break;
     case 'succ':
       Interact.consume(o);
       Pickups.magnetAll();
-      UI.toast('所有经验都飞过来了！', '#3fa9ff');
+      UI.toast('所有经验都飞过来了！', Kit.color('cya'));
       break;
     case 'curse':
       Interact.consume(o);
       Game.bossCurses++;
-      UI.toast('Boss 诅咒：下次 Boss 多一只', '#ff2a2a');
+      UI.toast('Boss 诅咒：下次 Boss 多一只', Kit.color('red'));
       break;
     case 'bossportal':
       Game.summonBoss(o);
@@ -557,7 +557,7 @@ Interact.breakPot = function (o) {
 
 Interact.openExit = function (x, z) {
   Interact.exit = Interact.add('exitportal', x, z, W.groundAt(x, z, P.pos.y + 3));
-  UI.toast('传送门开启了！随时可以进入下一关', '#b05aff');
+  UI.toast('传送门开启了！随时可以进入下一关', Kit.color('gold'));
 };
 
 // ---------------- 注册的新互动物体 ----------------

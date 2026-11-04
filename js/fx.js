@@ -426,21 +426,36 @@ FX.execText = function (e, text) {
   }
 };
 
-// 拾取提示：0.6 秒内捡到的经验 / 金币合并成一个数字，显示在玩家头顶
+// 拾取提示：捡到的经验 / 金币合并成一个数字，显示在玩家头顶的右边：两条固定的行，经验在上、金币在下，每种一次只有一个。
+// 还在屏幕上（没淡完）时又捡到：加进去，原地「复活」——不透明度回到 1、重新停 0.6 秒；它正在淡出才再弹一下（大一档 90 毫秒）。
+// 最后一次捡到以后停 0.6 秒（全不透明，另一种怎么捡都不影响），再花 0.4 秒淡出、往上飘 9 像素，淡完才去掉。
+// 位置只平滑地变（每秒最多 30 像素，30 帧时一帧 1 像素）：复活时从飘到的地方慢慢回到原行，不往回跳。
+// 两行不压在一起：经验按底边对齐、弹大时往上长，金币按顶边对齐、弹大时往下长（见 FX.drawTexts）；
+// 经验在屏幕上时金币最多飘到和经验一样高（经验没往上飘，金币就原地变淡）；金币飘起来以后才来经验：经验从金币上面出来，等金币淡完再落回原行
+FX.POP_HOLD = 0.6;
+FX.POP_FADE = 0.4;
+FX.POP_UP = 9;
+FX.POP_SPEED = 30;
+// 「已经在淡出」：上一帧的不透明度低于 0.99。刚停满 0.6 秒那一帧有浮点误差（fp 约 1e-16，画出来是 0.9999999），看起来还是全不透明，不算
+FX.POP_FADED = 0.01;
 FX.popup = function (kind, v) {
-  var L = FX.pops, p = null;
-  for (var i = L.length - 1; i >= 0; i--) if (L[i].k === kind) { p = L[i]; break; }
-  if (!p || FX.now - p.b > 0.6) {
-    while (L.length && FX.now - L[0].b > 1.5) L.shift();
-    if (L.length >= 8) L.shift();
-    p = { k: kind, v: 0, b: FX.now, last: FX.now };
+  var L = FX.pops, p = null, i;
+  for (i = L.length - 1; i >= 0; i--) if (L[i].k === kind) { p = L[i]; break; }
+  if (p && FX.now - p.b < 0) { L.splice(i, 1); p = null; }
+  if (!p) {
+    // 位置、淡出的数（off / fp / up）先放小数再归零：V8 一开始就把它们存成小数，FX.drawTexts 每帧写进去的小数不用再装箱（不产生垃圾）
+    p = { k: kind, v: 0, b: FX.now, pt: FX.now, off: 0.5, fp: 0.5, up: 0.5, _tv: -1, _t: '', _ls: '', _lf: 0 };
+    p.off = 0; p.fp = 0; p.up = 0;
     L.push(p);
-  }
+  } else if (p.fp > FX.POP_FADED) p.pt = FX.now;   // 上一帧画的时候已经看得出在淡出才再弹一下：刚好停满 0.6 秒、看起来还全不透明的不弹
+  p.b = FX.now;
   p.v += v;
-  p.last = FX.now;
 };
 
 var _v3 = null, _font = '';
+// 拾取提示的位置往目标挪，一次最多挪 d
+function popToward(a, b, d) { return a < b ? Math.min(b, a + d) : Math.max(b, a - d); }
+FX.popT = 0;
 FX.setFont = function (ctx, f) { if (_font !== f) { ctx.font = f; _font = f; } };
 
 // ---------------- 画布上的字（伤害数字、拾取提示、「鼓舞！」「格挡」「处决」） ----------------
@@ -636,27 +651,47 @@ FX.drawTexts = function (cam, dt) {
     ctx.globalAlpha = k > 0.6 ? (1 - k) / 0.4 : 1;
     FX.drawLabel(ctx, t.s, sx, sy, Math.round(t.px * pop), t.c, t.cjk, t);
   }
-  // 拾取提示：在头的右边，经验在上（浅蓝），金币在下（金色），左对齐
+  // 拾取提示：在头的右边，经验在上（浅蓝），金币在下（金色），左对齐。
+  // 经验那一行按字的底边（基线）对齐，金币那一行按「$」的顶边（描边在内，基线上面 11 个字体像素）对齐，
+  // 金币的顶边比经验最大的底边（36 号时基线下面 6 像素）再低 2 像素：两行怎么弹大都碰不到
   var L = FX.pops;
+  var pdt = Math.min(0.1, Math.max(0, now - FX.popT));
+  FX.popT = now;
+  if (L.length) {
+    var xp = null, gd = null;
+    for (i = L.length - 1; i >= 0; i--) {
+      var p = L[i], age = now - p.b;
+      // 淡完了才去掉（FX.now 往回走：换了一局）
+      if (age >= FX.POP_HOLD + FX.POP_FADE || age < 0) { L.splice(i, 1); continue; }
+      p.fp = Math.max(0, age - FX.POP_HOLD) / FX.POP_FADE;
+      p.up = FX.POP_UP * p.fp;
+      if (p.k === 'xp') xp = p; else gd = p;
+    }
+    var step = FX.POP_SPEED * pdt;
+    // 金币：经验在屏幕上时，最多飘到经验自己要飘的高度（或者停在已经飘到的地方，不往下掉）
+    if (gd) gd.off = popToward(gd.off, xp ? Math.min(gd.up, Math.max(xp.up, gd.off)) : gd.up, step);
+    // 经验：至少和金币飘得一样高（金币飘起来以后才来的经验从上面出来）
+    if (xp) xp.off = Math.max(popToward(xp.off, xp.up, step), gd ? gd.off : 0);
+  }
   if (L.length && P.model) {
     _v3.set(P.pos.x, P.pos.y + 1.95, P.pos.z).project(cam);
     var hx = Math.round((_v3.x * 0.5 + 0.5) * w + h * 0.035), hy = Math.round((-_v3.y * 0.5 + 0.5) * h);
-    var show = _v3.z < 1;
-    ctx.textAlign = 'left';
-    for (i = L.length - 1; i >= 0; i--) {
-      var p = L[i], age = now - p.b;
-      var rise = Math.max(0, age - 0.6) / 0.7;
-      if (rise >= 1 || age < 0) { L.splice(i, 1); continue; }
-      if (!show) continue;
-      // 刚出来的 0.09 秒大一档（36，和伤害数字一样一格跳，不平滑放大），之后 24
-      var px = age < 0.09 ? 36 : FX.POP_PX;
-      var y = hy + (p.k === 'xp' ? 0 : FX.POP_PX + 4) - Math.round(rise * 30);
-      ctx.globalAlpha = rise > 0.45 ? (1 - rise) / 0.55 : 1;
-      // 数值没变就用上次拼好的字（不每帧新拼字符串）
-      if (p._tv !== p.v) { p._tv = p.v; p._t = (p.k === 'xp' ? '+' : '$') + fmtNum(p.v); }
-      FX.drawLabel(ctx, p._t, hx, y, px, p.k === 'xp' ? '#5fc8ff' : '#ffd23a', false, p);
+    if (_v3.z < 1) {
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      for (i = L.length - 1; i >= 0; i--) {
+        var q = L[i];
+        // 刚出来 / 复活的 0.09 秒大一档（36，和伤害数字一样一格跳，不平滑放大），之后 24
+        var px = now - q.pt < 0.09 ? 36 : FX.POP_PX, f = px / 12;
+        var y = q.k === 'xp' ? hy + 10 - Math.round(q.off) : hy + 18 - Math.round(q.off) + 11 * f;
+        ctx.globalAlpha = 1 - q.fp;
+        // 数值没变就用上次拼好的字（不每帧新拼字符串）
+        if (q._tv !== q.v) { q._tv = q.v; q._t = (q.k === 'xp' ? '+' : '$') + fmtNum(q.v); }
+        FX.drawLabel(ctx, q._t, hx, y, px, q.k === 'xp' ? '#5fc8ff' : '#ffd23a', false, q);
+      }
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
     }
-    ctx.textAlign = 'center';
   }
   ctx.globalAlpha = 1;
   ctx.imageSmoothingEnabled = sm0;

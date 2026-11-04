@@ -52,7 +52,7 @@ var PWA = (function () {
   P.toast = function (text, ms) {
     if (!document.body) { document.addEventListener('DOMContentLoaded', function () { P.toast(text, ms); }); return; }
     var G = window.Game, U = window.UI;
-    if (G && G.state === 'play' && U && typeof U.toast === 'function') { try { U.toast(text, '#ffd84a'); return; } catch (e) { /* 用自己的 */ } }
+    if (G && G.state === 'play' && U && typeof U.toast === 'function') { try { U.toast(text, window.Kit ? Kit.color('cya') : '#6fd0ff'); return; } catch (e) { /* 用自己的 */ } }
     var el = pill('pwaToast', text);
     setTimeout(function () { drop(el); }, ms || 3500);
   };

@@ -27,6 +27,9 @@
   border-image: var(--fr-panel) 8 8 14 8 fill / 8px 8px 14px 8px / 0 0 6px 0 stretch;
   background: none; box-shadow: none;
 }
+/* 会滚动的弹窗：边框和框图一样宽（8 像素，下边 14 像素里 6 像素在框外），滚动的内容在框里面裁掉，不会盖住框内侧 5 像素的斜面
+   （style.css 的内边距相应少 5 像素，内容的位置不变） */
+.modal { border-width: 8px; }
 /* 半透明面板（主菜单的选择面板、占领进度条）：底 93% */
 .kmPanelT, .menuInner, #mxProgress {
   border-style: solid; border-width: 3px; border-color: transparent;
@@ -168,6 +171,10 @@
    kit.js 把每一段、每个词的宽度写成整数个字体像素（Kit.exact），一行里的字都从整数像素开始 */
 .kmNb { display: inline-block; max-width: 100%; }
 .kmW { display: inline-block; white-space: nowrap; }
+/* 「 · 」的点在行末时藏起来（Kit.sepFix；只是看不见，宽度不变） */
+.kmSep.kmEnd { visibility: hidden; }
+/* Kit.title（居中的弹窗标题）：段里的字靠左（段末「· 」的空格在段里被吞掉了，居中的话字会在写死的宽度里往右偏半个空格） */
+.kmTitle .kmNb { text-align: left; }
 @keyframes kmSlipIn { from { transform: translateX(12px); opacity: 0; } }
 /* 成就小签：阵亡、通关的过场里不显示（弹窗打开时 meta.js 自己藏） */
 body.fxDead #metaToasts, body.kmEnd #metaToasts { opacity: 0; }

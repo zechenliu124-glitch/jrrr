@@ -317,9 +317,9 @@ Pickups.magnetNear = function (r) {
 
 Pickups.collect = function (kind) {
   FX.flash(P.pos.x, P.pos.y + 1, P.pos.z, 3, Pickups.DROP_GLOW[kind] || 0xffffff, 0.3, 0);
-  if (kind === 'clock') { Enemies.list.forEach(function (e) { if (!e.boss) e.frozen = Math.max(e.frozen, 5); }); UI.toast('时间暂停！', '#5ad9ff'); return; }
-  if (kind === 'rage') { P.rage = 8; UI.toast('狂暴！伤害翻倍', '#ff3a3a'); return; }
+  if (kind === 'clock') { Enemies.list.forEach(function (e) { if (!e.boss) e.frozen = Math.max(e.frozen, 5); }); UI.toast('时间暂停！', Kit.color('gold')); return; }
+  if (kind === 'rage') { P.rage = 8; UI.toast('狂暴！伤害翻倍', Kit.color('gold')); return; }
   if (kind === 'heal') P.heal(P.st.maxHp * 0.3);
-  else if (kind === 'magnet') { Pickups.magnetAll(); UI.toast('磁铁！吸取所有经验', '#ff6b6b'); }
-  else if (kind === 'bomb') { Enemies.nova(P.pos.x, P.pos.z, 30, 0, 60); Enemies.inRadius(P.pos.x, P.pos.z, 30, function (e) { if (!e.boss) Enemies.damage(e, e.hp + 1, true, 0, 0); }); Game.shake(0.8); UI.toast('炸弹！', '#ffa62b'); }
+  else if (kind === 'magnet') { Pickups.magnetAll(); UI.toast('磁铁！吸取所有经验', Kit.color('cya')); }
+  else if (kind === 'bomb') { Enemies.nova(P.pos.x, P.pos.z, 30, 0, 60); Enemies.inRadius(P.pos.x, P.pos.z, 30, function (e) { if (!e.boss) Enemies.damage(e, e.hp + 1, true, 0, 0); }); Game.shake(0.8); UI.toast('炸弹！', Kit.color('gold')); }
 };

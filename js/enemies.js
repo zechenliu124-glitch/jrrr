@@ -814,7 +814,7 @@ Director.rhythm = function (dt) {
   if (t >= Director.surgeAt && !Game.bossAlive) {
     Director.surgeLen = Director.surgeT = rand(15, 20);
     Director.surgeAt = t + rand(80, 100);
-    UI.toast('敌潮涌来！', '#ffb36b');
+    UI.toast('敌潮涌来！', Kit.color('org'));
   }
   return 1;
 };
@@ -892,7 +892,7 @@ Director.update = function (dt) {
     Director.eliteT = Math.max(20, lerp(T / 16, T / 40, p));
     var ep = Director.spawnPoint();
     Enemies.spawn(Director.pickType(ph), ep.x, ep.z, { elite: true, hpMult: hpm, dmgMult: dmm * 1.3 });
-    UI.toast('精英怪出现了！', '#c46bff');
+    UI.toast('精英怪出现了！', Kit.color('org'));
   }
 };
 
@@ -903,12 +903,12 @@ Director.spawnMini = function (id) {
   var sp = Director.spawnPoint();
   var e = Enemies.spawn(id, sp.x, sp.z, { hpMult: Director.miniHpMult(), dmgMult: Director.dmgMult(), drop: true });
   e.state = 'intro'; e.st = 1;
-  UI.toast(ENEMIES[id].name + ' 出现了！', '#ff8a3a');
+  UI.toast(ENEMIES[id].name + ' 出现了！', Kit.color('org'));
 };
 
 Director.startSwarm = function () {
   if (Director.swarm) return;
   Director.swarm = true;
   Director.swarmT = 0;
-  UI.toast('最终虫潮来袭！', '#ff3b3b');
+  UI.toast('最终虫潮来袭！', Kit.color('red'));
 };

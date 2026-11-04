@@ -178,7 +178,7 @@ Evo.glory = function (w) {
   FX.burst(x, y + 1, z, 12, 0xffffff, 6, 0.3);
   FX.text(x, y + 2.8, z, w.def.name, '#ffe14a', 1.7);
   Game.shake(0.7);
-  UI.toast('超武觉醒：' + w.def.name + '！', '#ffe14a');
+  UI.toast('超武觉醒：' + w.def.name + '！', Kit.color('gold'));
 };
 
 // 竖直方向的透明渐变贴图（下面实、上面虚，最底下一小段淡入），光柱和锻炉的光束共用
@@ -798,7 +798,7 @@ Evo.checkReady = function () {
     var w = P.weapons[i];
     if (w.evo || w.evoTold || !Evo.canEvolve(w)) continue;
     w.evoTold = true;
-    UI.toast('「' + w.def.name + '」可以觉醒超武了！' + (Evo.liveForge() ? '去圣锻炉或开金宝箱' : '打开金宝箱就能觉醒'), '#ffe14a');
+    UI.toast('「' + w.def.name + '」可以觉醒超武了！' + (Evo.liveForge() ? '去圣锻炉或开金宝箱' : '打开金宝箱就能觉醒'), Kit.color('gold'));
   }
 };
 
@@ -955,7 +955,7 @@ Evo.forgeTick = function (o, dt, d2) {
 
 Evo.forgeLabel = function () {
   var ready = Evo.ready();
-  if (ready.length) return '圣锻炉：锻造超武（' + ready.map(function (w) { return w.def.name; }).join('、') + ' 可以觉醒）';
+  if (ready.length) return '圣锻炉：' + ready.map(function (w) { return w.def.name; }).join('、') + '可以觉醒';
   var lines = ['圣锻炉：武器 Lv' + EVO_REQ.level + ' + 对应魔典 Lv' + EVO_REQ.tome + ' 才能锻造超武'], reqs = [];
   P.weapons.forEach(function (w) { if (!w.evo && EVO[w.id]) reqs.push(Evo.reqText(w)); });
   // 三把以上时两条并成一行，提示框不会太高
@@ -1025,7 +1025,7 @@ Interact.KINDS.holyforge = {
   label: function () { return Evo.forgeLabel(); },
   canUse: function () { return Evo.anyReady(); },
   denied: function () {
-    return P.weapons.some(function (w) { return !w.evo; }) ? '还没有武器满足超武条件（武器 Lv' + EVO_REQ.level + ' + 对应魔典 Lv' + EVO_REQ.tome + '）' : '你的武器都已经觉醒超武了';
+    return P.weapons.some(function (w) { return !w.evo; }) ? '超武条件：武器 Lv' + EVO_REQ.level + ' + 对应魔典 Lv' + EVO_REQ.tome : '你的武器都已经觉醒超武了';
   },
   use: function (o) { Evo.openForge(o); },
   update: function (o, dt, d2) { Evo.forgeTick(o, dt, d2); },
@@ -1198,7 +1198,7 @@ Evo.pauseRow = function (w) {
   tx.className = 'evoPTxt';
   if (!ev) { nm.textContent = w.def.name; rq.textContent = '没有超武'; }
   else if (w.evo) {
-    nm.textContent = ev.name + '（已觉醒 Lv' + w.level + '）';
+    nm.textContent = ev.name + ' · 已觉醒 Lv' + w.level;
     rq.textContent = ev.traits.map(function (t) { return EVO_TRAITS[t].name; }).join(' · ');
   } else {
     nm.textContent = w.def.name + ' → ' + ev.name;

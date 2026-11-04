@@ -267,7 +267,9 @@ UI.update = function () {
   UI.setPct('hpFill', hpPct);
   UI.setPct('shieldFill', hpPct, 'left');
   UI.setPct('shieldFill', maxSh > 0 ? clamp(P.shield / tot, 0, 1) * 100 : 0);
-  var hpT = Math.ceil(P.hp) + '/' + Math.round(st.maxHp) + (P.shield >= 1 ? ' +' + Math.round(P.shield) : '');
+  // 生命和上限用同一种取整：上限四舍五入，生命向上取整但不超过上限（90.4/90.4 以前显示 91/90），活着时至少 1
+  var hpMax = Math.max(1, Math.round(st.maxHp)), hpNow = P.hp > 0 ? clamp(Math.ceil(P.hp), 1, hpMax) : 0;
+  var hpT = hpNow + '/' + hpMax + (P.shield >= 1 ? ' +' + Math.round(P.shield) : '');
   UI.set('hpText', hpT);
   UI.hpEven(hpT);
   UI.setClass('hpBar', 'low', P.hp < st.maxHp * 0.3);
@@ -523,14 +525,19 @@ UI.drawMinimap = function (force) {
 };
 
 // 提示文字：9 个字以内 24 号，长的 18 号（.kmLong）；返回这条提示的元素。颜色用用途色（Kit.toast 可以直接写 'gold' / 'red'……）
+// 还写着旧颜色的几处提示（那几行原创替换分支也在改，留到合并以后再改调用处）：换成用途色（UI_STYLE §2.4、§4.3），其余颜色原样用。
+// 神龛祝福、罗伯托囤宝箱 = 奖励（金）；弩车停火 = 帮手结束（浅金）；没东西可复制 = 拒绝（红）
+UI.TOAST_ROLE = { '#7ef0ff': 'gold', '#ff6b6b': 'red', '#7ab8ff': 'goldL', '#d8e8ff': 'gold' };
 UI.toast = function (text, color) {
   var d = document.createElement('div');
   d.className = String(text).length > 9 ? 'toast kmLong' : 'toast';
   d.textContent = text;
-  d.style.color = color || '#fff';
+  d.style.color = UI.TOAST_ROLE[color] ? Kit.color(UI.TOAST_ROLE[color]) : color || '#fff';
   $('toasts').appendChild(d);
-  // 18 号（.kmLong）居中：奇数个字体像素宽的一行会落在半个设备像素上，补成偶数个（24 号一个字体像素 2 像素，总是整的）
-  if (d.classList.contains('kmLong')) UI.evenFp(d, text, parseFloat(getComputedStyle(d).fontSize) || 18);
+  // 18 号居中：奇数个字体像素宽的一行会落在半个设备像素上，补成偶数个（24 号一个字体像素 2 像素，总是整的）。
+  // 看算出来的字号，不看 class：窄屏（分屏、侧拉，≤ 700 像素）上短提示也是 18 号
+  var fs = parseFloat(getComputedStyle(d).fontSize) || 24;
+  if (fs % 12) UI.evenFp(d, text, fs);
   UI.toasts.push({ el: d, t: Game.realTime });
   if (UI.toasts.length > 4) { UI.toasts[0].el.remove(); UI.toasts.shift(); }
   return d;
@@ -602,10 +609,11 @@ UI.openModal = function (id) {
     setTimeout(function () { UI.modalMore(el); }, 350);
   }
 };
-// 弹窗里的内容还没滚到底（钉住的按钮行下面还有字）：加 .kmMore（style.css 画分隔线），滚到底或者放得下就去掉
+// 弹窗里的内容要滚动（放不下）：加 .kmMore（style.css 在钉住的按钮行上面画分隔线）；滚到底也留着（固定的框边，不会一滚就闪），放得下就去掉。
+// 滚动时也再量一次（内容是后来填的）
 UI.modalMore = function (el) {
   if (!el || el.classList.contains('hidden')) return;
-  var more = el.scrollHeight - el.clientHeight - el.scrollTop > 1;
+  var more = el.scrollHeight - el.clientHeight > 1;
   if (el.__more !== more) { el.__more = more; el.classList.toggle('kmMore', more); }
 };
 window.addEventListener('resize', function () { MODALS.forEach(function (m) { UI.modalMore(document.getElementById(m)); }); });
@@ -695,7 +703,7 @@ UI.pickOption = function (i) {
     LevelUp.banned[o.id] = true;
     LevelUp.banishes--;
     UI.banishMode = false;
-    UI.toast('已放逐：' + o.title, '#ff6b6b');
+    UI.toast('已放逐：' + o.title, Kit.color('cya'));
     UI.showLevelUp(true);
     return;
   }
@@ -712,18 +720,19 @@ UI.pickOption = function (i) {
     P.gold -= Interact.microwaveCost(mw);
     Items.give(o.itemId);
     mw.uses--;
-    UI.toast('叮！复制了 ' + ITEMS[o.itemId].name, '#ffffff');
-    if (mw.uses <= 0) { Interact.consume(mw); FX.boom(mw.x, mw.y + 1, mw.z, 3, 0xff7a2a); UI.toast('微波炉爆炸了！', '#ff7a2a'); }
+    UI.toast('叮！复制了 ' + ITEMS[o.itemId].name, Kit.color('gold'));
+    if (mw.uses <= 0) { Interact.consume(mw); FX.boom(mw.x, mw.y + 1, mw.z, 3, 0xff7a2a); UI.toast('微波炉爆炸了！', Kit.color('red')); }
   } else LevelUp.apply(o);
   UI.closeModal();
   Game.afterModal();
 };
 
+// title：字符串（按「 · 」分段）或几段字的数组；居中、只在段和段之间换行，行末不留「·」（Kit.title）
 UI.choiceModal = function (mode, title, options) {
   UI.options = options;
   UI.mode = mode;
   UI.openModal('levelModal');
-  $('levelTitle').textContent = title;
+  Kit.title($('levelTitle'), title);
   UI.show('levelBtns', false);
   UI.renderCards();
 };
@@ -745,7 +754,7 @@ UI.microwave = function (o) {
   if (!owned.length) { UI.toast('你没有' + RARITY[o.rarity].name + '物品可以复制', '#ff6b6b'); return; }
   Game.openModal(function () {
     UI.shopRef = o;
-    UI.choiceModal('microwave', '微波炉 · 复制一件物品（' + Interact.microwaveCost(o) + ' 金币，剩 ' + o.uses + ' 次）', owned.slice(0, 6).map(function (id) { return { itemId: id, rarity: ITEMS[id].rarity, foot: '复制' }; }));
+    UI.choiceModal('microwave', ['微波炉', '复制一件物品', Interact.microwaveCost(o) + ' 金币 · 剩 ' + o.uses + ' 次'], owned.slice(0, 6).map(function (id) { return { itemId: id, rarity: ITEMS[id].rarity, foot: '复制' }; }));
   });
 };
 

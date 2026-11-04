@@ -75,7 +75,7 @@ LevelUp.make = function (p) {
     o.title = td.name; o.icon = td.icon; o.color = td.color;
     o.sub = t ? '等级 ' + t.level + ' → ' + (t.level + 1) : '新魔典';
     o.value = td.val * RARITY_MULT[rarity];
-    if (td.stat === 'chaos') o.lines = ['随机提升一项属性（×' + RARITY_MULT[rarity] + '）'];
+    if (td.stat === 'chaos') o.lines = ['随机提升一项属性 · ×' + RARITY_MULT[rarity]];
     else if (td.mult) o.lines = ['伤害 ×' + (1 + o.value).toFixed(2)];
     else o.lines = [LevelUp.statText(td.stat, o.value)];
     if (!t) o.lines.push(td.desc);
@@ -102,7 +102,7 @@ LevelUp.evoHint = function (o) {
       else mat = mat || w2;
     });
   }
-  if (hit) { o.lines.push('★ 可锻造超武！（' + EVO[hit.id].name + '）'); o.evoHint = true; }
+  if (hit) { o.lines.push('★ 可锻造超武：' + EVO[hit.id].name); o.evoHint = true; }
   else if (mat) o.lines.push('超武材料：' + mat.def.name + ' → ' + EVO[mat.id].name);
 };
 
@@ -123,7 +123,7 @@ LevelUp.apply = function (o) {
     if (td.stat === 'chaos') {
       var c = pick(CHAOS_POOL);
       P.mods.push({ stat: c[0], value: c[1] * o.value });
-      UI.toast('混沌：' + LevelUp.statText(c[0], c[1] * o.value), '#ff5ad9');
+      UI.toast('混沌：' + LevelUp.statText(c[0], c[1] * o.value), Kit.color('gold'));
     } else if (td.mult) t.mult *= 1 + o.value;
     else t.value += o.value;
     P.recalc();

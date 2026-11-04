@@ -630,7 +630,7 @@ MX.mountHorse = function (o) {
   MX.mount = { h: h, o: o, t: 45, max: 45, slope: 0, lift: 0 };
   FX.burst(P.pos.x, P.pos.y + 0.6, P.pos.z, 16, 0xd8c8a0, 5, 0.3);
   FX.ring(P.pos.x, P.pos.y, P.pos.z, 3, 0xe8b83a, 0.4);
-  UI.toast('骑上战马！45 秒内加速冲锋、践踏敌人', '#e8b83a');
+  UI.toast('骑上战马！45 秒内加速冲锋、践踏敌人', Kit.color('gold'));
 };
 
 MX.dismount = function (quiet) {
@@ -644,7 +644,7 @@ MX.dismount = function (quiet) {
   if (!quiet) {
     FX.burst(P.pos.x, P.pos.y + 1, P.pos.z, 20, 0xe8e0d0, 5, 0.3);
     MX.smoke(P.pos.x, P.pos.y + 0.5, P.pos.z, 12, 0xcfc7bb, 1.0, 0.45);
-    UI.toast('战马跑累了，自己回马厩了', '#d0955a');
+    UI.toast('战马跑累了，自己回马厩了', Kit.color('goldL'));
   }
 };
 
@@ -918,7 +918,7 @@ MX.activateBallista = function (o) {
   FX.ring(o.x, o.y + 0.4, o.z, 35, 0x4a9cff, 0.6);
   FX.burst(o.x, o.y + 1.5, o.z, 18, 0xe8b83a, 6, 0.3);
   MX.pillar(o.x, o.y, o.z, 0x4a9cff, 1.6, 7, 0.8);
-  UI.toast('友军弩车就位！自动射击 30 秒', '#7ab8ff');
+  UI.toast('友军弩车就位！自动射击 30 秒', Kit.color('gold'));
 };
 
 MX.updateTurrets = function (dt) {
@@ -1343,7 +1343,7 @@ MX.smithPick = function (opt) {
   if (!o || !opt || opt.kind !== 'weapon-up') return;
   var w = Weapons.find(opt.id), price = MX.smithPrice(o);
   if (!w) return;
-  if (P.gold < price) { UI.toast('金币不够', '#ff6b6b'); return; }
+  if (P.gold < price) { UI.toast('金币不够', Kit.color('red')); return; }
   P.gold -= price;
   Weapons.applyUpgrade(w, opt.picks);
   o.uses++;
@@ -1359,7 +1359,7 @@ MX.smithPick = function (opt) {
     o.fire.visible = false;
     var f = MX.local(o, -1.15, -1.3);
     MX.smoke(f.x, o.y + 1.4, f.z, 14, 0x5a5654, 0.5, 0.4);
-    UI.toast('铁匠铺的炉火熄灭了', '#b8a898');
+    UI.toast('铁匠铺的炉火熄灭了', Kit.color('goldL'));
   }
 };
 
@@ -1447,29 +1447,29 @@ MX.wishResolve = function (o, force) {
     P.addMod(c[0], v);
     for (var i = 0; i < 16; i++) MX.part(x + rand(-0.7, 0.7), y + 0.8, z + rand(-0.7, 0.7), rand(-0.4, 0.4), rand(2, 4.5), rand(-0.4, 0.4), 1.2, 0.14, 0.05, pick([0xffe14a, 0xffffff, 0x7dffcf]), 0.5);
     MX.pillar(x, y + 0.6, z, 0x7dffcf, 0.9, 5, 0.9);
-    UI.toast('愿望成真：' + LevelUp.statText(c[0], v), '#7dffcf');
+    UI.toast('愿望成真：' + LevelUp.statText(c[0], v), Kit.color('gold'));
   } else if (kind === 'double') {
     var back = cost * 2, n = 6;
     for (i = 0; i < n; i++) Pickups.gold(x + rand(-0.4, 0.4), y + 1.2, z + rand(-0.4, 0.4), i < n - 1 ? Math.floor(back / n) : back - Math.floor(back / n) * (n - 1));
-    UI.toast('井里涌出 ' + back + ' 金币！', '#ffd23a');
+    UI.toast('井里涌出 ' + back + ' 金币！', Kit.color('gold'));
   } else if (kind === 'item') {
     FX.burst(x, y + 1.2, z, 18, 0xc46bff, 6, 0.25);
     MX.pillar(x, y + 0.6, z, 0xc46bff, 0.9, 5, 0.9);
-    UI.toast('井底浮上来一件宝物！', '#c46bff');
+    UI.toast('井底浮上来一件宝物！', Kit.color('gold'));
     UI.chestReward(Items.roll());
   } else {
     P.addMod('difficulty', 0.03);
     var e = MX.spawnElite(x, z, 7, 10);
     MX.smoke(x, y + 1, z, 16, 0x3a2a4a, 0.8, 0.5);
     Game.shake(0.4);
-    UI.toast('许愿井的诅咒！难度 +3%，' + (e ? e.def.name : '精英') + '扑过来了', '#c46bff');
+    UI.toast('许愿井的诅咒！难度 +3%，' + (e ? e.def.name : '精英') + '扑过来了', Kit.color('org'));
   }
   if (o.uses <= 0) {
     // 井水干了
     o.used = true;
     o.water.visible = false;
     MX.smoke(x, y + 0.8, z, 8, 0x8a8478, 0.4, 0.35);
-    UI.toast('许愿井干涸了', '#9a9284');
+    UI.toast('许愿井干涸了', Kit.color('goldL'));
   }
 };
 // 在 (x,z) 附近刷一个精英怪（从天上掉下来）
@@ -1565,7 +1565,7 @@ MX.fireDone = function (o) {
   o.base.geometry = MX.geo('fireBurnt', function () { return MX.fireParts(true); });
   FX.ring(o.x, o.y + 0.2, o.z, 4, 0xffb050, 0.45);
   MX.sparks(o.x, o.y + 0.6, o.z, 24, [0xffd27a, 0xff9a3a, 0xffffff], 5, 0.14);
-  UI.toast('篝火：恢复 40% 生命，获得「温暖」30 秒', '#ffb050');
+  UI.toast('篝火：恢复 40% 生命，获得「温暖」30 秒', Kit.color('gold'));
   // 熄灭后冒一阵烟
   MX.anims.push({ o: o, t: 0, fn: function (q, dt, a) {
     a.t += dt;
@@ -1901,7 +1901,7 @@ MX.openCrypt = function (o) {
   MX.smoke(dp.x, o.y + 0.6, dp.z, 18, 0x6a6660, 1.2, 0.6);
   MX.sparks(dp.x, o.y + 1.4, dp.z, 16, [0x6dffb0, 0xb8ffe0], 6, 0.14);
   Game.shake(0.7);
-  UI.toast('墓门被撞开了！击败所有亡灵骑士', '#8f86ff');
+  UI.toast('墓门被撞开了！击败所有亡灵骑士', Kit.color('org'));
   // 墓门往前倒下，弹两下
   o.doorA = 0; o.doorV = 0;
   MX.anims.push({ o: o, fn: function (q, dt) {
@@ -2047,7 +2047,7 @@ MX.captureBanner = function (o) {
   FX.ring(o.x, o.y + 0.3, o.z, 7, 0xffd24a, 0.5);
   FX.burst(o.x, o.y + 5, o.z, 30, 0xffd24a, 7, 0.3);
   Game.shake(0.4);
-  UI.toast('占领了战旗据点！经验、金币和金宝箱', '#ffd24a');
+  UI.toast('占领了战旗据点！经验、金币和金宝箱', Kit.color('gold'));
   // 金色的旗子继续飘，圈慢慢淡出
   o.capT = 0;
   MX.anims.push({ o: o, fn: function (q, dt) {
@@ -2232,5 +2232,5 @@ MX.teleport = function (o) {
   FX.ring(P.pos.x, P.pos.y, P.pos.z, 3, c, 0.4);
   MX.sparks(P.pos.x, P.pos.y + 1, P.pos.z, 16, [c, 0xffffff], 5, 0.15);
   MX.flash(MX.PAIR_CSS[o.pair || 0]);
-  UI.toast('传送！', MX.PAIR_CSS[o.pair || 0]);
+  UI.toast('传送！', Kit.color('gold'));
 };

@@ -434,7 +434,7 @@ P.fallHurt = function (impact) {
 P.hint = function (key) {
   if (!P.hints || P.hints[key] || !P.HINTS[key]) return;
   P.hints[key] = true;
-  if (typeof UI !== 'undefined' && UI.toast) UI.toast(P.HINTS[key], '#9fe8ff');
+  if (typeof UI !== 'undefined' && UI.toast) UI.toast(P.HINTS[key], Kit.color('cyaL'));
 };
 
 P.update = function (dt) {
@@ -546,7 +546,7 @@ P.update = function (dt) {
       // 贴墙缓冲：往墙上推着往下掉，下落变慢，落地不摔伤
       P.vel.y = Math.max(P.vel.y, -12);
       if (P.wallHugT <= 0) FX.puff(P.pos.x, P.pos.y + 0.8, P.pos.z, 4, 0xcfc2a0);
-      if (P.hugTextT <= 0) { FX.text(P.pos.x, P.pos.y + 2.2, P.pos.z, '贴墙缓冲', '#cfe8ff', 0.8); P.hugTextT = 1.5; }
+      if (P.hugTextT <= 0) { FX.text(P.pos.x, P.pos.y + 2.2, P.pos.z, '贴墙缓冲', Kit.color('cyaL'), 0.8); P.hugTextT = 1.5; }
       P.wallHugT = 0.3;
     }
   }

@@ -450,7 +450,7 @@ Content.lightBrazier = function (o) {
   v.sockets.forEach(function (m) { m.visible = false; });
   v.next = 1;
   MX.smoke(o.x, o.y + 1.8, o.z, 8, 0x6a6660, 0.3, 0.35);
-  UI.toast('顺序不对：按光点从少到多点燃', Kit.color('redL'));
+  UI.toast('顺序不对：按光点从少到多点燃', Kit.color('red'));
   Content.sfx('brazierFail', o.x, o.y, o.z);
 };
 Interact.KINDS.ctVault = {
@@ -748,7 +748,7 @@ Content.EVENTS = {
       // 往下落的哨音（音效：落点越近越响，1.3 秒后砸地）
       if (l) Content.sfx('meteorFall', l.x1, l.y1, l.z1);
     },
-    end: function (ev, r) { if (r !== 'cancel') UI.toast('流星雨停了', '#ffd27a'); }
+    end: function (ev, r) { if (r !== 'cancel') UI.toast('流星雨停了', Kit.color('orgL')); }
   },
   // 金袋哥布林：背着一袋金币到处跑，挨打掉金币，抓住有大奖；40 秒后钻地逃走
   goldgob: {
@@ -766,7 +766,7 @@ Content.EVENTS = {
         FX.burst(e.x, e.y + 1, e.z, 30, 0xffd23a, 9, 0.35);
         for (var i = 0; i < 16; i++) Pickups.gold(e.x + rand(-1, 1), e.y + 1, e.z + rand(-1, 1), Math.ceil(3 * Game.stage * P.st.goldGain));
         Interact.spawnChest(e.x, e.z, true);
-        UI.toast('抓住金袋哥布林了！金币撒了一地', '#ffd23a');
+        UI.toast('抓住金袋哥布林了！金币撒了一地', Kit.color('gold'));
         Content.endEvent('success');
       }
     },
@@ -775,7 +775,7 @@ Content.EVENTS = {
       if (r === 'success' || !e || !e.alive) return;
       e.alive = false;
       FX.burst(e.x, e.y + 0.3, e.z, 18, 0x6a4a2a, 6, 0.35);
-      if (r !== 'cancel') UI.toast('金袋哥布林钻进地洞跑掉了……', '#c8a050');
+      if (r !== 'cancel') UI.toast('金袋哥布林钻进地洞跑掉了……', Kit.color('goldL'));
     }
   },
   // 旅行商人：在附近停 50 秒，只卖一件史诗 / 传说物品
@@ -793,7 +793,7 @@ Content.EVENTS = {
     end: function (ev, r) {
       var o = ev.o;
       if (o && !o.used) { Interact.consume(o); MX.smoke(o.x, o.y + 1, o.z, 14, 0x9a9488, 0.8, 0.5); }
-      if (r === 'timeout') UI.toast('旅行商人收拾好东西走了', '#9ad8c8');
+      if (r === 'timeout') UI.toast('旅行商人收拾好东西走了', Kit.color('goldL'));
     }
   },
   // 奇怪的宝箱：一个“免费金宝箱”……其实是宝箱怪。打倒它掉两个金宝箱
@@ -810,7 +810,7 @@ Content.EVENTS = {
       if (m && !m.alive) {
         Interact.spawnChest(m.x + 2, m.z, true);
         for (var i = 0; i < 12; i++) Pickups.gold(m.x + rand(-1, 1), m.y + 1, m.z + rand(-1, 1), Math.ceil(4 * Game.stage * P.st.goldGain));
-        UI.toast('宝箱怪被打倒了！', '#ffd23a');
+        UI.toast('宝箱怪被打倒了！', Kit.color('gold'));
         Content.endEvent('success');
       }
     },
@@ -821,7 +821,7 @@ Content.EVENTS = {
     },
     end: function (ev, r) {
       var o = ev.o, m = ev.mimic;
-      if (o && !o.used) { Interact.consume(o); MX.smoke(o.x, o.y + 0.6, o.z, 12, 0x9a9488, 0.6, 0.4); if (r === 'timeout') UI.toast('那个宝箱自己跳走了……', '#c8a050'); }
+      if (o && !o.used) { Interact.consume(o); MX.smoke(o.x, o.y + 0.6, o.z, 12, 0x9a9488, 0.6, 0.4); if (r === 'timeout') UI.toast('那个宝箱自己跳走了……', Kit.color('goldL')); }
       if (m && m.alive && r !== 'success') { m.alive = false; FX.burst(m.x, m.y + 1, m.z, 20, 0xc8922a, 6, 0.35); }
     }
   },
@@ -836,7 +836,7 @@ Content.EVENTS = {
     end: function (ev, r) {
       Content.xpMult = 1; Content.spawnBoost = 0;
       if (!Director.swarm && Game.state !== 'end') Game.applyAtmosphere(Game.stageDef.palette);
-      if (r !== 'cancel') UI.toast('血月落下了', '#ff8a8a');
+      if (r !== 'cancel') UI.toast('血月落下了', Kit.color('redL'));
     }
   }
 };
@@ -896,7 +896,7 @@ Interact.KINDS.ctMerchant = {
 UI.modeHandlers.ctTrade = function (opt) {
   var o = UI.shopRef;
   if (!opt.buy || !o || o.used) return;
-  if (P.gold < o.price) { UI.toast('金币不够', '#ff6b6b'); return; }
+  if (P.gold < o.price) { UI.toast('金币不够', Kit.color('red')); return; }
   P.gold -= o.price;
   Items.give(o.item);
   o.sold = true;

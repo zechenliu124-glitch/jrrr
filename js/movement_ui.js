@@ -26,12 +26,16 @@ MoveUI.fallText = function (k) {
 
 // 速度读数的颜色：15 以下白色，15~30 青色，30 以上金色
 MoveUI.tier = function (v) { return v < 15 ? 0 : v <= 30 ? 1 : 2; };
-MoveUI.TIER_COLORS = ['#ffffff', '#7ef0ff', '#ffc928'];
+// 三档速度的颜色：白 → 青 → 金（Kit 的用途色，UI_STYLE §2.4）。读数在 86% 不透明的深色小面板上，地面亮不亮几乎透不过来；
+// 浅一档的青 / 金（cyaL / goldL）和白色只差一点，换档时看不出来，所以用中间那档
+MoveUI.TIER_COLORS = ['white', 'cya', 'gold'];
 
 // 样式只写布局、字号和颜色变量（style.css）；像素按钮、勾选框、「选中」的样子在 css/kit.css（.mvOpts button、.mvBox）
 MoveUI.CSS = [
   // 速度读数：左上那一列（任务框下面）的一个小面板（kit.css 的 .kmPlate），18 号描边字
   '#speedText { padding: 3px 12px 3px 9px; font-size: var(--fs-m); line-height: 24px; color: #fff; text-shadow: var(--ol1); white-space: nowrap; }',
+  // 数字像素加粗（和状态小牌的秒数一样：--olB + 1 个字体像素的字距），「速度」两个字不加粗
+  '#speedText .mvNum { letter-spacing: var(--o); text-shadow: var(--olB); }',
   '.mvSet { margin-top: 9px; cursor: pointer; }',
   // 触屏：每一行都是 44 像素高的触控区（行和行之间不再空 9 像素，44 像素里本来就有上下的空）
   'body.touch .mvSet { min-height: 44px; margin-top: 0; }',
@@ -146,9 +150,11 @@ MoveUI.update = function () {
   var v = Math.round(P.speed());
   if (v === MoveUI.shownV) return;
   MoveUI.shownV = v;
-  el.textContent = '速度 ' + v;
+  var n = el.querySelector('.mvNum');
+  if (!n) { el.textContent = '速度 '; n = el.appendChild(document.createElement('span')); n.className = 'mvNum'; }
+  n.textContent = String(v);
   var t = MoveUI.tier(v);
-  if (t !== MoveUI.shownTier) { MoveUI.shownTier = t; el.style.color = MoveUI.TIER_COLORS[t]; }
+  if (t !== MoveUI.shownTier) { MoveUI.shownTier = t; el.style.color = Kit.color(MoveUI.TIER_COLORS[t]); }
 };
 
 // 主菜单角色介绍（ui.js 的 UI.descRow：左边灰色标签、右边内容）：被动下面加「滑铲｜坐骑 · 说明」和「坐骑特性」；属性里加摔落伤害
