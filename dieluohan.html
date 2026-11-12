@@ -1,0 +1,1876 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#7fd0f5">
+<title>叠罗汉</title>
+<style>
+:root{
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --ink: #3b3148;
+  --font: "PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{
+  margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#7fd0f5;
+  overscroll-behavior:none;touch-action:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  font-family:var(--font);color:var(--ink);
+}
+body{position:fixed;inset:0;}
+#c{position:absolute;left:0;top:0;width:100%;height:100%;display:block;touch-action:none;}
+#hud{
+  z-index:2;position:absolute;left:calc(var(--sal) + 14px);top:calc(var(--sat) + 12px);
+  pointer-events:none;transition:opacity .3s;opacity:0;
+}
+#hud.on{opacity:1;}
+.pill{
+  display:inline-block;background:rgba(255,255,255,.88);border:3px solid var(--ink);
+  border-radius:999px;padding:4px 16px 5px;font-weight:800;line-height:1.15;
+  box-shadow:0 4px 0 rgba(59,49,72,.22);
+}
+#hH{font-size:30px;letter-spacing:.5px;}
+#hH small{font-size:15px;margin-left:3px;}
+#hSub{margin-top:8px;font-size:13px;font-weight:700;padding:3px 12px 4px;border-width:2px;box-shadow:0 3px 0 rgba(59,49,72,.18);}
+#mute{
+  position:absolute;right:calc(var(--sar) + 12px);top:calc(var(--sat) + 12px);
+  width:46px;height:46px;border-radius:50%;border:3px solid var(--ink);
+  background:rgba(255,255,255,.88);box-shadow:0 4px 0 rgba(59,49,72,.22);
+  padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  touch-action:manipulation;outline:none;z-index:6;
+}
+#mute:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(59,49,72,.22);}
+#mute svg{width:26px;height:26px;display:block;}
+#mute .off{display:none;}
+#mute.muted .off{display:block;}
+#mute.muted .on{display:none;}
+.panel{
+  position:absolute;left:0;top:0;width:100%;height:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:calc(var(--sat) + 16px) calc(var(--sar) + 16px) calc(var(--sab) + 16px) calc(var(--sal) + 16px);
+  text-align:center;opacity:0;visibility:hidden;transition:opacity .35s, visibility .35s;z-index:3;
+}
+.panel.on{opacity:1;visibility:visible;}
+#start:not(.on){transition:none;}
+#over:not(.on){transition:none;}
+#start{cursor:pointer;justify-content:flex-start;}
+#start .sp{flex:0 0 13%;}
+h1{
+  margin:0;font-size:min(22vw,17vh,108px);font-weight:900;letter-spacing:.06em;line-height:1.05;
+  color:#fff;-webkit-text-stroke:0;
+  text-shadow:
+    -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink), 3px 3px 0 var(--ink),
+    0 -4px 0 var(--ink), 0 4px 0 var(--ink), -4px 0 0 var(--ink), 4px 0 0 var(--ink),
+    0 9px 0 var(--ink), 0 13px 0 rgba(59,49,72,.25);
+}
+h1 span{display:inline-block;animation:bob 1.6s ease-in-out infinite;}
+h1 span:nth-child(1){color:#ffd166;}
+h1 span:nth-child(2){color:#ff8fab;animation-delay:.18s;}
+h1 span:nth-child(3){color:#8ee3b4;animation-delay:.36s;}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-2deg);}50%{transform:translateY(-9px) rotate(2deg);}}
+#how{
+  margin-top:min(5vh,30px);font-size:min(4.4vw,18px);font-weight:700;max-width:26em;line-height:1.6;
+  background:rgba(255,255,255,.86);border:3px solid var(--ink);border-radius:18px;padding:9px 18px 10px;
+  box-shadow:0 5px 0 rgba(59,49,72,.2);
+}
+#tap{
+  margin-top:auto;margin-bottom:min(9vh,70px);font-size:min(5.4vw,23px);font-weight:900;color:#fff;
+  text-shadow:-2px -2px 0 var(--ink),2px -2px 0 var(--ink),-2px 2px 0 var(--ink),2px 2px 0 var(--ink),0 4px 0 var(--ink);
+  animation:pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
+#over{background:rgba(40,30,60,.28);}
+#card{
+  background:#fffaf0;border:4px solid var(--ink);border-radius:28px;padding:20px 26px 24px;
+  width:min(86vw,350px);box-shadow:0 9px 0 rgba(59,49,72,.3);
+  transform:translateY(24px) scale(.92);transition:transform .45s cubic-bezier(.2,1.5,.4,1);
+}
+#over.on #card{transform:none;}
+#oTitle{font-size:27px;font-weight:900;}
+#oNew{
+  display:none;margin:8px auto 0;font-size:17px;font-weight:900;color:#fff;background:#ff6b8b;
+  border:3px solid var(--ink);border-radius:999px;padding:2px 16px 3px;width:max-content;
+  animation:pulse .7s ease-in-out infinite;
+}
+#oNew.on{display:block;}
+#oH{font-size:62px;font-weight:900;line-height:1.1;margin-top:8px;color:#ff8a3d;
+  text-shadow:-2px -2px 0 var(--ink),2px -2px 0 var(--ink),-2px 2px 0 var(--ink),2px 2px 0 var(--ink),0 5px 0 var(--ink);}
+#oH small{font-size:24px;margin-left:6px;color:var(--ink);text-shadow:none;}
+#oRow{display:flex;justify-content:center;gap:12px;margin-top:14px;font-size:15px;font-weight:800;}
+#oRow div{background:#fff;border:2.5px solid var(--ink);border-radius:14px;padding:5px 13px 6px;flex:1;}
+#oRow b{display:block;font-size:20px;}
+#again{
+  margin-top:18px;font-family:var(--font);font-size:23px;font-weight:900;color:var(--ink);
+  background:#ffd166;border:4px solid var(--ink);border-radius:999px;padding:10px 0 12px;width:100%;
+  box-shadow:0 6px 0 var(--ink);cursor:pointer;touch-action:manipulation;outline:none;
+}
+#again:active{transform:translateY(4px);box-shadow:0 2px 0 var(--ink);}
+@media (max-height:460px){
+  h1{font-size:min(11vw,21vh);text-shadow:-2px -2px 0 var(--ink),2px -2px 0 var(--ink),-2px 2px 0 var(--ink),2px 2px 0 var(--ink),0 -3px 0 var(--ink),0 3px 0 var(--ink),-3px 0 0 var(--ink),3px 0 0 var(--ink),0 6px 0 var(--ink);} #start .sp{flex-basis:2%;} #how{margin-top:8px;font-size:12.5px;line-height:1.45;padding:4px 14px 5px;border-width:2.5px;}
+  #tap{margin-bottom:5vh;font-size:18px;}
+  #card{padding:10px 22px 14px;width:min(80vw,430px);} #oTitle{font-size:20px;} #oH{font-size:40px;margin-top:2px;}
+  #oRow{margin-top:8px;} #again{margin-top:10px;font-size:19px;padding:6px 0 8px;} #hH{font-size:22px;}
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div><span class="pill" id="hH"><span id="hHv">0.0</span><small>米</small></span></div>
+  <div><span class="pill" id="hSub"><span id="hCnt">0</span> 人 · 纪录 <span id="hBest">0.0</span> 米</span></div>
+</div>
+<button id="mute" aria-label="声音开关" title="声音开关">
+  <svg class="on" viewBox="0 0 24 24" fill="none" stroke="#3b3148" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="#ffd166"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6"/><path d="M18 6.5a7.6 7.6 0 0 1 0 11"/></svg>
+  <svg class="off" viewBox="0 0 24 24" fill="none" stroke="#3b3148" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="#d8d3df"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+</button>
+<div id="start" class="panel on">
+  <div class="sp"></div>
+  <h1><span>叠</span><span>罗</span><span>汉</span></h1>
+  <div id="how">小人在天上晃来晃去<br>点击屏幕（或按空格）把他放下去<br>叠得越高越好，塔倒了就结束！</div>
+  <div id="tap">点击任意位置开始</div>
+</div>
+<div id="over" class="panel">
+  <div id="card">
+    <div id="oTitle">塔倒啦！</div>
+    <div id="oNew">新纪录！</div>
+    <div id="oH"><span id="oHv">0.0</span><small>米</small></div>
+    <div id="oRow"><div>叠了<b><span id="oCnt">0</span> 人</b></div><div>最高纪录<b><span id="oBest">0.0</span> 米</b></div></div>
+    <button id="again">再来一次</button>
+  </div>
+</div>
+<script>
+"use strict";
+(function(){
+// =====================================================================
+//  叠罗汉 — custom XPBD particle ragdoll engine (no libraries)
+// =====================================================================
+var UPM = 70;               // world units per displayed metre
+var SUB = 10;               // physics substeps per 1/60 s
+var HS = 1 / 600;           // substep length (the fixed timestep)
+var GRAV = 1250;            // world units / s^2 (y points down, ground at y = 0)
+var NP = 13, NB = 16, MAXR = 64;
+var GROUND_HALF = 205;      // half width of the ground platform
+var WIND_ACC = 100;          // lateral acceleration of wind strength 1.0
+var VMAX = 1700;
+var MU = 0.9, MU_G = 1.0, MU_HEAD = 0.12, FOOT_GRACE = 40;
+// particle indices
+var P_H = 0, P_SL = 1, P_SR = 2, P_HL = 3, P_HR = 4, P_EL = 5, P_ER = 6, P_AL = 7, P_AR = 8, P_KL = 9, P_KR = 10, P_FL = 11, P_FR = 12;
+var BONES = [1,2, 3,4, 1,3, 2,4, 1,4, 2,3, 0,1, 0,2, 1,5, 5,7, 2,6, 6,8, 3,9, 9,11, 4,10, 10,12];
+// collision shapes: particle a, particle b, category (0 head, 1 torso, 2 arm, 3 leg)
+var SHP = [0,0,0, 1,2,1, 3,4,1, 1,3,1, 2,4,1, 1,5,2, 2,6,2, 5,7,2, 6,8,2, 3,9,3, 4,10,3, 9,11,3, 10,12,3];
+var NSH = 13;
+var CORE = [0, 1, 2, 3, 4, 9, 10, 11, 12];
+var BASEM = [1.0, 1.2, 1.2, 1.4, 1.4, 0.35, 0.35, 0.35, 0.35, 0.7, 0.7, 0.8, 0.8];
+
+var NTOT = MAXR * NP;
+var px = new Float64Array(NTOT), py = new Float64Array(NTOT), ox = new Float64Array(NTOT), oy = new Float64Array(NTOT);
+var vx = new Float64Array(NTOT), vy = new Float64Array(NTOT), pw = new Float64Array(NTOT), pr = new Float64Array(NTOT);
+var NST = MAXR * NSH;
+var s1 = new Int32Array(NST), s2 = new Int32Array(NST), scat = new Int8Array(NST), sown = new Int16Array(NST);
+var srad = new Float64Array(NST), sext = new Float64Array(NST);
+var sminx = new Float64Array(NST), sminy = new Float64Array(NST), smaxx = new Float64Array(NST), smaxy = new Float64Array(NST);
+var MAXPAIR = 9000;
+var pairA = new Int32Array(MAXPAIR), pairB = new Int32Array(MAXPAIR), nPairs = 0;
+var slots = [];            // slot -> ragdoll or null
+var rags = [];             // active ragdolls in creation order
+var grabs = [];            // active grab springs (hands)
+var holds = [];            // active foot-holds (feet planted on shoulders)
+var windNow = 0;           // current wind strength (signed)
+var physTime = 0;
+var impactCb = null;       // function(ragA, ragB or null, x, y, relSpeed)
+for (var _i = 0; _i < MAXR; _i++) slots.push(null);
+
+// ---------- deterministic RNG ----------
+var seedParam = null, muteParam = false;
+try {
+  var _q = new URLSearchParams(window.location.search);
+  if (_q.has('seed')) { var _s = parseInt(_q.get('seed'), 10); if (isFinite(_s)) seedParam = _s; }
+  muteParam = _q.get('mute') === '1';
+} catch (e) {}
+var rngState = (seedParam === null ? ((Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0) : ((seedParam * 2654435761 + 97) >>> 0)) || 1;
+function rnd() {            // mulberry32 (game logic / physics randomness)
+  rngState = (rngState + 0x6D2B79F5) >>> 0;
+  var t = rngState;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function rr(a, b) { return a + (b - a) * rnd(); }
+var fxState = 12345;
+function frnd() {           // separate stream for purely visual effects (never affects gameplay)
+  fxState = (fxState * 1664525 + 1013904223) >>> 0;
+  return fxState / 4294967296;
+}
+function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+// ---------- ragdoll construction ----------
+var PALETTE = ['#ff8fab', '#ffd166', '#8ee3b4', '#7cc6fe', '#c3a6ff', '#ffa770', '#f6e58d', '#7eddd3', '#ff9aa2', '#b5ead7', '#a0c4ff', '#ffc6ff', '#fdffb6', '#9bf6ff', '#ffb4a2'];
+function newRag(kind) {
+  var slot = -1, i;
+  for (i = 0; i < MAXR; i++) if (!slots[i]) { slot = i; break; }
+  if (slot < 0) return null;
+  var k = rr(0.86, 1.14), fat = rr(0.05, 0.6), massMul;
+  if (kind === 'fat') { k = rr(0.92, 1.02); fat = rr(1.25, 1.45); }
+  else if (kind === 'long') { k = rr(1.42, 1.58); fat = rr(0.0, 0.2); }
+  massMul = kind === 'fat' ? 2.0 : kind === 'long' ? 1.35 : (0.55 + 0.45 * k) * (0.85 + 0.35 * fat);
+  var r = {
+    slot: slot, base: slot * NP, sbase: slot * NSH, kind: kind, k: k, fat: fat, massMul: massMul,
+    color: PALETTE[(rnd() * PALETTE.length) | 0], skin: rnd() < 0.5 ? '#ffe8d2' : (rnd() < 0.5 ? '#ffdcc0' : '#f5cfa8'),
+    hair: (rnd() * 5) | 0, blush: rnd() < 0.7,
+    rl: 5.5 + (kind === 'fat' ? 1.2 : 0), ra: 4.4 + (kind === 'fat' ? 0.8 : 0), rt: 6, rb: 6 + 3.6 * fat,
+    rh: (kind === 'fat' ? 14.2 : rr(12.4, 13.6)), fs: 19.5,
+    lt: 22 * k, ls: 22 * k, th: 33 * (kind === 'long' ? k * 0.92 : k),
+    hw: 9 + 4.5 * fat, sw: 21 + 3 * Math.min(fat, 1.4),
+    au: 18.5 * (0.45 + 0.55 * k), af: 18.5 * (0.45 + 0.55 * k),
+    blen: new Float64Array(NB), armLen: new Float64Array(12), rx: new Float64Array(NP), ry: new Float64Array(NP), qx: new Float64Array(NP), qy: new Float64Array(NP),
+    cmSum: 0, height: 0, shoulderH: 0,
+    state: 'carried', tone: 0.004, armTone: 0.006, upK: 0, upMax: 0.0004, massScale: 1, windF: 1,
+    armOn: [true, true], grab: [null, null], grabCool: [0, 0], hold: [null, null], holdCool: 0, above: 0, armA1: [1.0, 1.0], armA2: [1.3, 1.3],
+    tilt: 0, comx: 0, comy: 0, cvx: 0, cvy: 0, speed: 0, maxSpeed: 0,
+    minx: 0, miny: 0, maxx: 0, maxy: 0, gc: 0, touch: 0, touchRag: null, hitSpeed: 0, hitX: 0, hitY: 0, hitOther: null,
+    footL: 0, footR: 0, pivot: 0, dampRel: 0, dampC0: 0.1, dampC1: 0, dampV0: 1, isBase: false, age: 0, landT: -1, calmT: 0, stacked: false, stackIdx: -1, settleHeadY: 0, tiltT: 0, feetOn: null,
+    face: 'nervous', faceT: 0, blinkT: rr(1, 4), blink: 0, squash: 0, squashV: 0, sweatT: 0, lookX: 0, lookY: 0,
+    flail: 0, flailPh: rr(0, 6.28), crouch: 0, crouchV: 0, dead: false, reliefT: 0, dizzyPh: rr(0, 6.28), voice: rr(0.75, 1.45)
+  };
+  buildPose(r, 0);
+  // bones from the rest pose
+  for (i = 0; i < NB; i++) {
+    var a = BONES[2 * i], b = BONES[2 * i + 1];
+    r.blen[i] = Math.hypot(r.rx[a] - r.rx[b], r.ry[a] - r.ry[b]);
+  }
+  r.blen[8] = r.au; r.blen[10] = r.au; r.blen[9] = r.af; r.blen[11] = r.af;
+  var rads = [r.rh, r.rt, r.rt, r.rb, r.rb, r.ra, r.ra, r.ra, r.ra, r.rl, r.rl, r.rl, r.rl];
+  for (i = 0; i < NP; i++) {
+    var g = r.base + i;
+    pw[g] = 1 / (BASEM[i] * massMul); pr[g] = rads[i];
+    px[g] = r.rx[i]; py[g] = r.ry[i]; ox[g] = px[g]; oy[g] = py[g]; vx[g] = 0; vy[g] = 0;
+  }
+  for (i = 0; i < NSH; i++) {
+    var s = r.sbase + i, c = SHP[3 * i + 2];
+    s1[s] = r.base + SHP[3 * i]; s2[s] = r.base + SHP[3 * i + 1]; scat[s] = c; sown[s] = slot;
+    srad[s] = c === 0 ? r.rh : c === 2 ? r.ra : c === 3 ? r.rl : (i === 1 ? r.rt : i === 2 ? r.rb : (r.rt + r.rb) * 0.5);
+    sext[s] = i === 1 ? 6.5 : 0;
+  }
+  slots[slot] = r; rags.push(r);
+  return r;
+}
+// Standing rest pose in local coordinates (origin between the feet on the floor, y negative = up).
+// crouch 0..1 lowers the hips and bends the knees outward. Arm targets come from armA1/armA2.
+function buildPose(r, crouch) {
+  var rx = r.rx, ry = r.ry, L = r.lt + r.ls, D = L * (0.965 - 0.3 * crouch);
+  var dxh = r.fs - r.hw, yh = -r.rl - Math.sqrt(Math.max(1, D * D - dxh * dxh));
+  rx[P_FL] = -r.fs; ry[P_FL] = -r.rl; rx[P_FR] = r.fs; ry[P_FR] = -r.rl;
+  rx[P_HL] = -r.hw; ry[P_HL] = yh; rx[P_HR] = r.hw; ry[P_HR] = yh;
+  // knee: circle intersection (hip, lt) & (foot, ls), outward solution
+  var ex = dxh, ey = -r.rl - yh, d = Math.hypot(ex, ey), a = (r.lt * r.lt - r.ls * r.ls + d * d) / (2 * d);
+  var h = Math.sqrt(Math.max(0, r.lt * r.lt - a * a)), ux = ex / d, uy = ey / d;
+  var kx = r.hw + ux * a + uy * h, ky = yh + uy * a - ux * h;
+  rx[P_KR] = kx; ry[P_KR] = ky; rx[P_KL] = -kx; ry[P_KL] = ky;
+  var ys = yh - r.th;
+  rx[P_SL] = -r.sw; ry[P_SL] = ys; rx[P_SR] = r.sw; ry[P_SR] = ys;
+  rx[P_H] = 0; ry[P_H] = ys - (r.rh + r.rt - 4);
+  r.height = -(ry[P_H] - r.rh); r.shoulderH = -ys + r.rt;
+  poseArms(r);
+  var cx = 0, cy = 0, m = 0, i, j;
+  for (j = 0; j < 9; j++) { i = CORE[j]; cx += rx[i] * BASEM[i]; cy += ry[i] * BASEM[i]; m += BASEM[i]; }
+  cx /= m; cy /= m; r.cmSum = m; r.cx0 = cx; r.cy0 = cy;
+  for (i = 0; i < NP; i++) { r.qx[i] = rx[i] - cx; r.qy[i] = ry[i] - cy; }
+}
+function poseArms(r) {
+  var rx = r.rx, ry = r.ry, s, sd, sh, el, ha, a1, a2;
+  for (s = 0; s < 2; s++) {
+    sd = s ? 1 : -1; sh = s ? P_SR : P_SL; el = s ? P_ER : P_EL; ha = s ? P_AR : P_AL; a1 = r.armA1[s]; a2 = r.armA2[s];
+    rx[el] = rx[sh] + sd * Math.sin(a1) * r.au; ry[el] = ry[sh] + Math.cos(a1) * r.au;
+    rx[ha] = rx[el] + sd * Math.sin(a2) * r.af; ry[ha] = ry[el] + Math.cos(a2) * r.af;
+    var a0 = P_H, a1 = s ? P_HR : P_HL, a2 = s ? P_SL : P_SR, L = r.armLen, o = s * 6;
+    L[o] = Math.hypot(rx[el] - rx[a0], ry[el] - ry[a0]); L[o + 1] = Math.hypot(rx[el] - rx[a1], ry[el] - ry[a1]); L[o + 2] = Math.hypot(rx[el] - rx[a2], ry[el] - ry[a2]);
+    L[o + 3] = Math.hypot(rx[ha] - rx[a0], ry[ha] - ry[a0]); L[o + 4] = Math.hypot(rx[ha] - rx[a1], ry[ha] - ry[a1]); L[o + 5] = Math.hypot(rx[ha] - rx[a2], ry[ha] - ry[a2]);
+  }
+}
+// place the ragdoll so that its local origin sits at (x, y), in rest pose, with velocity zero
+function placeRag(r, x, y) {
+  for (var i = 0; i < NP; i++) {
+    var g = r.base + i;
+    px[g] = x + r.rx[i]; py[g] = y + r.ry[i]; ox[g] = px[g]; oy[g] = py[g]; vx[g] = 0; vy[g] = 0;
+  }
+}
+function setMassScale(r, sc) {
+  if (r.massScale === sc) return;
+  r.massScale = sc;
+  for (var i = 0; i < NP; i++) { var g = r.base + i; if (pw[g] > 0) pw[g] = 1 / (BASEM[i] * r.massMul * sc); }
+}
+function removeRag(r) {
+  var i = rags.indexOf(r); if (i >= 0) rags.splice(i, 1);
+  slots[r.slot] = null; r.dead = true;
+  for (i = grabs.length - 1; i >= 0; i--) if (grabs[i].ra === r || grabs[i].rb === r) dropGrab(grabs[i]);
+  for (i = holds.length - 1; i >= 0; i--) if (holds[i].ra === r || holds[i].rb === r) dropHold(holds[i]);
+}
+function dropHold(g) {
+  var i = holds.indexOf(g); if (i >= 0) holds.splice(i, 1);
+  if (g.ra.hold[g.side] === g) g.ra.hold[g.side] = null;
+  g.on = false;
+}
+function addHold(ra, side, rb, b1, b2, t, rest) {
+  var g = { on: true, ra: ra, side: side, hi: ra.base + (side ? P_FR : P_FL), rb: rb, b1: b1, b2: b2, t: t, rest: rest, comp: 0.0005, stretch: 0, age: 0, over: 0 };
+  ra.hold[side] = g; holds.push(g);
+  return g;
+}
+function dropGrab(g) {
+  var i = grabs.indexOf(g); if (i >= 0) grabs.splice(i, 1);
+  if (g.ra.grab[g.side] === g) { g.ra.grab[g.side] = null; g.ra.armOn[g.side] = true; }
+  g.on = false;
+}
+function addGrab(ra, side, rb, b1, b2, t) {
+  var hi = ra.base + (side ? P_AR : P_AL);
+  var tx = px[b1] * (1 - t) + px[b2] * t, ty = py[b1] * (1 - t) + py[b2] * t;
+  var g = { on: true, ra: ra, side: side, hi: hi, rb: rb, b1: b1, b2: b2, t: t, rest: Math.hypot(tx - px[hi], ty - py[hi]), comp: 0.0012, stretch: 0, age: 0, over: 0, held: 0 };
+  ra.grab[side] = g; ra.armOn[side] = false; grabs.push(g);
+  return g;
+}
+function clearWorld() {
+  for (var i = 0; i < MAXR; i++) slots[i] = null;
+  for (i = 0; i < rags.length; i++) rags[i].dead = true;
+  rags.length = 0; grabs.length = 0; holds.length = 0; nPairs = 0; windNow = 0;
+}
+// ---------- solver pieces ----------
+function solveBones(r) {
+  var b = r.base, bl = r.blen, i, a, c, dx, dy, d, wa, wc, ws, s;
+  for (i = 0; i < NB; i++) {
+    a = b + BONES[2 * i]; c = b + BONES[2 * i + 1];
+    dx = px[c] - px[a]; dy = py[c] - py[a]; d = Math.sqrt(dx * dx + dy * dy);
+    wa = pw[a]; wc = pw[c]; ws = wa + wc;
+    if (ws <= 0 || d < 1e-9) continue;
+    s = (d - bl[i]) / (d * ws);
+    px[a] += dx * s * wa; py[a] += dy * s * wa; px[c] -= dx * s * wc; py[c] -= dy * s * wc;
+  }
+}
+// Muscle tone: soft shape matching of the core (head, torso, legs) toward the standing pose,
+// arm targets expressed in the body frame, plus a limited "balance" rotation toward upright.
+function shapeMatch(r) {
+  var b = r.base, qx = r.qx, qy = r.qy, cx = 0, cy = 0, i, j, k, m, dx, dy, A = 0, B = 0;
+  for (j = 0; j < 9; j++) { i = CORE[j]; k = b + i; m = BASEM[i]; cx += px[k] * m; cy += py[k] * m; }
+  cx /= r.cmSum; cy /= r.cmSum;
+  for (j = 0; j < 9; j++) {
+    i = CORE[j]; k = b + i; m = BASEM[i]; dx = px[k] - cx; dy = py[k] - cy;
+    A += m * (qx[i] * dx + qy[i] * dy); B += m * (qx[i] * dy - qy[i] * dx);
+  }
+  var th = Math.atan2(B, A), co = Math.cos(th), si = Math.sin(th), al = r.tone, gx, gy;
+  r.tilt = th; r.comx = cx; r.comy = cy;
+  if (al > 0) {
+    for (j = 0; j < 9; j++) {
+      i = CORE[j]; k = b + i; if (pw[k] === 0) continue;
+      gx = cx + co * qx[i] - si * qy[i]; gy = cy + si * qx[i] + co * qy[i];
+      px[k] += al * (gx - px[k]); py[k] += al * (gy - py[k]);
+    }
+  }
+  // a holding arm keeps its elbow pointing outward (never across the face)
+  for (i = 0; i < 2; i++) {
+    if (!r.grab[i]) continue;
+    var eo = b + (i ? P_ER : P_EL), so = b + (i ? P_SL : P_SR), need = 2 * r.sw + 0.55 * r.au, wE = pw[eo], wS = pw[so];
+    dx = px[eo] - px[so]; dy = py[eo] - py[so]; A = Math.sqrt(dx * dx + dy * dy);
+    if (A < need && A > 1e-6 && wE + wS > 0) { B = 0.02 * (need - A) / (A * (wE + wS)); px[eo] += dx * B * wE; py[eo] += dy * B * wE; px[so] -= dx * B * wS; py[so] -= dy * B * wS; }
+  }
+  var aa = r.armTone;
+  if (aa > 0) {
+    // arm muscles: soft distance springs from elbow / hand to three body anchors (momentum-neutral)
+    var al2 = r.armLen, side, e, h, a0, a1, a2, c2, pk, an, d, wa, wb, cc;
+    for (side = 0; side < 2; side++) {
+      if (!r.armOn[side]) continue;
+      e = b + (side ? P_ER : P_EL); h = b + (side ? P_AR : P_AL);
+      a0 = b + P_H; a1 = b + (side ? P_HR : P_HL); a2 = b + (side ? P_SL : P_SR);
+      for (c2 = 0; c2 < 6; c2++) {
+        pk = c2 < 3 ? e : h; an = (c2 % 3) === 0 ? a0 : (c2 % 3) === 1 ? a1 : a2;
+        wa = pw[pk]; wb = pw[an]; if (wa + wb <= 0) continue;
+        dx = px[an] - px[pk]; dy = py[an] - py[pk]; d = Math.sqrt(dx * dx + dy * dy); if (d < 1e-6) continue;
+        cc = aa * (d - al2[side * 6 + c2]) / (d * (wa + wb));
+        px[pk] += dx * cc * wa; py[pk] += dy * cc * wa; px[an] -= dx * cc * wb; py[an] -= dy * cc * wb;
+      }
+    }
+  }
+  if (r.upK > 0) {
+    // balance reflex: rotate toward upright about the support (feet when standing, hands when carried, COM in the air)
+    var dth = r.upK * th, pvx = cx, pvy = cy;
+    if (dth > r.upMax) dth = r.upMax; else if (dth < -r.upMax) dth = -r.upMax;
+    if (r.pivot === 1) {
+      pvx = (px[b + P_FL] + px[b + P_FR]) * 0.5; pvy = (py[b + P_FL] + py[b + P_FR]) * 0.5;
+      var fc = r.footL < r.footR ? r.footL : r.footR;       // needs both feet planted
+      dth *= fc >= FOOT_GRACE ? 1 : fc / FOOT_GRACE;
+    }
+    else if (r.pivot === 2) { pvx = (px[b + P_AL] + px[b + P_AR]) * 0.5; pvy = (py[b + P_AL] + py[b + P_AR]) * 0.5; }
+    else {                                                   // airborne: true centre of mass, so no momentum is injected
+      pvx = 0; pvy = 0; m = 0;
+      for (i = 0; i < NP; i++) { k = b + i; pvx += px[k] * BASEM[i]; pvy += py[k] * BASEM[i]; m += BASEM[i]; }
+      pvx /= m; pvy /= m;
+      for (i = 0; i < NP; i++) {                              // kinematic (adds no spin): also shift the previous positions
+        k = b + i; dx = px[k] - pvx; dy = py[k] - pvy;
+        px[k] += dth * dy; py[k] -= dth * dx; ox[k] += dth * dy; oy[k] -= dth * dx;
+      }
+      return;
+    }
+    for (i = 0; i < NP; i++) {
+      k = b + i; if (pw[k] === 0) continue;
+      dx = px[k] - pvx; dy = py[k] - pvy;
+      px[k] += dth * dy; py[k] -= dth * dx;
+    }
+  }
+}
+function solveLinks(arr) {      // soft, pull-only springs: hand grabs and foot-holds
+  var n = arr.length, i, g, t, tx, ty, dx, dy, d, C, wh, w1, w2, wb, lam, hi, b1, b2, nx, ny;
+  for (i = 0; i < n; i++) {
+    g = arr[i]; hi = g.hi; b1 = g.b1; b2 = g.b2; t = g.t;
+    tx = px[b1] * (1 - t) + px[b2] * t; ty = py[b1] * (1 - t) + py[b2] * t;
+    dx = tx - px[hi]; dy = ty - py[hi]; d = Math.sqrt(dx * dx + dy * dy);
+    g.stretch = d;
+    C = d - g.rest; if (C <= 0 || d < 1e-9) continue;
+    wh = pw[hi]; w1 = pw[b1] * (1 - t); w2 = pw[b2] * t; wb = w1 * (1 - t) + w2 * t;
+    lam = C / (wh + wb + g.comp / (HS * HS)); nx = dx / d; ny = dy / d;
+    px[hi] += nx * lam * wh; py[hi] += ny * lam * wh;
+    px[b1] -= nx * lam * w1; py[b1] -= ny * lam * w1; px[b2] -= nx * lam * w2; py[b2] -= ny * lam * w2;
+  }
+}
+// the base ragdoll digs its feet in: pull-only springs to the spots where its feet were planted
+var gHold = { rag: null, on: false, ax: [0, 0], ay: [0, 0], comp: 0.001, stretch: [0, 0], over: 0, cool: 0 };
+function solveGroundHold() {
+  var g = gHold, r = g.rag, f, k, dx, dy, d, w, lam;
+  if (!g.on || !r || r.dead) return;
+  for (f = 0; f < 2; f++) {
+    k = r.base + (f ? P_FR : P_FL);
+    dx = g.ax[f] - px[k]; dy = g.ay[f] - py[k]; d = Math.sqrt(dx * dx + dy * dy); g.stretch[f] = d;
+    if (d < 1e-9) continue;
+    w = pw[k]; lam = d / (w + g.comp / (HS * HS)) * w / d;
+    px[k] += dx * lam; py[k] += dy * lam;
+  }
+}
+// closest points between two segments (either may be degenerate); result in cS, cT
+var cS = 0, cT = 0;
+function segseg(p1x, p1y, q1x, q1y, p2x, p2y, q2x, q2y) {
+  var d1x = q1x - p1x, d1y = q1y - p1y, d2x = q2x - p2x, d2y = q2y - p2y, rx = p1x - p2x, ry = p1y - p2y;
+  var a = d1x * d1x + d1y * d1y, e = d2x * d2x + d2y * d2y, f = d2x * rx + d2y * ry, s, t, c, b, den;
+  if (a <= 1e-9 && e <= 1e-9) { cS = 0; cT = 0; return; }
+  if (a <= 1e-9) { s = 0; t = f / e; t = t < 0 ? 0 : t > 1 ? 1 : t; }
+  else {
+    c = d1x * rx + d1y * ry;
+    if (e <= 1e-9) { t = 0; s = -c / a; s = s < 0 ? 0 : s > 1 ? 1 : s; }
+    else {
+      b = d1x * d2x + d1y * d2y; den = a * e - b * b;
+      if (den > 1e-9) { s = (b * f - c * e) / den; s = s < 0 ? 0 : s > 1 ? 1 : s; } else s = 0.5;
+      t = (b * s + f) / e;
+      if (t < 0) { t = 0; s = -c / a; s = s < 0 ? 0 : s > 1 ? 1 : s; }
+      else if (t > 1) { t = 1; s = (b - c) / a; s = s < 0 ? 0 : s > 1 ? 1 : s; }
+    }
+  }
+  cS = s; cT = t;
+}
+// geometry of one shape pair -> penetration depth (positive = overlapping); fills cg* scratch
+var cgS = 0, cgT = 0, cgNx = 0, cgNy = 0, cgPen = 0;
+function pairGeom(ia, ib) {
+  var a1 = s1[ia], a2 = s2[ia], b1 = s1[ib], b2 = s2[ib];
+  var ax = px[a1], ay = py[a1], bx = px[a2], by = py[a2], cx = px[b1], cy = py[b1], dx = px[b2], dy = py[b2];
+  var ea = sext[ia], eb = sext[ib], La = 0, Lb = 0, ux, uy;
+  if (ea > 0) { ux = bx - ax; uy = by - ay; La = Math.sqrt(ux * ux + uy * uy); if (La > 1e-6) { ux *= ea / La; uy *= ea / La; ax -= ux; ay -= uy; bx += ux; by += uy; } else ea = 0; }
+  if (eb > 0) { ux = dx - cx; uy = dy - cy; Lb = Math.sqrt(ux * ux + uy * uy); if (Lb > 1e-6) { ux *= eb / Lb; uy *= eb / Lb; cx -= ux; cy -= uy; dx += ux; dy += uy; } else eb = 0; }
+  segseg(ax, ay, bx, by, cx, cy, dx, dy);
+  var s = cS, t = cT;
+  var pax = ax + (bx - ax) * s, pay = ay + (by - ay) * s, pbx = cx + (dx - cx) * t, pby = cy + (dy - cy) * t;
+  var nx = pbx - pax, ny = pby - pay, d2 = nx * nx + ny * ny, rs = srad[ia] + srad[ib];
+  if (d2 >= rs * rs) { cgPen = 0; return false; }
+  var d = Math.sqrt(d2);
+  if (d < 1e-6) { cgPen = 0; return false; }
+  if (ea > 0) s = (s * (La + 2 * ea) - ea) / La;
+  if (eb > 0) t = (t * (Lb + 2 * eb) - eb) / Lb;
+  cgS = s; cgT = t; cgNx = nx / d; cgNy = ny / d; cgPen = rs - d;
+  return true;
+}
+function solveContact(ia, ib) {
+  if (!pairGeom(ia, ib)) return;
+  var a1 = s1[ia], a2 = s2[ia], b1 = s1[ib], b2 = s2[ib], s = cgS, t = cgT, nx = cgNx, ny = cgNy, pen = cgPen;
+  var wa1 = pw[a1] * (1 - s), wa2 = a1 === a2 ? 0 : pw[a2] * s, wb1 = pw[b1] * (1 - t), wb2 = b1 === b2 ? 0 : pw[b2] * t;
+  var W = wa1 * (1 - s) + wa2 * s + wb1 * (1 - t) + wb2 * t;
+  if (W <= 0) return;
+  var lam = pen / W;
+  px[a1] -= nx * lam * wa1; py[a1] -= ny * lam * wa1; px[a2] -= nx * lam * wa2; py[a2] -= ny * lam * wa2;
+  px[b1] += nx * lam * wb1; py[b1] += ny * lam * wb1; px[b2] += nx * lam * wb2; py[b2] += ny * lam * wb2;
+  // friction on the tangential displacement of this substep
+  var rdx = (px[b1] - ox[b1]) * (1 - t) + (px[b2] - ox[b2]) * t - (px[a1] - ox[a1]) * (1 - s) - (px[a2] - ox[a2]) * s;
+  var rdy = (py[b1] - oy[b1]) * (1 - t) + (py[b2] - oy[b2]) * t - (py[a1] - oy[a1]) * (1 - s) - (py[a2] - oy[a2]) * s;
+  var dt = -rdx * ny + rdy * nx, lim = ((scat[ia] === 0 || scat[ib] === 0) ? MU_HEAD : MU) * pen;
+  var ra = slots[sown[ia]], rb = slots[sown[ib]];
+  if (ra.touch === 0 || rb.touch === 0) {       // first touch of a faller: report the impact
+    var rn = Math.abs(rdx * nx + rdy * ny) / HS, rsp = Math.sqrt(rdx * rdx + rdy * rdy) / HS;
+    if (rsp > rn) rn = rsp;
+    if (ra.touch === 0 && ra.state === 'falling') { ra.hitSpeed = rn; ra.hitOther = rb; ra.hitX = px[a1] + (px[a2] - px[a1]) * s; ra.hitY = py[a1] + (py[a2] - py[a1]) * s; }
+    if (rb.touch === 0 && rb.state === 'falling') { rb.hitSpeed = rn; rb.hitOther = ra; rb.hitX = px[b1] + (px[b2] - px[b1]) * t; rb.hitY = py[b1] + (py[b2] - py[b1]) * t; }
+  }
+  ra.touch = 2; rb.touch = 2;
+  var la = ia - ra.sbase, lb = ib - rb.sbase;
+  if (la >= 11 && s > 0.75 && ny > 0.35) { if (la === 11) ra.footL = FOOT_GRACE; else ra.footR = FOOT_GRACE; }
+  if (lb >= 11 && t > 0.75 && ny < -0.35) { if (lb === 11) rb.footL = FOOT_GRACE; else rb.footR = FOOT_GRACE; }
+  if (dt > lim) dt = lim; else if (dt < -lim) dt = -lim;
+  lam = dt / W;
+  var tx = -ny, ty = nx;
+  px[a1] += tx * lam * wa1; py[a1] += ty * lam * wa1; px[a2] += tx * lam * wa2; py[a2] += ty * lam * wa2;
+  px[b1] -= tx * lam * wb1; py[b1] -= ty * lam * wb1; px[b2] -= tx * lam * wb2; py[b2] -= ty * lam * wb2;
+}
+function solveGround() {
+  var n = rags.length, q, r, b, i, k, rad, x, y, pen, G = GROUND_HALF, dxm, lim, ex, dx, d, dTop, dSide;
+  for (q = 0; q < n; q++) {
+    r = rags[q]; if (r.maxy < -30 || r.state === 'carried') continue;
+    b = r.base;
+    for (i = 0; i < NP; i++) {
+      k = b + i; rad = pr[k]; y = py[k];
+      if (y + rad <= 0) continue;
+      x = px[k];
+      if (x >= -G && x <= G) {
+        dTop = y + rad; dSide = G - Math.abs(x) + rad;
+        if (y > 0 && dSide < dTop) { px[k] += (x > 0 ? dSide : -dSide); continue; }
+        pen = dTop; py[k] = -rad;
+        dxm = px[k] - ox[k]; lim = MU_G * pen;
+        if (dxm > lim) px[k] -= lim; else if (dxm < -lim) px[k] += lim; else px[k] = ox[k];
+        if (!(r.gc & (1 << i))) {
+          if (r.touch === 0 && r.state === 'falling') { r.hitSpeed = Math.abs(vy[k]); r.hitOther = null; r.hitX = x; r.hitY = 0; }
+          r.gc |= (1 << i);
+        }
+        if (i === P_FL) r.footL = FOOT_GRACE; else if (i === P_FR) r.footR = FOOT_GRACE;
+        r.touch = 2;
+      } else {
+        ex = x > 0 ? G : -G; dx = x - ex;
+        if (y >= 0) { pen = rad - Math.abs(dx); if (pen > 0) px[k] += dx > 0 ? pen : -pen; }
+        else { d = Math.sqrt(dx * dx + y * y); if (d < rad && d > 1e-6) { pen = (rad - d) / d; px[k] += dx * pen; py[k] += y * pen; } }
+      }
+    }
+  }
+}
+// ---------- broad phase (once per 1/60 s tick) ----------
+function buildPairs() {
+  var n = rags.length, q, r, b, i, k, s, m, a, c, ra2, x1, x2, y1, y2, e, p, sa, sb, ca, cb, ga, gb, sideA, sideB;
+  for (q = 0; q < n; q++) {
+    r = rags[q]; b = r.base; m = 2.5 + r.maxSpeed / 60 * 1.3;
+    r.minx = 1e9; r.miny = 1e9; r.maxx = -1e9; r.maxy = -1e9;
+    for (i = 0; i < NSH; i++) {
+      s = r.sbase + i; a = s1[s]; c = s2[s]; ra2 = srad[s] + m; e = sext[s];
+      x1 = px[a]; x2 = px[c]; y1 = py[a]; y2 = py[c];
+      sminx[s] = (x1 < x2 ? x1 : x2) - ra2 - e; smaxx[s] = (x1 > x2 ? x1 : x2) + ra2 + e;
+      sminy[s] = (y1 < y2 ? y1 : y2) - ra2 - e; smaxy[s] = (y1 > y2 ? y1 : y2) + ra2 + e;
+      if (sminx[s] < r.minx) r.minx = sminx[s]; if (smaxx[s] > r.maxx) r.maxx = smaxx[s];
+      if (sminy[s] < r.miny) r.miny = sminy[s]; if (smaxy[s] > r.maxy) r.maxy = smaxy[s];
+    }
+  }
+  nPairs = 0;
+  for (q = 0; q < n; q++) {
+    var A = rags[q]; if (A.state === 'carried') continue;
+    for (p = q + 1; p < n; p++) {
+      var B = rags[p]; if (B.state === 'carried') continue;
+      if (A.maxx < B.minx || B.maxx < A.minx || A.maxy < B.miny || B.maxy < A.miny) continue;
+      ga = A.grab; gb = B.grab;
+      for (i = 0; i < NSH; i++) {
+        sa = A.sbase + i; ca = scat[sa];
+        sideA = ca === 2 ? ((i - 5) & 1) : -1;
+        if (sideA >= 0 && ga[sideA] && ga[sideA].rb === B) continue;        // an arm does not collide with what it holds
+        for (k = 0; k < NSH; k++) {
+          sb = B.sbase + k; cb = scat[sb];
+          if (sminx[sa] > smaxx[sb] || sminx[sb] > smaxx[sa] || sminy[sa] > smaxy[sb] || sminy[sb] > smaxy[sa]) continue;
+          if (ca === 2 && cb === 2) continue;                                // arms pass arms (keeps grabbing calm)
+          sideB = cb === 2 ? ((k - 5) & 1) : -1;
+          if (sideB >= 0 && gb[sideB] && gb[sideB].rb === A) continue;
+          if (nPairs < MAXPAIR) { pairA[nPairs] = sa; pairB[nPairs] = sb; nPairs++; }
+        }
+      }
+    }
+  }
+}
+var prePhysics = null;      // set by the game: pins the carried ragdoll, called every substep
+function substep() {
+  var n = rags.length, q, r, b, i, k, ax, sp, c, f, vxx, vyy, ms;
+  physTime += HS;
+  ax = windNow * WIND_ACC * HS;
+  var gy = GRAV * HS;
+  for (q = 0; q < n; q++) {
+    r = rags[q]; b = r.base; f = ax * r.windF;
+    for (i = 0; i < NP; i++) {
+      k = b + i;
+      if (pw[k] === 0) { ox[k] = px[k]; oy[k] = py[k]; continue; }
+      vx[k] += f; vy[k] += gy;
+      ox[k] = px[k]; oy[k] = py[k];
+      px[k] += vx[k] * HS; py[k] += vy[k] * HS;
+    }
+    if (r.touch > 0) r.touch--;
+    if (r.footL > 0) r.footL--;
+    if (r.footR > 0) r.footR--;
+  }
+  if (prePhysics) prePhysics();
+  for (q = 0; q < n; q++) { r = rags[q]; solveBones(r); shapeMatch(r); }
+  solveLinks(grabs); solveLinks(holds); solveGroundHold();
+  for (i = 0; i < nPairs; i++) solveContact(pairA[i], pairB[i]);
+  for (q = 0; q < n; q++) solveBones(rags[q]);
+  solveGround();                 // last, so planted feet are exactly stuck (no creeping)
+  var inv = 1 / HS;
+  for (q = 0; q < n; q++) {
+    r = rags[q]; b = r.base; ms = 0;
+    var c0 = r.dampC0, c1 = r.dampC1, v0 = r.dampV0, mvx = 0, mvy = 0;
+    for (i = 0; i < NP; i++) {
+      k = b + i;
+      vxx = (px[k] - ox[k]) * inv; vyy = (py[k] - oy[k]) * inv;
+      sp = Math.sqrt(vxx * vxx + vyy * vyy);
+      c = c0; if (sp < v0) c += c1 * (1 - sp / v0);
+      f = 1 - c * HS;
+      if (sp > VMAX) f *= VMAX / sp;
+      vxx *= f; vyy *= f; sp *= f;
+      vx[k] = vxx; vy[k] = vyy; if (sp > ms) ms = sp;
+      if (i < 5) { mvx += vxx; mvy += vyy; }
+    }
+    r.maxSpeed = ms; r.cvx = mvx * 0.2; r.cvy = mvy * 0.2;
+    if (r.dampRel > 0) {            // balance damping: lateral motion relative to the own feet
+      var vf = r.pivot === 2 ? carrier.vx : (vx[b + P_FL] + vx[b + P_FR]) * 0.5, cr = r.dampRel * HS;
+      for (i = 0; i < 11; i++) { k = b + i; vx[k] -= (vx[k] - vf) * cr; }
+    }
+  }
+}
+// =====================================================================
+//  game state
+// =====================================================================
+var gstate = 'ready';
+var stack = [];                 // ragdolls counted as stacked, in landing order (stack[0] = base)
+var carried = null, faller = null, baseRag = null;
+var carrier = { x: 0, y: -330, vx: 0, phase: 0, cx: 0, amp: 80, omega: 1.15, readyT: 0, emptyT: 0, bob: 0 };
+var gameTime = 0, realTime = 0, subCount = 0, physAcc = 0, timeScale = 1;
+var sway = 0, swayRaw = 0, shownH = 0, maxCount = 0, dropCount = 0, towerTopY = 0, towerTopYs = 0;
+var best = 0, bestCount = 0, newRecord = false, runBestAtStart = 0;
+var collapseT = 0, collapsePhase = 0, failX = 0, failY = 0, spawnDelay = 0;
+var wind = { forced: null, cur: 0, target: 0, phase: 0, t: 0, next: 9, hold: 2, leaf: 0 };
+var camBump = 0, shakeT = 0;
+var fxLand = [], fxEvents = [];     // event queues consumed by the renderer / audio layer
+var TONE0 = 0.035, TONE_K = 0.9, UP0 = 0.0002, UP_K = 0, UP_LIM = 0.03, MASS_K = 0.5, DAMP_REL = 4.5, BASE_UP = 0.0002, GH_C = 0.5, GH_BREAK = 3;
+var TONE_P = 2, PAN_SOFT = 0.35;
+var FALL_TONE = 0.02, FALL_ARM = 0.004, FALL_UP = 0.012;
+var GRAB_C = 0.0012, GRAB_BREAK = 16;
+var HOLD_C = 0.0006, HOLD_K = 0.6, HOLD_BREAK = 6, HOLD_P = 3;
+var STORE_KEY = 'dieluohan_xpbd_best_v1';
+function loadBest() {
+  try {
+    var s = window.localStorage.getItem(STORE_KEY);
+    if (s) { var o = JSON.parse(s); if (o && isFinite(o.h)) { best = +o.h || 0; bestCount = +o.n || 0; } }
+  } catch (e) {}
+}
+function saveBest() {
+  try { window.localStorage.setItem(STORE_KEY, JSON.stringify({ h: best, n: bestCount })); } catch (e) {}
+}
+function emit(type, a, b, c, d) { if (fxEvents.length < 200) fxEvents.push({ type: type, a: a, b: b, c: c, d: d }); }
+
+function setState(r, st) {
+  r.state = st; r.faceT = 0;
+  if (st === 'carried') { r.tone = 0.008; r.armTone = 0; r.upK = 0.0007; r.upMax = 0.002; r.dampC0 = 1.6; r.dampC1 = 0; r.dampV0 = 1; r.windF = 0.25; r.face = 'nervous'; r.pivot = 2; r.dampRel = 30; }
+  else if (st === 'falling') { r.tone = FALL_TONE; r.armTone = FALL_ARM; r.upK = FALL_UP; r.upMax = 0.01; r.dampC0 = 0.05; r.dampC1 = 0; r.dampV0 = 1; r.windF = 1; r.face = 'terror'; r.pivot = 0; r.dampRel = 0; }
+  else if (st === 'landed') { r.dampC0 = 0.55; r.dampC1 = 24; r.dampV0 = 9; r.windF = 1; r.pivot = 1; r.dampRel = DAMP_REL; }
+  else if (st === 'limp') { r.tone = 0; r.armTone = 0; r.upK = 0; r.dampC0 = 0.22; r.dampC1 = 16; r.dampV0 = 8; r.windF = 0.12; r.armOn[0] = r.armOn[1] = true; r.pivot = 0; r.dampRel = 0; }
+}
+function pickKind() {
+  if (dropCount < 2) return 'normal';
+  var u = rnd();
+  return u < 0.11 ? 'fat' : u < 0.22 ? 'long' : 'normal';
+}
+function hangLen(r) { return r.au + r.af + r.shoulderH - r.rt; }       // hands -> soles when dangling
+function carrierTargetY(r) { return towerTopY - 78 - (r ? hangLen(r) : 125); }
+function spawnCarried() {
+  var r = newRag(pickKind()); if (!r) return;
+  dropCount++;
+  setState(r, 'carried');
+  r.armA1[0] = r.armA1[1] = 3.05; r.armA2[0] = r.armA2[1] = 3.1; poseArms(r);
+  var ty = carrierTargetY(r);
+  if (stack.length === 0 && gstate !== 'playing') carrier.y = ty;
+  // hang it from the carrier: local origin (feet) below the hands
+  // hang it under the carrier with straight arms reaching up to the two grip points
+  var L = r.au + r.af, dxs = r.sw - 4.5, drop = Math.sqrt(Math.max(1, L * L - dxs * dxs)) * 0.985, b = r.base, sd, sh, k;
+  placeRag(r, carrier.x, carrier.y + drop - r.ry[P_SL]);
+  for (sd = 0; sd < 2; sd++) {
+    sh = b + (sd ? P_SR : P_SL); k = r.au / L;
+    var gxp = carrier.x + (sd ? 4.5 : -4.5), el = b + (sd ? P_ER : P_EL), ha = b + (sd ? P_AR : P_AL);
+    px[el] = px[sh] + (gxp - px[sh]) * k; py[el] = py[sh] + (carrier.y - py[sh]) * k; px[ha] = gxp; py[ha] = carrier.y;
+    ox[el] = px[el]; oy[el] = py[el]; ox[ha] = px[ha]; oy[ha] = py[ha];
+  }
+  pw[r.base + P_AL] = 0; pw[r.base + P_AR] = 0;
+  r.armOn[0] = r.armOn[1] = false;
+  for (var i = 0; i < NP; i++) { vx[r.base + i] = carrier.vx; }
+  carried = r; carrier.readyT = 0.28;
+  emit('spawn', r);
+}
+function pinCarried() {         // runs every substep (prePhysics)
+  var c = carrier, dt = HS;
+  c.phase += c.omega * dt;
+  var nx = c.cx + c.amp * Math.sin(c.phase);
+  c.vx = (nx - c.x) / dt; c.x = nx;
+  if (carried) {
+    var b = carried.base;
+    px[b + P_AL] = c.x - 4.5; py[b + P_AL] = c.y; px[b + P_AR] = c.x + 4.5; py[b + P_AR] = c.y;
+  }
+}
+prePhysics = pinCarried;
+function releaseCarried() {
+  var r = carried; if (!r) return false;
+  var b = r.base, i;
+  pw[b + P_AL] = 1 / (BASEM[P_AL] * r.massMul); pw[b + P_AR] = 1 / (BASEM[P_AR] * r.massMul);
+  var rvx = r.cvx * 0.2;                                   // keep only a little of the swing, no spin
+  for (i = 0; i < NP; i++) { vx[b + i] = rvx; vy[b + i] = 0; }
+  r.armOn[0] = r.armOn[1] = true;
+  r.armA1[0] = r.armA1[1] = 2.5; r.armA2[0] = r.armA2[1] = 2.9; poseArms(r);
+  setState(r, 'falling');
+  r.touch = 0; r.gc = 0; r.age = 0; r.isBase = stack.length === 0;
+  faller = r; carried = null; carrier.emptyT = 0;
+  emit('release', r);
+  return true;
+}
+function doDrop() {
+  if (gstate !== 'playing' || !carried || carrier.readyT > 0) return false;
+  return releaseCarried();
+}
+function fallTime(r) {
+  var soles = py[r.base + P_FL] + r.rl, sup = stack.length ? supportY() : 0;
+  var d = sup - soles; if (d < 1) d = 1;
+  return Math.sqrt(2 * d / GRAV);
+}
+function topRag() { return stack.length ? stack[stack.length - 1] : null; }
+function supportY() { var t = topRag(); return t ? (py[t.base + P_SL] + py[t.base + P_SR]) * 0.5 - t.rt : 0; }
+function supportX() { var t = topRag(); return t ? (px[t.base + P_SL] + px[t.base + P_SR]) * 0.5 : carrier.cx; }
+function aimInfo() {
+  var r = carried, can = gstate === 'playing' && !!r && carrier.readyT <= 0;
+  if (!r) return { canDrop: false, x: carrier.x, targetX: supportX() };
+  var t = fallTime(r), drift = 0.2 * r.cvx * t + 0.5 * windNow * WIND_ACC * t * t;
+  return { canDrop: can, x: r.comx, targetX: supportX() - drift };
+}
+// ---------- per-tick ragdoll upkeep ----------
+function updateTone() {
+  var n = stack.length, i, r, above, pan, extra = 0;
+  for (i = 0; i < rags.length; i++) if (rags[i].state === 'landed' && !rags[i].stacked) extra++;
+  for (i = 0; i < rags.length; i++) {
+    r = rags[i];
+    if (r.state !== 'landed') continue;
+    above = r.stacked ? (n - 1 - r.stackIdx + extra) : 0;
+    pan = clamp(sway * 1.1, 0, 1);
+    var soft = gstate === 'collapsing' ? 0.25 : 1;
+    r.tone = Math.min(0.5, TONE0 * Math.pow(1 + TONE_K * above, TONE_P)) * (1 - PAN_SOFT * pan) * soft;
+    r.armTone = 0.003 * soft;
+    r.above = above;
+    r.upK = gstate === 'collapsing' ? 0 : (r === baseRag || r.isBase ? BASE_UP : Math.min(0.03, UP0 * (1 + UP_K * above)) * (1 - PAN_SOFT * pan));
+    r.upMax = r.upK * UP_LIM;
+    setMassScale(r, 1 + MASS_K * above);
+  }
+}
+function landFx(r, other, speed) {
+  var k = clamp(speed / 520, 0.15, 1.3);
+  r.crouchV += 3.2 * k; r.squashV += 5 * k;
+  if (other) { other.crouchV += 1.9 * k; other.squashV += 3.5 * k; var o2 = other.feetOn; if (o2) o2.crouchV += 0.8 * k; }
+  camBump += 5 * k;
+  emit('land', r, other, speed);
+}
+function stepCrouch(r, dt) {
+  if (r.crouch === 0 && r.crouchV === 0) return;
+  r.crouchV += (-190 * r.crouch - 15 * r.crouchV) * dt; r.crouch += r.crouchV * dt;
+  if (r.crouch > 0.55) { r.crouch = 0.55; if (r.crouchV > 0) r.crouchV = 0; }
+  if (r.crouch < -0.04) { r.crouch = -0.04; if (r.crouchV < 0) r.crouchV = 0; }
+  if (Math.abs(r.crouch) < 0.0015 && Math.abs(r.crouchV) < 0.02) { r.crouch = 0; r.crouchV = 0; }
+  buildPose(r, r.crouch);
+}
+function headTop(r) { return py[r.base + P_H] - r.rh; }
+function becomeStacked(r) {
+  r.stacked = true; r.stackIdx = stack.length; stack.push(r);
+  r.settleHeadY = headTop(r); r.reliefT = 1.6; r.face = 'relief';
+  if (stack.length === 1) baseRag = r;
+  var top = 0, i;
+  for (i = 0; i < stack.length; i++) top = Math.min(top, headTop(stack[i]));
+  towerTopY = top;
+  var h = -top;
+  if (h > shownH) shownH = h;
+  if (stack.length > maxCount) maxCount = stack.length;
+  emit('stacked', r, h / UPM);
+  if (faller === r) { faller = null; spawnDelay = 0.3; }
+}
+function fail(reason, x, y) {
+  if (gstate !== 'playing') return;
+  gstate = 'collapsing'; collapseT = 0; collapsePhase = 0; failX = x; failY = y;
+  for (var i = 0; i < rags.length; i++) { rags[i].face = 'scream'; rags[i].faceT = 0; }
+  emit('collapse', reason);
+}
+var G_FOOTBITS = (1 << P_FL) | (1 << P_FR) | (1 << P_KL) | (1 << P_KR) | (1 << P_AL) | (1 << P_AR) | (1 << P_EL) | (1 << P_ER);
+function checkRag(r, dt) {
+  var b = r.base, i, y, lowest = -1e9, lx = 0;
+  for (i = 0; i < NP; i++) { y = py[b + i]; if (y > lowest) { lowest = y; lx = px[b + i]; } }
+  if (lowest > 34) { fail('off', lx, lowest); return; }                    // fell off the platform
+  if (r.gc) {
+    if (r !== baseRag && !r.isBase) { fail('ground', r.comx, 0); return; }  // missed the tower / fell to the ground
+    if (r.gc & ~G_FOOTBITS) { fail('base', r.comx, 0); return; }             // the base ragdoll fell over
+  }
+  if (r.stacked) {
+    var ht = headTop(r);
+    if (ht < r.settleHeadY) r.settleHeadY += (ht - r.settleHeadY) * 0.02;
+    if (ht - r.settleHeadY > 0.42 * r.height) { fail('drop', r.comx, r.comy); return; }
+    if (Math.abs(r.tilt) > 0.95) { r.tiltT += dt; if (r.tiltT > 0.25) { fail('tilt', r.comx, r.comy); return; } } else r.tiltT = 0;
+  }
+}
+function supported(r) {
+  if (r.touch > 0) return true;
+  if (r.grab[0] || r.grab[1]) return true;
+  return false;
+}
+function logicTick() {
+  var dt = 1 / 60, i, r;
+  gameTime += dt;
+  if (carrier.readyT > 0) carrier.readyT -= dt;
+  // carrier height / swing parameters follow the tower
+  var n = stack.length;
+  carrier.amp += ((n === 0 ? 80 : 120) - carrier.amp) * 0.04;
+  var om = 1.15 + 0.105 * n, omMax = 322 / carrier.amp;
+  carrier.omega += ((om > omMax ? omMax : om) - carrier.omega) * 0.05;
+  if (baseRag) carrier.cx += (clamp(baseRag.comx, -60, 60) - carrier.cx) * 0.02;
+  var cy = carrierTargetY(carried);
+  carrier.y += (cy - carrier.y) * 0.07;
+  if (gstate === 'playing' || gstate === 'ready') {
+    if (!carried && !faller) { spawnDelay -= dt; if (spawnDelay <= 0 && gstate === 'playing') spawnCarried(); }
+  }
+  for (i = 0; i < rags.length; i++) {
+    r = rags[i]; r.age += dt;
+    if (r.state === 'falling' && r.touch > 0) {                // first contact
+      setState(r, 'landed'); r.landT = gameTime; r.calmT = 0; r.face = 'land';
+      landFx(r, r.hitOther, r.hitSpeed);
+      r.armA1[0] = r.armA1[1] = 1.05; r.armA2[0] = r.armA2[1] = 1.45; poseArms(r);
+    }
+    stepCrouch(r, dt);
+    if (r.grabCool[0] > 0) r.grabCool[0] -= dt;
+    if (r.grabCool[1] > 0) r.grabCool[1] -= dt;
+  }
+  updateTone();
+  animArms(dt);
+  if (gstate === 'playing') {
+    for (i = 0; i < rags.length && gstate === 'playing'; i++) {
+      r = rags[i];
+      if (r.state === 'carried') continue;
+      checkRag(r, dt);
+      if (gstate !== 'playing') break;
+      if (r.state === 'landed' && !r.stacked) {
+        var since = gameTime - r.landT;
+        if (since > 0.3 && r.maxSpeed < 30 && supported(r)) r.calmT += dt; else r.calmT = 0;
+        if (r.calmT > 0.3 || (since > 5 && r.maxSpeed < 90 && supported(r)) || since > 9) becomeStacked(r);
+      }
+    }
+    if (faller && faller.state === 'falling' && faller.age > 6) fail('lost', faller.comx, faller.comy);
+  }
+  if (gstate === 'playing' || gstate === 'collapsing') { updateGrabs(dt); updateHolds(dt); updateGroundHold(dt); updateSway(dt); }
+  else { updateGrabs(dt); sway *= 0.97; }
+  updateWind(dt);
+  for (i = 0; i < rags.length; i++) rags[i].gc = 0;
+  // drop bodies that fell far below the platform
+  for (i = rags.length - 1; i >= 0; i--) {
+    r = rags[i];
+    if (r.state !== 'carried' && r.comy > 900) { if (faller === r) faller = null; var si = stack.indexOf(r); if (si >= 0 && gstate !== 'playing') stack.splice(si, 1); removeRag(r); }
+  }
+}
+// ---------- grabbing ----------
+var grabTick = 0;
+function segPoint(x, y, a, b) {       // closest point on segment a-b (global particle ids) -> cS = t, returns distance
+  var ax = px[a], ay = py[a], dx = px[b] - ax, dy = py[b] - ay, l2 = dx * dx + dy * dy, t = 0;
+  if (l2 > 1e-9) { t = ((x - ax) * dx + (y - ay) * dy) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t; }
+  cS = t;
+  return Math.hypot(ax + dx * t - x, ay + dy * t - y);
+}
+function breakGrab(g, quiet) {
+  var x = px[g.hi], y = py[g.hi];
+  g.ra.grabCool[g.side] = 2.5;
+  dropGrab(g);
+  if (!quiet) emit('pop', x, y);
+}
+function findFeetOn() {
+  var i, j, A, B, f, k, d, sl, sr;
+  for (i = 0; i < rags.length; i++) rags[i].feetOn = null;
+  for (i = 0; i < rags.length; i++) {
+    B = rags[i]; if (B.state !== 'landed') continue;
+    for (j = 0; j < rags.length && !B.feetOn; j++) {
+      A = rags[j]; if (A === B || A.state !== 'landed') continue;
+      if (B.maxx < A.minx || A.maxx < B.minx || B.maxy < A.miny || A.maxy < B.miny) continue;
+      sl = A.base + P_SL; sr = A.base + P_SR;
+      for (f = 0; f < 2; f++) {
+        k = B.base + (f ? P_FR : P_FL);
+        if (py[k] > (py[sl] + py[sr]) * 0.5 + 2) continue;
+        d = segPoint(px[k], py[k], sl, sr);
+        if (d < A.rt + B.rl + 9) { B.feetOn = A; break; }
+      }
+    }
+  }
+}
+function tryGrab(A, s) {
+  var hand = A.base + (s ? P_AR : P_AL), sh = A.base + (s ? P_SR : P_SL), reach = (A.au + A.af) * 0.9;
+  var hx = px[hand], hy = py[hand], i, B, k, d, t, ax, ay, bestD = 1e9, bB = null, b1 = 0, b2 = 0, bt = 0, sp, q1, q2;
+  // 1) someone stands on my shoulders: hold the ankle on my side
+  for (i = 0; i < rags.length; i++) {
+    B = rags[i]; if (B.feetOn !== A) continue;
+    q1 = B.base + (s ? P_KR : P_KL); q2 = B.base + (s ? P_FR : P_FL); t = 0.7;
+    ax = px[q1] * (1 - t) + px[q2] * t; ay = py[q1] * (1 - t) + py[q2] * t;
+    d = Math.hypot(ax - px[sh], ay - py[sh]);
+    if (d < reach && d < bestD) { bestD = d; bB = B; b1 = q1; b2 = q2; bt = t; }
+  }
+  // 2) newcomers and danglers grab whatever is next to the hand
+  if (!bB && (gameTime - A.landT < 1.5 || (!A.feetOn && A !== baseRag && !A.isBase))) {
+    for (i = 0; i < rags.length; i++) {
+      B = rags[i]; if (B === A || B.state !== 'landed') continue;
+      if (hx < B.minx - 14 || hx > B.maxx + 14 || hy < B.miny - 14 || hy > B.maxy + 14) continue;
+      for (k = 3; k < NSH; k++) {
+        sp = B.sbase + k; q1 = s1[sp]; q2 = s2[sp];
+        d = segPoint(hx, hy, q1, q2) - srad[sp]; t = cS;
+        if (d > 13 || d >= bestD) continue;
+        ax = px[q1] * (1 - t) + px[q2] * t; ay = py[q1] * (1 - t) + py[q2] * t;
+        if (Math.hypot(ax - px[sh], ay - py[sh]) > reach) continue;
+        bestD = d; bB = B; b1 = q1; b2 = q2; bt = t;
+      }
+    }
+  }
+  if (!bB) return;
+  addGrab(A, s, bB, b1, b2, bt);
+  A.grabCool[s] = 0.5;
+  emit('grab', A, px[b1] * (1 - bt) + px[b2] * bt, py[b1] * (1 - bt) + py[b2] * bt);
+}
+function updateGrabs(dt) {
+  var i, g, r, s;
+  for (i = grabs.length - 1; i >= 0; i--) {
+    g = grabs[i]; g.age += dt;
+    if (g.rest > 0) { g.rest -= 170 * dt; if (g.rest < 0) g.rest = 0; }
+    if (g.ra.dead || g.rb.dead || g.ra.state === 'limp') { dropGrab(g); continue; }
+    g.comp = GRAB_C / g.ra.massScale;                 // same springiness for heavy (deep) ragdolls
+    if (g.rest === 0) g.held += dt;
+    if ((g.held > 0.4 && g.stretch > GRAB_BREAK) || g.stretch - g.rest > 34) { g.over += dt; if (g.over > 0.07) { breakGrab(g, false); continue; } } else g.over = 0;
+  }
+  if (gstate === 'collapsing' && collapsePhase >= 1) return;
+  if (gstate === 'over') return;
+  grabTick++;
+  if (grabTick % 5 === 0) findFeetOn();
+  for (i = 0; i < rags.length; i++) {
+    r = rags[i];
+    if (r.state !== 'landed' || (grabTick + r.slot) % 5 !== 0) continue;
+    for (s = 0; s < 2; s++) if (!r.grab[s] && r.grabCool[s] <= 0) tryGrab(r, s);
+  }
+}
+// ---------- foot-holds: planted feet stick softly to the shoulders they stand on ----------
+function updateHolds(dt) {
+  var i, g, B, A, f, k, sl, sr, ax, ay, dx, dy, l2, t, d, cand = [0, 0], cd = [0, 0], ok;
+  for (i = holds.length - 1; i >= 0; i--) {
+    g = holds[i]; g.age += dt;
+    if (g.ra.dead || g.rb.dead || g.ra.state !== 'landed' || g.rb.state !== 'landed') { dropHold(g); continue; }
+    g.comp = HOLD_C / Math.pow(1 + HOLD_K * g.ra.above, HOLD_P);
+    if (g.stretch - g.rest > HOLD_BREAK) { g.over += dt; if (g.over > 0.04) { g.ra.holdCool = 0.4; emit('peel', px[g.hi], py[g.hi]); dropHold(g); continue; } } else g.over = 0;
+  }
+  if (gstate !== 'playing' || grabTick % 3 !== 0) return;
+  for (i = 0; i < rags.length; i++) {
+    B = rags[i]; if (B.holdCool > 0) B.holdCool -= dt * 3;
+    A = B.feetOn;
+    if (B.state !== 'landed' || !A || B.holdCool > 0 || (B.hold[0] && B.hold[1])) continue;
+    if (B.footL <= 0 || B.footR <= 0) continue;                 // needs a proper two-footed stance
+    if (Math.abs(B.cvx - A.cvx) + Math.abs(B.cvy - A.cvy) > 140) continue;
+    sl = A.base + P_SL; sr = A.base + P_SR; ok = true;
+    ax = px[sl]; ay = py[sl]; dx = px[sr] - ax; dy = py[sr] - ay; l2 = dx * dx + dy * dy; if (l2 < 1) continue;
+    for (f = 0; f < 2; f++) {
+      k = B.base + (f ? P_FR : P_FL);
+      t = ((px[k] - ax) * dx + (py[k] - ay) * dy) / l2;
+      if (t < -0.32 || t > 1.32) { ok = false; break; }
+      d = Math.hypot(ax + dx * t - px[k], ay + dy * t - py[k]);
+      if (d > A.rt + B.rl + 3) { ok = false; break; }
+      cand[f] = t; cd[f] = d;
+    }
+    if (!ok) continue;
+    for (f = 0; f < 2; f++) if (!B.hold[f]) addHold(B, f, A, sl, sr, cand[f], A.rt + B.rl - 0.25);
+  }
+}
+function updateGroundHold(dt) {
+  var g = gHold, r = baseRag, i, M = 0, f;
+  if (g.cool > 0) g.cool -= dt;
+  if (!r || r.dead || r.state !== 'landed' || gstate !== 'playing') { g.on = false; g.rag = null; return; }
+  if (!g.on) {
+    if (g.cool <= 0 && r.footL > 0 && r.footR > 0 && r.maxSpeed < 60 && (r.gc & (1 << P_FL)) && (r.gc & (1 << P_FR))) {
+      g.on = true; g.rag = r; g.over = 0;
+      for (f = 0; f < 2; f++) { g.ax[f] = px[r.base + (f ? P_FR : P_FL)]; g.ay[f] = -r.rl; }
+    }
+    return;
+  }
+  for (i = 0; i < rags.length; i++) if (rags[i].state === 'landed') M += 9.9 * rags[i].massMul * rags[i].massScale;
+  g.comp = GH_BREAK / (GH_C * M * GRAV);            // strength grows with the weight it carries
+  if (g.stretch[0] > GH_BREAK || g.stretch[1] > GH_BREAK) { g.over += dt; if (g.over > 0.05) { g.on = false; g.cool = 1.2; emit('peel', px[r.base + P_FL], 0); } } else g.over = 0;
+}
+// ---------- sway / panic level ----------
+function updateSway(dt) {
+  var n = stack.length, i, r, a, v, maxTilt = 0, maxV = 0, lean = 0;
+  if (!n) { swayRaw = 0; sway *= 0.95; return; }
+  for (i = 0; i < n; i++) {
+    r = stack[i]; a = Math.abs(r.tilt); if (a > maxTilt) maxTilt = a;
+    if (i >= (n - 1) * 0.5) { v = Math.abs(r.cvx); if (v > maxV) maxV = v; }
+  }
+  if (n > 1) {
+    var top = stack[n - 1], hgt = baseRag.comy - top.comy;
+    if (hgt > 30) lean = Math.abs(Math.atan2(top.comx - baseRag.comx, hgt));
+  }
+  var raw = Math.max(maxTilt / 0.23, maxV / 80, lean / 0.115);
+  if (gstate === 'collapsing') raw = 1;
+  swayRaw = clamp((raw - 0.07) / 0.93, 0, 1);
+  sway += (swayRaw - sway) * (swayRaw > sway ? 0.22 : 0.03);
+}
+// ---------- wind ----------
+function updateWind(dt) {
+  var w = wind;
+  if (w.forced !== null) { w.cur += (w.forced - w.cur) * 0.1; if (Math.abs(w.forced - w.cur) < 1e-4) w.cur = w.forced; w.leaf = w.forced; w.phase = 0; w.target = 0; windNow = w.cur; return; }
+  if (gstate !== 'playing') { w.target = 0; w.phase = 0; w.leaf *= 0.96; }
+  else if (w.phase === 0) {
+    w.target = 0; w.leaf *= 0.9;
+    if (stack.length >= 4) {
+      w.next -= dt;
+      if (w.next <= 0) { w.phase = 1; w.t = 0; w.str = (rnd() < 0.5 ? -1 : 1) * rr(0.85, 1.15) * Math.min(0.9, 5.9 / stack.length); w.hold = rr(1.8, 3.2); emit('gust', w.str); }
+    }
+  } else {
+    w.t += dt;
+    if (w.phase === 1) { w.leaf = w.str * Math.min(1, w.t / 0.45); if (w.t > 1.0) { w.phase = 2; w.t = 0; } }
+    else if (w.phase === 2) { w.target = w.str * Math.min(1, w.t / 0.7); w.leaf = w.str; if (w.t > 0.7 + w.hold) { w.phase = 3; w.t = 0; } }
+    else { w.target = w.str * Math.max(0, 1 - w.t / 0.9); w.leaf = w.target; if (w.t > 0.9) { w.phase = 0; w.target = 0; w.next = rr(6, 11) * Math.max(0.55, 1 - 0.02 * stack.length); } }
+  }
+  w.cur += (w.target - w.cur) * 0.15; if (Math.abs(w.cur) < 1e-4 && w.target === 0) w.cur = 0;
+  windNow = w.cur;
+}
+// ---------- game-over sequence ----------
+function goLimp() {
+  var i, r, k, cx = failX, dir, kx, ky, lean = 0;
+  if (stack.length > 1) lean = stack[stack.length - 1].comx - stack[0].comx;
+  for (i = grabs.length - 1; i >= 0; i--) dropGrab(grabs[i]);
+  for (i = holds.length - 1; i >= 0; i--) dropHold(holds[i]);
+  gHold.on = false;
+  for (i = 0; i < rags.length; i++) {
+    r = rags[i];
+    if (r.state === 'carried') { pw[r.base + P_AL] = 1 / (BASEM[P_AL] * r.massMul); pw[r.base + P_AR] = 1 / (BASEM[P_AR] * r.massMul); if (carried === r) carried = null; }
+    setState(r, 'limp'); setMassScale(r, 1); r.face = 'scream';
+    dir = (Math.abs(lean) > 12 && rnd() < 0.7) ? (lean > 0 ? 1 : -1) : (rnd() < 0.5 ? -1 : 1);
+    kx = dir * rr(30, 150); ky = -rr(10, 140);
+    for (k = 0; k < NP; k++) { vx[r.base + k] = vx[r.base + k] * 0.42 + kx * rr(0.7, 1.3); vy[r.base + k] += ky * rr(0.5, 1.2); }
+  }
+  emit('scatter');
+}
+function finishRun() {
+  gstate = 'over';
+  var h = Math.round(shownH / UPM * 10) / 10;
+  newRecord = h > best + 1e-9 && h > 0;
+  if (newRecord) { best = h; bestCount = maxCount; saveBest(); }
+  emit('over', h, maxCount, newRecord);
+}
+function updateCollapse(dt) {
+  collapseT += dt;
+  if (collapsePhase === 0) {
+    timeScale += (0.2 - timeScale) * Math.min(1, dt * 20);
+    if (collapseT >= 1.0) { collapsePhase = 1; goLimp(); }
+  } else if (collapsePhase === 1) {
+    timeScale += (1 - timeScale) * Math.min(1, dt * 6);
+    if (collapseT >= 3.9) { collapsePhase = 2; timeScale = 1; finishRun(); }
+  }
+}
+function resetWorld(state) {
+  clearWorld();
+  stack.length = 0; carried = null; faller = null; baseRag = null;
+  gstate = state; timeScale = 1; physAcc = 0; sway = 0; swayRaw = 0; shownH = 0; maxCount = 0; dropCount = 0;
+  towerTopY = 0; collapseT = 0; collapsePhase = 0; spawnDelay = 0; newRecord = false; gameTime = 0; subCount = 0; grabTick = 0;
+  camBump = 0; fxEvents.length = 0; gHold.on = false; gHold.rag = null; gHold.cool = 0;
+  wind.cur = 0; wind.target = 0; wind.phase = 0; wind.t = 0; wind.next = 8; wind.leaf = 0;
+  if (seedParam !== null) rngState = ((seedParam * 2654435761 + 97) >>> 0) || 1;
+  carrier.cx = 0; carrier.amp = 80; carrier.omega = 1.15; carrier.phase = -1.3; carrier.x = carrier.amp * Math.sin(carrier.phase); carrier.vx = 0;
+  carrier.y = carrierTargetY(null);
+  spawnCarried();
+  emit('reset');
+}
+function startGame() { resetWorld('playing'); emit('start'); }
+// ---------- main fixed-step update (shared by the real-time loop and __game.advance) ----------
+var updateFx = null;            // visual layer hook, set by the renderer
+function update(dt) {
+  realTime += dt;
+  if (gstate === 'collapsing') updateCollapse(dt); else timeScale = 1;
+  physAcc += dt * timeScale;
+  var guard = 0;
+  while (physAcc >= HS - 1e-9 && guard < 600) {
+    if (subCount % SUB === 0) buildPairs();
+    substep(); subCount++;
+    if (subCount % SUB === 0) logicTick();
+    physAcc -= HS; guard++;
+  }
+  if (guard >= 600) physAcc = 0;
+  if (updateFx) updateFx(dt);
+}
+function computeStats() {
+  var i, k, r, ms = 0, mp = 0, nan = false, v;
+  for (i = 0; i < stack.length; i++) { r = stack[i]; if (!r.dead && r.maxSpeed > ms) ms = r.maxSpeed; }
+  buildPairs();
+  for (i = 0; i < nPairs; i++) { if (pairGeom(pairA[i], pairB[i]) && cgPen > mp) mp = cgPen; }
+  for (i = 0; i < rags.length; i++) {
+    r = rags[i];
+    for (k = r.base; k < r.base + NP; k++) {
+      if (!isFinite(px[k]) || !isFinite(py[k]) || !isFinite(vx[k]) || !isFinite(vy[k])) nan = true;
+      if (r.state !== 'carried' && px[k] >= -GROUND_HALF && px[k] <= GROUND_HALF) { v = py[k] + pr[k]; if (v > mp && py[k] < pr[k]) mp = v; }
+    }
+  }
+  return {
+    count: gstate === 'playing' || gstate === 'ready' ? stack.length : maxCount, heightM: Math.round(shownH / UPM * 10) / 10, bestM: best, sway: sway,
+    maxSettledSpeed: ms, maxPenetration: mp, wind: windNow, hasNaN: nan
+  };
+}
+// =====================================================================
+//  audio: everything is synthesized with Web Audio (no files)
+// =====================================================================
+var AC = null, aMaster = null, aNoise = null, aWindGain = null, aWindFilt = null, aVoices = 0, muted = muteParam, aOK = true;
+function audioInit() {
+  if (AC || !aOK) return;
+  try {
+    var Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) { aOK = false; return; }
+    AC = new Ctor();
+    var comp = AC.createDynamicsCompressor();
+    comp.threshold.value = -16; comp.knee.value = 18; comp.ratio.value = 6; comp.attack.value = 0.004; comp.release.value = 0.2;
+    aMaster = AC.createGain(); aMaster.gain.value = muted ? 0 : 0.85;
+    aMaster.connect(comp); comp.connect(AC.destination);
+    var len = AC.sampleRate | 0, buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0), i, s = 22222;
+    for (i = 0; i < len; i++) { s = (s * 1664525 + 1013904223) >>> 0; d[i] = s / 2147483648 - 1; }
+    aNoise = buf;
+    var src = AC.createBufferSource(); src.buffer = buf; src.loop = true;
+    aWindFilt = AC.createBiquadFilter(); aWindFilt.type = 'bandpass'; aWindFilt.frequency.value = 380; aWindFilt.Q.value = 0.7;
+    aWindGain = AC.createGain(); aWindGain.gain.value = 0;
+    src.connect(aWindFilt); aWindFilt.connect(aWindGain); aWindGain.connect(aMaster); src.start();
+  } catch (e) { AC = null; aOK = false; }
+}
+function audioResume() {
+  audioInit();
+  try { if (AC && AC.state === 'suspended') { var p = AC.resume(); if (p && p.catch) p.catch(function () {}); } } catch (e) {}
+}
+function setMuted(m) {
+  muted = m;
+  try { if (AC && aMaster) aMaster.gain.setTargetAtTime(m ? 0 : 0.85, AC.currentTime, 0.03); } catch (e) {}
+}
+function aReady() { return !!AC && !muted && AC.state === 'running' && aVoices < 16; }
+function aEnd(node, nodes) {
+  aVoices++;
+  node.onended = function () { aVoices--; try { for (var i = 0; i < nodes.length; i++) nodes[i].disconnect(); } catch (e) {} };
+}
+function aEnv(g, t0, a, peak, dur) {
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t0 + a);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+}
+function aTone(type, f0, f1, dur, vol, delay) {
+  if (!aReady()) return;
+  try {
+    var t0 = AC.currentTime + (delay || 0), o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
+    aEnv(g, t0, 0.008, vol, dur); o.connect(g); g.connect(aMaster); o.start(t0); o.stop(t0 + dur + 0.03); aEnd(o, [o, g]);
+  } catch (e) {}
+}
+function aNoiseBurst(ftype, f0, f1, q, dur, vol, delay) {
+  if (!aReady()) return;
+  try {
+    var t0 = AC.currentTime + (delay || 0), s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+    s.buffer = aNoise; s.loop = true; f.type = ftype; f.Q.value = q;
+    f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t0 + dur);
+    aEnv(g, t0, 0.006, vol, dur); s.connect(f); f.connect(g); g.connect(aMaster);
+    s.start(t0, (t0 * 0.37) % 0.8); s.stop(t0 + dur + 0.03); aEnd(s, [s, f, g]);
+  } catch (e) {}
+}
+// vowel-ish voice: a buzzy source through two gliding formant band-passes
+function aVoice(delay, dur, p0, p1, p2, fa1, fa2, fb1, fb2, vol, vib) {
+  if (!aReady()) return;
+  try {
+    var t0 = AC.currentTime + (delay || 0), o = AC.createOscillator(), g = AC.createGain();
+    var b1 = AC.createBiquadFilter(), b2 = AC.createBiquadFilter(), g2 = AC.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(p0, t0); o.frequency.exponentialRampToValueAtTime(p1, t0 + dur * 0.35); o.frequency.exponentialRampToValueAtTime(p2, t0 + dur);
+    b1.type = 'bandpass'; b1.Q.value = 5; b1.frequency.setValueAtTime(fa1, t0); b1.frequency.exponentialRampToValueAtTime(fb1, t0 + dur);
+    b2.type = 'bandpass'; b2.Q.value = 7; b2.frequency.setValueAtTime(fa2, t0); b2.frequency.exponentialRampToValueAtTime(fb2, t0 + dur);
+    g2.gain.value = 0.6;
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.setValueAtTime(vol, t0 + dur * 0.55); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(b1); o.connect(b2); b1.connect(g); b2.connect(g2); g2.connect(g); g.connect(aMaster);
+    var nodes = [o, b1, b2, g2, g];
+    if (vib) {
+      var l = AC.createOscillator(), lg = AC.createGain();
+      l.frequency.value = vib; lg.gain.value = p1 * 0.06; l.connect(lg); lg.connect(o.frequency); l.start(t0); l.stop(t0 + dur + 0.03); nodes.push(l, lg);
+    }
+    o.start(t0); o.stop(t0 + dur + 0.03); aEnd(o, nodes);
+  } catch (e) {}
+}
+// ---- the actual sound effects ----
+function sfxThump(k, delay) {              // "噗": pitch-dropping sine thump + muffled noise puff
+  k = clamp(k, 0.15, 1.3);
+  aTone('sine', 150 + 50 * k, 42, 0.2, 0.55 * k, delay);
+  aNoiseBurst('lowpass', 900, 180, 0.7, 0.13, 0.4 * k, delay);
+}
+function sfxHey(v, delay) {                // "嘿": breathy onset + short "ei" vowel
+  var p = 250 * v;
+  aNoiseBurst('bandpass', 1800, 1200, 1.2, 0.05, 0.1, delay);
+  aVoice((delay || 0) + 0.025, 0.15, p * 0.94, p * 1.12, p * 1.0, 620, 1750, 420, 2250, 0.5, 0);
+}
+function sfxSigh(v) { aNoiseBurst('bandpass', 1500, 520, 1.6, 0.42, 0.16, 0); aVoice(0.02, 0.3, 300 * v, 250 * v, 190 * v, 500, 1000, 420, 880, 0.08, 0); }
+function sfxWhimper(v, lvl) { var p = 520 * v * (1 + 0.25 * lvl); aVoice(0, 0.2 + 0.1 * frnd(), p, p * 1.12, p * 0.9, 380, 2300, 330, 2500, 0.07 + 0.1 * lvl, 11); }
+function sfxScream(v, delay) {
+  var p = 430 * v * (0.85 + 0.4 * frnd()), dur = 0.38 + 0.5 * frnd(), up = frnd() < 0.5;
+  aVoice(delay, dur, p, p * (up ? 1.55 : 1.25), p * (up ? 0.8 : 0.55), 850, 1350, 720 + 300 * frnd(), 1150 + 500 * frnd(), 0.42, 7 + 9 * frnd());
+}
+function sfxPop() { aTone('sine', 880, 240, 0.07, 0.3, 0); aNoiseBurst('highpass', 2500, 1500, 0.8, 0.04, 0.12, 0); }
+function sfxClick() { aTone('triangle', 700, 520, 0.05, 0.25, 0); }
+function sfxWhoosh() { aNoiseBurst('bandpass', 500, 1700, 1.4, 0.22, 0.14, 0); }
+function sfxJingle() { var n = [523.25, 659.25, 783.99, 1046.5, 1318.5], i; for (i = 0; i < n.length; i++) { aTone('triangle', n[i], n[i], 0.28, 0.3, 0.1 * i); aTone('sine', n[i] * 2, n[i] * 2, 0.2, 0.08, 0.1 * i); } }
+function sfxStart() { aTone('triangle', 392, 392, 0.12, 0.25, 0); aTone('triangle', 587.3, 587.3, 0.2, 0.25, 0.1); }
+function audioWind(level) {
+  if (!AC || !aWindGain) return;
+  try {
+    var a = Math.min(1.6, Math.abs(level));
+    aWindGain.gain.setTargetAtTime(muted ? 0 : Math.min(0.3, 0.2 * a), AC.currentTime, 0.25);
+    aWindFilt.frequency.setTargetAtTime(330 + 330 * a, AC.currentTime, 0.3);
+  } catch (e) {}
+}
+// =====================================================================
+//  rendering: view, sky, ground, ruler, carrier
+// =====================================================================
+var cv = document.getElementById('c'), ctx = cv.getContext('2d');
+var VW = 360, VH = 640, DPR = 1, vScale = 1, camX = 0, camY = -300, camZoom = 1, camInit = false, safeT = 0, safeL = 0, safeB = 0;
+var INK = '#3b3148', FONT = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif';
+var skyH = 0;                 // smoothed tower height (m) that drives the sky colours
+var stars = [], clouds = [], shoot = { t: 9, x: 0, y: 0, life: 0 };
+(function () {
+  var i, s = 4711;
+  function h() { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }
+  for (i = 0; i < 90; i++) stars.push({ x: h(), y: h(), r: 0.6 + 1.5 * h() * h(), ph: h() * 6.28, sp: 0.6 + 2.2 * h() });
+  for (i = 0; i < 26; i++) clouds.push({ x: (h() * 2 - 1) * 520, y: -140 - i * 215 - h() * 120, w: 60 + h() * 70, par: 0.55 + 0.35 * h(), dr: 3 + 6 * h() });
+})();
+function readSafe() {
+  try {
+    var cs = getComputedStyle(document.documentElement);
+    safeT = parseFloat(cs.getPropertyValue('--sat')) || 0; safeL = parseFloat(cs.getPropertyValue('--sal')) || 0; safeB = parseFloat(cs.getPropertyValue('--sab')) || 0;
+  } catch (e) { safeT = safeL = safeB = 0; }
+}
+function resize() {
+  VW = Math.max(200, window.innerWidth || document.documentElement.clientWidth || 360);
+  VH = Math.max(200, window.innerHeight || document.documentElement.clientHeight || 640);
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  var w = Math.round(VW * DPR), h = Math.round(VH * DPR);
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  vScale = clamp(Math.min(VW / 430, VH / 700), 0.42, 1.7);
+  readSafe();
+}
+function groundMargin() { return Math.max(64, VH * 0.11) + safeB; }
+function camTargetY(sc) {
+  var topM = Math.max(74, VH * 0.1) + safeT + 46;
+  var a = carrier.y - 26 + (VH * 0.5 - topM) / sc, b = -(VH * 0.5 - groundMargin()) / sc;
+  return a < b ? a : b;
+}
+function updateCamera(dt) {
+  var zt = 1, ty, tx = 0, k = 1 - Math.pow(0.0025, dt);
+  if (gstate === 'collapsing' || gstate === 'over') {
+    var need = (shownH + 330) * vScale, fit = (VH - groundMargin() - 30) / Math.max(1, need);
+    zt = clamp(fit, 0.5, 0.84);
+    ty = -(VH * 0.5 - groundMargin()) / (vScale * zt);
+    var cy = failY - 80; if (cy < ty && fit < 0.5) ty = Math.max(cy, ty - 500);
+    tx = clamp(failX * 0.35, -80, 80);
+  } else { ty = camTargetY(vScale); if (baseRag) tx = clamp(baseRag.comx, -60, 60) * 0.6; }
+  if (!camInit) { camY = ty; camX = tx; camZoom = zt; camInit = true; }
+  camZoom += (zt - camZoom) * (1 - Math.pow(0.02, dt));
+  camY += (ty - camY) * k; camX += (tx - camX) * k;
+  camBump *= Math.pow(0.0008, dt); if (camBump < 0.02) camBump = 0;
+  var hm = Math.max(0, -towerTopY) / UPM;
+  skyH += (hm - skyH) * (1 - Math.pow(0.3, dt));
+}
+function w2sx(x) { return (x - camX) * vScale * camZoom + VW * 0.5; }
+function w2sy(y) { return (y - camY) * vScale * camZoom + VH * 0.5 + camBump; }
+function setWorld() {
+  var s = vScale * camZoom * DPR;
+  ctx.setTransform(s, 0, 0, s, (VW * 0.5 - camX * vScale * camZoom) * DPR, (VH * 0.5 - camY * vScale * camZoom + camBump) * DPR);
+}
+function setScreen() { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+function sstep(a, b, x) { x = clamp((x - a) / (b - a), 0, 1); return x * x * (3 - 2 * x); }
+function mix3(c1, c2, c3, t1, t2) {      // day -> dusk -> night
+  var r = c1[0] + (c2[0] - c1[0]) * t1, g = c1[1] + (c2[1] - c1[1]) * t1, b = c1[2] + (c2[2] - c1[2]) * t1;
+  r += (c3[0] - r) * t2; g += (c3[1] - g) * t2; b += (c3[2] - b) * t2;
+  return 'rgb(' + (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ')';
+}
+var SKY_TOP = [[84, 178, 240], [86, 74, 150], [8, 12, 44]], SKY_MID = [[150, 213, 250], [240, 130, 128], [26, 30, 84]], SKY_BOT = [[214, 242, 255], [255, 206, 140], [58, 52, 112]];
+var duskT = 0, nightT = 0;
+function drawSky() {
+  duskT = sstep(6.5, 12.5, skyH); nightT = sstep(13.5, 20, skyH);
+  var g = ctx.createLinearGradient(0, 0, 0, VH);
+  g.addColorStop(0, mix3(SKY_TOP[0], SKY_TOP[1], SKY_TOP[2], duskT, nightT));
+  g.addColorStop(0.55, mix3(SKY_MID[0], SKY_MID[1], SKY_MID[2], duskT, nightT));
+  g.addColorStop(1, mix3(SKY_BOT[0], SKY_BOT[1], SKY_BOT[2], duskT, nightT));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+  var i, s, a, x, y, sc = vScale * camZoom;
+  if (nightT > 0.02) {                                       // stars, moon, shooting star
+    ctx.fillStyle = '#fff';
+    for (i = 0; i < stars.length; i++) {
+      s = stars[i]; a = nightT * (0.45 + 0.55 * Math.sin(realTime * s.sp + s.ph));
+      if (a <= 0.03) continue;
+      ctx.globalAlpha = a; x = s.x * VW; y = (s.y * VH * 1.15 - camY * 0.04) % (VH * 1.15); if (y < 0) y += VH * 1.15;
+      ctx.beginPath(); ctx.arc(x, y, s.r, 0, 6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = nightT;
+    x = VW * 0.8; y = Math.max(70, VH * 0.2) + safeT;
+    ctx.fillStyle = '#fff6c9'; ctx.beginPath(); ctx.arc(x, y, 26, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = mix3(SKY_TOP[0], SKY_TOP[1], SKY_TOP[2], duskT, nightT); ctx.beginPath(); ctx.arc(x + 11, y - 6, 22, 0, 6.2832); ctx.fill();
+    if (shoot.life > 0) {
+      ctx.globalAlpha = nightT * Math.min(1, shoot.life * 3); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      x = shoot.x + (0.7 - shoot.life) * 260; y = shoot.y + (0.7 - shoot.life) * 120;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 46, y - 21); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // sun: sinks behind the horizon as the camera climbs
+  var sunA = 1 - nightT;
+  if (sunA > 0.02) {
+    x = VW * 0.78; y = w2sy(-470) * 0.35 + VH * 0.2 + skyH * 16 * sc;
+    ctx.globalAlpha = sunA * 0.25; ctx.fillStyle = duskT > 0.5 ? '#ffb38a' : '#fff7c2'; ctx.beginPath(); ctx.arc(x, y, 58, 0, 6.2832); ctx.fill();
+    ctx.globalAlpha = sunA; ctx.fillStyle = duskT > 0.5 ? '#ff9d6e' : '#ffe27a'; ctx.beginPath(); ctx.arc(x, y, 34, 0, 6.2832); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  // drifting clouds (parallax)
+  var cr = 255, cg2 = 255 - 40 * duskT - 90 * nightT, cb = 255 - 60 * duskT - 40 * nightT;
+  ctx.fillStyle = 'rgba(' + (cr - 120 * nightT | 0) + ',' + (cg2 | 0) + ',' + (cb | 0) + ',' + (0.85 - 0.45 * nightT) + ')';
+  for (i = 0; i < clouds.length; i++) {
+    s = clouds[i];
+    y = (s.y - camY) * sc * s.par + VH * 0.5; if (y < -80 || y > VH + 80) continue;
+    x = ((s.x + realTime * s.dr + 700) % 1400 - 700) * sc * s.par + VW * 0.5;
+    a = s.w * sc * 0.9;
+    ctx.beginPath(); ctx.arc(x - a * 0.5, y, a * 0.36, 0, 6.2832); ctx.arc(x, y - a * 0.2, a * 0.48, 0, 6.2832); ctx.arc(x + a * 0.52, y, a * 0.34, 0, 6.2832);
+    ctx.rect(x - a * 0.5, y - a * 0.02, a * 1.02, a * 0.36); ctx.fill();
+  }
+}
+function drawGround() {
+  var G = GROUND_HALF, sc = vScale * camZoom, hy = w2sy(0), i, x;
+  if (hy < -400) return;
+  setScreen();
+  // far hills (parallax)
+  var py2 = (40 - camY) * sc * 0.82 + VH * 0.5 + camBump;
+  ctx.fillStyle = mix3([168, 222, 160], [214, 150, 150], [38, 46, 96], duskT, nightT);
+  ctx.beginPath(); ctx.moveTo(0, VH + 2);
+  for (i = 0; i <= 24; i++) { x = i / 24 * VW; ctx.lineTo(x, py2 - (38 + 30 * Math.sin(i * 0.9 + 1) + 18 * Math.sin(i * 2.3)) * sc); }
+  ctx.lineTo(VW, VH + 2); ctx.fill();
+  py2 = (70 - camY) * sc * 0.9 + VH * 0.5 + camBump;
+  ctx.fillStyle = mix3([132, 204, 138], [176, 120, 140], [28, 34, 78], duskT, nightT);
+  ctx.beginPath(); ctx.moveTo(0, VH + 2);
+  for (i = 0; i <= 24; i++) { x = i / 24 * VW; ctx.lineTo(x, py2 - (26 + 22 * Math.sin(i * 0.7 + 4) + 12 * Math.sin(i * 1.9 + 2)) * sc); }
+  ctx.lineTo(VW, VH + 2); ctx.fill();
+  setWorld();
+  // the plateau the tower stands on
+  var dirt = mix3([196, 148, 104], [170, 110, 100], [70, 62, 100], duskT, nightT), dirt2 = mix3([170, 122, 84], [146, 90, 88], [56, 50, 86], duskT, nightT);
+  var grass = mix3([126, 211, 108], [150, 180, 100], [60, 120, 110], duskT, nightT), grass2 = mix3([96, 186, 90], [120, 150, 86], [44, 96, 96], duskT, nightT);
+  ctx.lineJoin = 'round'; ctx.lineWidth = 3.4; ctx.strokeStyle = INK;
+  ctx.fillStyle = dirt; ctx.beginPath(); ctx.moveTo(-G, 6); ctx.lineTo(G, 6); ctx.lineTo(G - 16, 1300); ctx.lineTo(-G + 16, 1300); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = dirt2;
+  for (i = 0; i < 7; i++) { x = -G + 40 + i * 47; ctx.beginPath(); ctx.ellipse(x, 44 + (i * 37) % 60, 13, 6, 0, 0, 6.2832); ctx.fill(); }
+  ctx.fillStyle = grass; ctx.beginPath();
+  ctx.moveTo(-G - 6, 0); ctx.lineTo(G + 6, 0); ctx.quadraticCurveTo(G + 12, 10, G + 2, 20);
+  for (i = 0; i < 11; i++) { x = G - (i + 0.5) * (2 * G / 11); ctx.quadraticCurveTo(x + G / 22, 32, x, 20); }
+  ctx.quadraticCurveTo(-G - 12, 10, -G - 6, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = grass2; ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.beginPath();
+  for (i = 0; i < 9; i++) { x = -G + 24 + i * 36 + (i % 2) * 7; ctx.moveTo(x, 9); ctx.lineTo(x + 5, 9); }
+  ctx.stroke();
+}
+function drawRuler() {
+  setScreen();
+  var x0 = safeL + 9, sc = vScale * camZoom, top = safeT + (gstate === 'ready' ? 30 : 118), bot = VH - 8, m, y, stepM = sc * UPM < 34 ? 2 : 1, lab = sc * UPM < 34 ? 4 : (sc * UPM < 52 ? 2 : 1);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, top, 130, bot - top); ctx.clip();
+  var y0 = w2sy(0), ytop = Math.max(top, 0);
+  ctx.strokeStyle = 'rgba(59,49,72,0.75)'; ctx.lineCap = 'round'; ctx.lineWidth = 3;
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(x0 - 3, ytop, 15, Math.max(0, Math.min(bot, y0) - ytop));
+  ctx.beginPath(); ctx.moveTo(x0, ytop); ctx.lineTo(x0, Math.min(bot, y0)); ctx.stroke();
+  var mMin = Math.max(0, Math.floor((camY * -1 - VH * 0.5 / sc) / UPM) - 1), mMax = Math.ceil((-camY + VH * 0.5 / sc) / UPM) + 1;
+  ctx.font = '700 11px ' + FONT; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.lineWidth = 2; ctx.beginPath();
+  for (m = mMin - (mMin % stepM); m <= mMax; m += stepM) { if (m < 0) continue; y = w2sy(-m * UPM); ctx.moveTo(x0, y); ctx.lineTo(x0 + (m % (lab) === 0 ? 12 : 7), y); }
+  ctx.stroke();
+  ctx.fillStyle = nightT > 0.5 ? 'rgba(255,255,255,0.92)' : 'rgba(59,49,72,0.9)';
+  for (m = mMin - (mMin % lab); m <= mMax; m += lab) { if (m <= 0) continue; y = w2sy(-m * UPM); ctx.fillText(m + '', x0 + 16, y); }
+  // record marker
+  if (best > 0) {
+    y = w2sy(-best * UPM);
+    ctx.strokeStyle = '#ff6b8b'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + 70, y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#ff6b8b'; ctx.font = '800 11px ' + FONT; ctx.fillText('纪录 ' + best.toFixed(1), x0 + 30, y - 9);
+  }
+  // current height pointer
+  if (shownH > 0) {
+    y = w2sy(-shownH);
+    ctx.fillStyle = '#ffd166'; ctx.strokeStyle = INK; ctx.lineWidth = 2.2; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(x0 + 2, y); ctx.lineTo(x0 + 13, y - 7); ctx.lineTo(x0 + 13, y + 7); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawCarrier() {
+  var c = carrier, x = c.x, y = c.y - 20 + Math.sin(realTime * 3.1) * 1.6, tilt = clamp(c.vx * 0.0006, -0.16, 0.16);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(tilt);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = 3.2;
+  // little grabbing hands under the cloud
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.moveTo(-5, 8); ctx.lineTo(-4.5, 19); ctx.moveTo(5, 8); ctx.lineTo(4.5, 19); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-25, 8); ctx.bezierCurveTo(-39, 8, -38, -11, -24, -9); ctx.bezierCurveTo(-23, -25, -3, -27, 2, -15); ctx.bezierCurveTo(9, -25, 28, -20, 25, -7); ctx.bezierCurveTo(38, -6, 37, 8, 25, 8); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  var scream = gstate === 'collapsing', look = clamp(c.vx * 0.006, -1.6, 1.6);
+  ctx.fillStyle = INK;
+  if (scream) { ctx.beginPath(); ctx.arc(-9, -6, 3.2, 0, 6.2832); ctx.arc(9, -6, 3.2, 0, 6.2832); ctx.fill(); ctx.beginPath(); ctx.ellipse(0, 1.5, 3.4, 4.2, 0, 0, 6.2832); ctx.fill(); }
+  else {
+    ctx.beginPath(); ctx.arc(-9 + look, -5, 2.4, 0, 6.2832); ctx.arc(9 + look, -5, 2.4, 0, 6.2832); ctx.fill();
+    ctx.lineWidth = 2; ctx.beginPath(); if (carried) ctx.arc(0, -2.5, 4, 0.25, 2.9); else ctx.arc(0, -1, 3, 0.1, 3.04); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,143,171,0.55)'; ctx.beginPath(); ctx.arc(-16, -1, 3.4, 0, 6.2832); ctx.arc(16, -1, 3.4, 0, 6.2832); ctx.fill();
+  }
+  ctx.restore();
+}
+// =====================================================================
+//  rendering: the little people
+// =====================================================================
+function shade(hex, f) {
+  var n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  if (f < 1) { r *= f; g *= f; b *= f; } else { r += (255 - r) * (f - 1); g += (255 - g) * (f - 1); b += (255 - b) * (f - 1); }
+  return 'rgb(' + (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ')';
+}
+function ensureCols(r) { if (!r.colDark) { r.colDark = shade(r.color, 0.72); r.colLight = shade(r.color, 1.45); r.colShoe = shade(r.color, 0.5); } }
+var OUTL = 3.4;
+function drawBody(r) {
+  ensureCols(r);
+  var b = r.base, c = ctx, rl = r.rl, i;
+  var slx = px[b + 1], sly = py[b + 1], srx = px[b + 2], sry = py[b + 2], hlx = px[b + 3], hly = py[b + 3], hrx = px[b + 4], hry = py[b + 4];
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  // legs
+  c.beginPath();
+  c.moveTo(hlx, hly); c.lineTo(px[b + 9], py[b + 9]); c.lineTo(px[b + 11], py[b + 11]);
+  c.moveTo(hrx, hry); c.lineTo(px[b + 10], py[b + 10]); c.lineTo(px[b + 12], py[b + 12]);
+  c.strokeStyle = INK; c.lineWidth = rl * 2 + OUTL; c.stroke();
+  c.strokeStyle = r.colDark; c.lineWidth = rl * 2 - 0.6; c.stroke();
+  // shoes
+  c.fillStyle = r.colShoe;
+  for (i = 11; i <= 12; i++) { c.beginPath(); c.arc(px[b + i], py[b + i], rl - 0.2, 0, 6.2832); c.fill(); }
+  // torso (rounded quad through shoulders and hips; the belly gets wider with fatness)
+  var wT = (r.rt + r.rb) * 0.5 + 0.8, ins = 3.5 / (2 * r.sw), ix = (srx - slx) * ins, iy = (sry - sly) * ins;
+  c.beginPath(); c.moveTo(slx + ix, sly + iy); c.lineTo(srx - ix, sry - iy); c.lineTo(hrx, hry); c.lineTo(hlx, hly); c.closePath();
+  c.strokeStyle = INK; c.lineWidth = wT * 2 + OUTL; c.stroke();
+  c.strokeStyle = r.color; c.fillStyle = r.color; c.lineWidth = wT * 2 - 0.6; c.stroke(); c.fill();
+  if (r.kind === 'fat') {                                    // a proper round belly for the chubby ones
+    var bx = (hlx + hrx) * 0.5 * 0.62 + (slx + srx) * 0.5 * 0.38, by = (hly + hry) * 0.5 * 0.62 + (sly + sry) * 0.5 * 0.38;
+    c.beginPath(); c.ellipse(bx, by, r.hw + r.rb + 4.5, r.th * 0.5 + 3, Math.atan2(sry - sly, srx - slx), 0, 6.2832);
+    c.fillStyle = r.color; c.fill(); c.strokeStyle = INK; c.lineWidth = OUTL * 0.5 + 0.6; c.stroke();
+    c.beginPath(); c.moveTo(slx + ix, sly + iy); c.lineTo(srx - ix, sry - iy); c.lineTo(hrx, hry); c.lineTo(hlx, hly); c.closePath();
+    c.strokeStyle = r.color; c.lineWidth = wT * 2 - 0.6; c.stroke(); c.fill();
+  }
+  // tummy patch + belly button line
+  var mx = (slx + srx + hlx + hrx) * 0.25, my = (sly + sry + hly + hry) * 0.25, ang = Math.atan2(sry - sly, srx - slx);
+  c.save(); c.translate(mx, my); c.rotate(ang);
+  c.fillStyle = r.colLight; c.beginPath(); c.ellipse(0, 4 + r.fat * 2, r.hw * 0.75 + r.rb * 0.3, r.th * 0.26 + r.rb * 0.2, 0, 0, 6.2832); c.fill();
+  if (r.kind === 'fat') { c.strokeStyle = r.colDark; c.lineWidth = 1.6; c.beginPath(); c.arc(0, 8, 2.2, 0.3, 2.84); c.stroke(); }
+  if (r.kind === 'long') { c.strokeStyle = r.colDark; c.lineWidth = 2.4; c.beginPath(); c.moveTo(-r.sw * 0.7, -r.th * 0.22); c.lineTo(r.sw * 0.7, -r.th * 0.22); c.moveTo(-r.sw * 0.6, r.th * 0.2); c.lineTo(r.sw * 0.6, r.th * 0.2); c.stroke(); }
+  c.restore();
+  drawHead(r);
+}
+function drawArms(r) {
+  var b = r.base, c = ctx, s, sh, el, ha, g, hx, hy, st, w;
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  for (s = 0; s < 2; s++) {
+    sh = b + (s ? 2 : 1); el = b + (s ? 6 : 5); ha = b + (s ? 8 : 7); g = r.grab[s];
+    hx = px[ha]; hy = py[ha]; st = 0;
+    if (g && g.on) {                                   // the hand is drawn where it holds on: the forearm visibly stretches
+      var tx = px[g.b1] * (1 - g.t) + px[g.b2] * g.t, ty = py[g.b1] * (1 - g.t) + py[g.b2] * g.t;
+      if (g.rest < 6) { var k = 1 - g.rest / 6; st = Math.hypot(tx - hx, ty - hy) * k; hx += (tx - hx) * k; hy += (ty - hy) * k; }
+    }
+    w = r.ra * 2 * clamp(1 - st / 55, 0.62, 1);
+    c.beginPath(); c.moveTo(px[sh], py[sh]); c.lineTo(px[el], py[el]); c.lineTo(hx, hy);
+    c.strokeStyle = INK; c.lineWidth = w + OUTL; c.stroke();
+    c.strokeStyle = r.color; c.lineWidth = w - 0.6; c.stroke();
+    c.beginPath(); c.arc(hx, hy, r.ra + 1.1, 0, 6.2832); c.fillStyle = r.skin; c.fill(); c.strokeStyle = INK; c.lineWidth = 2; c.stroke();
+  }
+}
+function drawHead(r) {
+  var b = r.base, c = ctx, R = r.rh * 1.22, hx = px[b], hy = py[b];
+  var ux = hx - (px[b + 1] + px[b + 2]) * 0.5, uy = hy - (py[b + 1] + py[b + 2]) * 0.5, ang = Math.atan2(ux, -uy);
+  var sq = clamp(r.squash + r.crouch * 0.35, -0.16, 0.3), f = r.face, pan = r.panic || 0;
+  if (f === 'scream') { hx += Math.sin(realTime * 57 + r.flailPh) * 1.3; hy += Math.cos(realTime * 49 + r.flailPh) * 1.0; }
+  else if (f === 'sweat') { hx += Math.sin(realTime * 41 + r.flailPh) * 0.7 * pan; }
+  c.save(); c.translate(hx, hy); c.rotate(ang); c.translate(0, -r.rh * 0.2); c.scale(1 + sq * 0.8, 1 - sq);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  c.beginPath(); c.arc(0, 0, R, 0, 6.2832); c.fillStyle = r.skin; c.fill();
+  // hair
+  c.fillStyle = r.colDark; c.strokeStyle = INK; c.lineWidth = 2;
+  if (r.hair === 0) { c.beginPath(); c.arc(0, 0, R, 3.5, 5.92); c.quadraticCurveTo(0, -R * 0.55, -R * 0.93, -R * 0.36); c.fill(); }
+  else if (r.hair === 1) { c.beginPath(); c.arc(0, 0, R, 3.9, 5.52); c.quadraticCurveTo(0, -R * 0.75, -R * 0.72, -R * 0.69); c.fill(); c.beginPath(); c.moveTo(-2, -R + 1); c.quadraticCurveTo(-1, -R - 8, 5, -R - 6); c.strokeStyle = r.colDark; c.lineWidth = 3; c.stroke(); }
+  else if (r.hair === 2) { c.beginPath(); c.arc(-R * 0.72, -R * 0.72, R * 0.34, 0, 6.2832); c.arc(R * 0.72, -R * 0.72, R * 0.34, 0, 6.2832); c.fill(); c.beginPath(); c.arc(0, 0, R, 3.7, 5.72); c.quadraticCurveTo(0, -R * 0.6, -R * 0.85, -R * 0.53); c.fill(); }
+  else if (r.hair === 3) { c.fillStyle = r.color; c.beginPath(); c.arc(0, 0, R, 3.45, 5.97); c.lineTo(R * 0.95, -R * 0.12); c.lineTo(-R * 0.95, -R * 0.12); c.closePath(); c.fill(); c.fillStyle = r.colLight; c.beginPath(); c.arc(0, -R - 1, 3.4, 0, 6.2832); c.fill(); }
+  c.beginPath(); c.arc(0, 0, R, 0, 6.2832); c.strokeStyle = INK; c.lineWidth = 2.8; c.stroke();
+  drawFace(r, R, f, pan);
+  c.restore();
+}
+function drawFace(r, R, f, pan) {
+  var c = ctx, ex = R * 0.4, ey = R * 0.02, my = R * 0.5, t = realTime, lx = r.lookX * R * 0.09, ly = r.lookY * R * 0.09, er, i;
+  c.fillStyle = INK; c.strokeStyle = INK; c.lineWidth = 1.9;
+  if (r.blush && f !== 'scream' && f !== 'terror') { c.fillStyle = 'rgba(255,120,150,0.42)'; c.beginPath(); c.arc(-R * 0.62, R * 0.32, R * 0.17, 0, 6.2832); c.arc(R * 0.62, R * 0.32, R * 0.17, 0, 6.2832); c.fill(); c.fillStyle = INK; }
+  if (f === 'terror' || f === 'sweat' || f === 'scream') {
+    if (f === 'scream' && ((r.slot & 1) === 0)) {              // half of them squeeze their eyes shut: > <
+      c.lineWidth = 2.2; c.beginPath();
+      c.moveTo(-ex - 3.2, ey - 3); c.lineTo(-ex + 2.4, ey); c.lineTo(-ex - 3.2, ey + 3);
+      c.moveTo(ex + 3.2, ey - 3); c.lineTo(ex - 2.4, ey); c.lineTo(ex + 3.2, ey + 3); c.stroke();
+    } else {
+      er = R * (f === 'sweat' ? 0.24 : 0.3);
+      c.fillStyle = '#fff'; c.beginPath(); c.arc(-ex, ey, er, 0, 6.2832); c.arc(ex, ey, er, 0, 6.2832); c.fill(); c.lineWidth = 1.6; c.stroke();
+      c.fillStyle = INK; i = f === 'sweat' ? Math.sin(t * 23 + r.flailPh) * 0.9 : 0;
+      c.beginPath(); c.arc(-ex + i + lx * 0.5, ey + (f === 'terror' ? 1 : 0), er * 0.38, 0, 6.2832); c.arc(ex + i + lx * 0.5, ey + (f === 'terror' ? 1 : 0), er * 0.38, 0, 6.2832); c.fill();
+    }
+    c.lineWidth = 2; c.beginPath();                              // raised / pinched brows
+    c.moveTo(-ex - 4, ey - R * 0.5); c.lineTo(-ex + 3, ey - R * 0.6); c.moveTo(ex + 4, ey - R * 0.5); c.lineTo(ex - 3, ey - R * 0.6); c.stroke();
+    var mw = f === 'scream' ? R * 0.36 : f === 'terror' ? R * 0.24 : R * 0.26, mh = f === 'scream' ? R * 0.4 : f === 'terror' ? R * 0.3 : R * (0.13 + 0.07 * Math.sin(t * 19 + r.flailPh));
+    c.fillStyle = '#7a2f45'; c.beginPath(); c.ellipse(0, my + (f === 'scream' ? 1 : 0), mw, mh, 0, 0, 6.2832); c.fill(); c.lineWidth = 1.8; c.stroke();
+    if (f !== 'sweat') { c.fillStyle = '#ff8fa0'; c.beginPath(); c.ellipse(0, my + mh * 0.55, mw * 0.6, mh * 0.38, 0, 0, 6.2832); c.fill(); }
+    if (f === 'scream') { c.fillStyle = '#bfe9ff'; c.beginPath(); c.ellipse(-ex - 1, ey + R * 0.34, 1.8, 3, 0, 0, 6.2832); c.ellipse(ex + 1, ey + R * 0.34, 1.8, 3, 0, 0, 6.2832); c.fill(); }
+  } else if (f === 'relief') {
+    c.lineWidth = 2.1; c.beginPath(); c.arc(-ex, ey + 1.5, R * 0.17, 3.5, 5.93); c.stroke(); c.beginPath(); c.arc(ex, ey + 1.5, R * 0.17, 3.5, 5.93); c.stroke();
+    if (r.reliefT > 0.9) { c.beginPath(); c.arc(0, my, R * 0.11, 0, 6.2832); c.stroke(); }       // "phew"
+    else { c.beginPath(); c.arc(0, my - R * 0.14, R * 0.26, 0.5, 2.64); c.stroke(); }
+  } else if (f === 'land') {
+    c.lineWidth = 2.2; c.beginPath();
+    c.moveTo(-ex - 3, ey - 2.6); c.lineTo(-ex + 2.4, ey); c.lineTo(-ex - 3, ey + 2.6); c.moveTo(ex + 3, ey - 2.6); c.lineTo(ex - 2.4, ey); c.lineTo(ex + 3, ey + 2.6);
+    c.moveTo(-R * 0.22, my); c.lineTo(R * 0.22, my); c.stroke();
+  } else if (f === 'dizzy') {
+    c.lineWidth = 1.7;
+    for (i = -1; i <= 1; i += 2) { c.beginPath(); var a0 = t * 6 * i + r.dizzyPh, q; for (q = 0; q <= 12; q++) { var rr2 = R * 0.045 + q * R * 0.019, aa = a0 + q * 0.75; if (q === 0) c.moveTo(i * ex + Math.cos(aa) * rr2, ey + Math.sin(aa) * rr2); else c.lineTo(i * ex + Math.cos(aa) * rr2, ey + Math.sin(aa) * rr2); } c.stroke(); }
+    c.lineWidth = 2; c.beginPath(); c.moveTo(-R * 0.26, my); c.quadraticCurveTo(-R * 0.13, my - 3.4, 0, my); c.quadraticCurveTo(R * 0.13, my + 3.4, R * 0.26, my); c.stroke();
+  } else {
+    // idle / nervous / worried
+    var worried = f === 'worried' || f === 'nervous';
+    if (r.blink > 0 && !worried) { c.lineWidth = 2; c.beginPath(); c.moveTo(-ex - 2.6, ey); c.lineTo(-ex + 2.6, ey); c.moveTo(ex - 2.6, ey); c.lineTo(ex + 2.6, ey); c.stroke(); }
+    else { er = worried ? R * 0.15 : R * 0.13; c.beginPath(); c.arc(-ex + lx, ey + ly, er, 0, 6.2832); c.arc(ex + lx, ey + ly, er, 0, 6.2832); c.fill(); c.fillStyle = '#fff'; c.beginPath(); c.arc(-ex + lx + er * 0.35, ey + ly - er * 0.35, er * 0.33, 0, 6.2832); c.arc(ex + lx + er * 0.35, ey + ly - er * 0.35, er * 0.33, 0, 6.2832); c.fill(); c.fillStyle = INK; }
+    c.lineWidth = 2;
+    if (worried) {
+      c.beginPath(); c.moveTo(-ex - 4, ey - R * 0.3); c.lineTo(-ex + 3.4, ey - R * 0.46); c.moveTo(ex + 4, ey - R * 0.3); c.lineTo(ex - 3.4, ey - R * 0.46); c.stroke();
+      c.beginPath(); c.moveTo(-R * 0.24, my + 1); c.quadraticCurveTo(-R * 0.12, my - 2.6, 0, my + 1); c.quadraticCurveTo(R * 0.12, my + 4.2, R * 0.24, my + 0.4); c.stroke();
+    } else { c.beginPath(); c.arc(0, my - R * 0.2, R * 0.27, 0.45, 2.69); c.stroke(); }
+  }
+  // sweat drops stuck to the forehead when in danger
+  if (f === 'sweat' || f === 'worried' || (f === 'nervous' && pan > 0.3)) {
+    var n = f === 'sweat' ? 3 : 1;
+    c.fillStyle = '#9fdcff'; c.strokeStyle = '#4aa6d8'; c.lineWidth = 1;
+    for (i = 0; i < n; i++) {
+      var sx = (i === 0 ? R * 0.72 : i === 1 ? -R * 0.78 : R * 0.15), sy = -R * 0.5 + ((t * (0.9 + i * 0.3) + i * 0.37 + r.dizzyPh) % 1) * R * 0.5 - (i === 2 ? R * 0.42 : 0);
+      c.beginPath(); c.moveTo(sx, sy - 4.2); c.quadraticCurveTo(sx + 3.4, sy + 1.6, sx, sy + 2.6); c.quadraticCurveTo(sx - 3.4, sy + 1.6, sx, sy - 4.2); c.fill(); c.stroke();
+    }
+  }
+}
+function drawPeople() {
+  var i, r, n = rags.length, sc = vScale * camZoom, top = camY - VH * 0.5 / sc - 160, bot = camY + VH * 0.5 / sc + 160;
+  setWorld();
+  for (i = 0; i < n; i++) { r = rags[i]; if (r.comy > top && r.comy < bot) { if (r.state === 'carried' || r.state === 'falling') drawArms(r); drawBody(r); } }
+  // rope hands of the carrier are drawn by drawCarrier; arms go on top of every body so held ankles show the hands
+  for (i = 0; i < n; i++) { r = rags[i]; if (r.comy > top && r.comy < bot && r.state !== 'carried' && r.state !== 'falling') drawArms(r); }
+}
+// =====================================================================
+//  effects: particles, leaves, popups, faces, event handling
+// =====================================================================
+var NPART = 260, parts = [], popups = [], whimperT = 0, leafAcc = 0, userActed = false, hudCache = { h: '', n: '', b: '' };
+(function () { for (var i = 0; i < NPART; i++) parts.push({ on: false, type: 0, x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, size: 1, rot: 0, vr: 0, col: '#fff' }); })();
+function spawnPart(type, x, y, vx2, vy2, life, size, col) {
+  for (var i = 0; i < NPART; i++) {
+    var p = parts[i];
+    if (!p.on) { p.on = true; p.type = type; p.x = x; p.y = y; p.vx = vx2; p.vy = vy2; p.life = life; p.max = life; p.size = size; p.rot = frnd() * 6.28; p.vr = (frnd() - 0.5) * 8; p.col = col || '#fff'; return p; }
+  }
+  return null;
+}
+function addPopup(text, x, y, col, big) { if (popups.length < 12) popups.push({ text: text, x: x, y: y, t: 0, col: col || '#fff', big: !!big }); }
+function dustBurst(x, y, k) {
+  var n = 5 + (k * 7 | 0), i, a;
+  for (i = 0; i < n; i++) { a = (i / n - 0.5) * 2; spawnPart(0, x + a * 12, y - 2, a * (50 + 80 * frnd()) * (0.5 + k), -(12 + 40 * frnd()), 0.45 + 0.3 * frnd(), 4 + 5 * frnd() * (0.6 + k), '#fff'); }
+}
+function vib(p) { if (!userActed) return; try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+function handleEvents() {
+  var i, e, r, n;
+  for (i = 0; i < fxEvents.length; i++) {
+    e = fxEvents[i];
+    switch (e.type) {
+      case 'land':
+        r = e.a; n = clamp(e.c / 520, 0.15, 1.3);
+        sfxThump(n, 0); dustBurst(r.hitX, r.hitY, n); vib(12);
+        break;
+      case 'grab': sfxHey(e.a.voice, 0); for (n = 0; n < 4; n++) spawnPart(3, e.b, e.c, (frnd() - 0.5) * 90, (frnd() - 0.5) * 90, 0.3, 3, '#ffe27a'); break;
+      case 'stacked':
+        r = e.a; sfxSigh(r.voice);
+        spawnPart(2, px[r.base] + 14, py[r.base] + 3, 16, -22, 0.9, 5, '#fff');
+        addPopup(e.b.toFixed(1) + ' 米', px[r.base], py[r.base] - r.rh - 16, '#fff', false);
+        break;
+      case 'pop': case 'peel': sfxPop(); spawnPart(5, e.a, e.b, 0, 0, 0.3, 6, '#fff'); break;
+      case 'release': sfxWhoosh(); break;
+      case 'spawn': r = e.a; if (gstate === 'playing' && r.kind !== 'normal') addPopup(r.kind === 'fat' ? '胖墩来啦！' : '大长腿来啦！', carrier.x, carrier.y - 62, '#ffd166', false); break;
+      case 'collapse':
+        n = Math.min(9, rags.length + 1);
+        for (r = 0; r < n; r++) sfxScream(rags[r % rags.length].voice, r * 0.09 + frnd() * 0.12);
+        vib([30, 40, 60]);
+        break;
+      case 'scatter': for (n = 0; n < 7; n++) sfxThump(0.35 + 0.5 * frnd(), 0.25 + n * 0.16 + frnd() * 0.1); for (n = 0; n < 3; n++) sfxScream(0.8 + 0.7 * frnd(), 0.05 + n * 0.22); break;
+      case 'over': showOver(e.a, e.b, e.c); break;
+      case 'start': hideOver(); sfxStart(); break;
+    }
+  }
+  fxEvents.length = 0;
+}
+// arm animation (runs in physics time: it changes pose targets)
+function animArms(dt) {
+  var i, r, s, a1, a2, sup, chg, t = gameTime, pan, top = topRag();
+  for (i = 0; i < rags.length; i++) {
+    r = rags[i];
+    if (r.state === 'falling') { for (s = 0; s < 2; s++) { r.armA1[s] = 2.45 + 0.45 * Math.sin(t * 17 + r.flailPh + s * 2.1); r.armA2[s] = 2.85 + 0.4 * Math.sin(t * 21 + r.flailPh * 1.7 + s); } poseArms(r); continue; }
+    if (r.state !== 'landed') continue;
+    if (!r.armOn[0] && !r.armOn[1]) continue;
+    pan = clamp(sway * (r === top ? 1.25 : 0.8), 0, 1); sup = false; chg = false;
+    if (r !== top) { sup = true; }                         // someone is (or will be) on my shoulders: hands up, ready to hold ankles
+    for (s = 0; s < 2; s++) {
+      if (sup) { a1 = 1.95; a2 = 3.0; }
+      else { a1 = 1.1; a2 = 1.5; }
+      if (pan > 0.2) { var k = (pan - 0.2) / 0.8; a1 += k * (0.75 + 0.75 * Math.sin(t * 13 + r.flailPh + s * 2.6)); a2 += k * (0.9 + 0.8 * Math.sin(t * 16 + r.flailPh * 1.3 + s * 1.9)); }
+      if (r.armA1[s] !== a1 || r.armA2[s] !== a2) { r.armA1[s] = a1; r.armA2[s] = a2; chg = true; }
+    }
+    if (chg) poseArms(r);
+  }
+}
+function updateFaces(dt) {
+  var i, r, n = stack.length, tgt = carried || faller, f, frac, b;
+  for (i = 0; i < rags.length; i++) {
+    r = rags[i]; b = r.base; r.faceT += dt;
+    r.blinkT -= dt; if (r.blinkT <= 0) { r.blink = 0.12; r.blinkT = 1.5 + 3.5 * frnd(); }
+    if (r.blink > 0) r.blink -= dt;
+    if (r.reliefT > 0) r.reliefT -= dt;
+    r.squashV += (-260 * r.squash - 17 * r.squashV) * dt; r.squash += r.squashV * dt * 0.05;
+    if (r.squash > 0.3) r.squash = 0.3; if (r.squash < -0.14) r.squash = -0.14;
+    frac = r.stacked && n > 0 ? (r.stackIdx + 1) / n : 1;
+    r.panic = clamp(sway * (0.5 + 0.65 * frac), 0, 1);
+    if (tgt && tgt !== r) { var dx = tgt.comx - px[b], dy = tgt.comy - py[b], d = Math.hypot(dx, dy) || 1; r.lookX += (dx / d * 1.6 - r.lookX) * 0.1; r.lookY += (dy / d * 1.4 - r.lookY) * 0.1; }
+    else { r.lookX *= 0.9; r.lookY += ((r.state === 'carried' ? 1.3 : 0) - r.lookY) * 0.1; }
+    if (r.state === 'carried') f = gstate === 'collapsing' ? 'terror' : 'nervous';
+    else if (r.state === 'falling') f = 'terror';
+    else if (r.state === 'limp') f = (collapseT > 2.3 && r.maxSpeed < 70) || gstate === 'over' ? (r.maxSpeed < 120 ? 'dizzy' : 'scream') : 'scream';
+    else if (gstate === 'collapsing') f = 'scream';
+    else if (gameTime - r.landT < 0.2) f = 'land';
+    else if (r.panic > 0.6) f = 'sweat';
+    else if (r.panic > 0.28) f = 'worried';
+    else if (r.reliefT > 0) f = 'relief';
+    else f = 'idle';
+    r.face = f;
+    if ((f === 'sweat' || f === 'scream') && frnd() < dt * (f === 'sweat' ? 5 * r.panic : 7)) spawnPart(1, px[b] + (frnd() - 0.5) * r.rh * 2, py[b] - r.rh * 0.6, (frnd() - 0.5) * 120, -60 - 80 * frnd(), 0.6, 2.6, '#9fdcff');
+  }
+}
+function updateParticles(dt) {
+  var i, p, lf = wind.leaf, a = Math.abs(lf);
+  // leaves stream across the screen ahead of (and during) every gust
+  if (a > 0.04) {
+    leafAcc += dt * (7 + 30 * Math.min(1.6, a));
+    while (leafAcc >= 1) {
+      leafAcc -= 1;
+      var dir = lf > 0 ? 1 : -1, sp = (230 + 330 * Math.min(1.6, a)) * (0.7 + 0.6 * frnd());
+      p = spawnPart(4, dir > 0 ? -20 : VW + 20, VH * (0.04 + 0.9 * frnd()), dir * sp, (frnd() - 0.4) * 50, 6, 5 + 4 * frnd(), frnd() < 0.5 ? '#7ccf6a' : (frnd() < 0.5 ? '#f6b04e' : '#a6dd72'));
+    }
+  } else leafAcc = 0;
+  for (i = 0; i < NPART; i++) {
+    p = parts[i]; if (!p.on) continue;
+    p.life -= dt; if (p.life <= 0) { p.on = false; continue; }
+    if (p.type === 0) { p.vx *= 1 - 3.2 * dt; p.vy *= 1 - 2.5 * dt; p.size += 9 * dt; }
+    else if (p.type === 1) { p.vy += 520 * dt; }
+    else if (p.type === 2) { p.size += 7 * dt; p.vx *= 1 - 1.5 * dt; }
+    else if (p.type === 4) {
+      p.vy += Math.sin(realTime * 5 + p.rot) * 160 * dt; p.rot += p.vr * dt;
+      if (a < 0.04) { p.vx *= 1 - 1.4 * dt; p.vy += 90 * dt; if (p.life > 1.2) p.life = 1.2; }
+      if (p.x < -40 || p.x > VW + 40 || p.y > VH + 30) p.on = false;
+    }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (i = popups.length - 1; i >= 0; i--) { popups[i].t += dt; if (popups[i].t > 1.3) popups.splice(i, 1); }
+  shoot.t -= dt;
+  if (shoot.life > 0) shoot.life -= dt;
+  else if (shoot.t <= 0) { shoot.t = 5 + 9 * frnd(); if (nightT > 0.5) { shoot.life = 0.7; shoot.x = VW * (0.1 + 0.6 * frnd()); shoot.y = VH * (0.05 + 0.3 * frnd()); } }
+}
+function drawParticles(world) {
+  var i, p, a, c = ctx;
+  for (i = 0; i < NPART; i++) {
+    p = parts[i]; if (!p.on || (p.type === 4) === world) continue;
+    a = p.life / p.max;
+    if (p.type === 0) { c.globalAlpha = 0.75 * a; c.fillStyle = p.col; c.beginPath(); c.arc(p.x, p.y, p.size, 0, 6.2832); c.fill(); }
+    else if (p.type === 1) { c.globalAlpha = Math.min(1, a * 2); c.fillStyle = p.col; c.beginPath(); c.arc(p.x, p.y, p.size, 0, 6.2832); c.fill(); }
+    else if (p.type === 2) { c.globalAlpha = 0.9 * a; c.strokeStyle = INK; c.fillStyle = '#fff'; c.lineWidth = 1.6; c.beginPath(); c.arc(p.x, p.y, p.size, 0, 6.2832); c.arc(p.x + p.size * 1.1, p.y - p.size * 0.5, p.size * 0.6, 0, 6.2832); c.fill(); }
+    else if (p.type === 3) { c.globalAlpha = a; c.strokeStyle = p.col; c.lineWidth = 2.4; c.lineCap = 'round'; c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x - p.vx * 0.05, p.y - p.vy * 0.05); c.stroke(); }
+    else if (p.type === 5) { c.globalAlpha = a; c.strokeStyle = p.col; c.lineWidth = 2.5; c.beginPath(); c.arc(p.x, p.y, p.size + (1 - a) * 12, 0, 6.2832); c.stroke(); }
+    else if (p.type === 4) {
+      c.globalAlpha = Math.min(1, p.life * 1.5); c.save(); c.translate(p.x, p.y); c.rotate(p.rot + Math.atan2(p.vy, p.vx) * 0.3);
+      c.fillStyle = p.col; c.strokeStyle = 'rgba(59,49,72,0.65)'; c.lineWidth = 1.3;
+      c.beginPath(); c.moveTo(-p.size, 0); c.quadraticCurveTo(0, -p.size * 0.75, p.size, 0); c.quadraticCurveTo(0, p.size * 0.75, -p.size, 0); c.fill(); c.stroke();
+      c.beginPath(); c.moveTo(-p.size * 0.7, 0); c.lineTo(p.size * 0.7, 0); c.stroke(); c.restore();
+    }
+  }
+  c.globalAlpha = 1;
+}
+function drawOverlays() {
+  var c = ctx, i, p, a, x, y, w = Math.abs(windNow);
+  setScreen();
+  if (w > 0.08) {                                           // soft wind streaks
+    c.strokeStyle = '#fff'; c.lineCap = 'round'; c.lineWidth = 2;
+    for (i = 0; i < 7; i++) {
+      a = ((realTime * (0.5 + 0.13 * i) + i * 0.37) % 1); x = (windNow > 0 ? a : 1 - a) * (VW + 200) - 100; y = VH * (0.12 + 0.11 * i) + Math.sin(a * 6 + i) * 9;
+      c.globalAlpha = Math.min(0.5, w * 0.45) * Math.sin(a * 3.1416); c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + 22, y - 5, x + 46 + 30 * w, y); c.stroke();
+    }
+    c.globalAlpha = 1;
+  }
+  drawParticles(false);
+  for (i = 0; i < popups.length; i++) {
+    p = popups[i]; a = p.t < 0.15 ? p.t / 0.15 : p.t > 0.95 ? Math.max(0, (1.3 - p.t) / 0.35) : 1;
+    x = clamp(w2sx(p.x), 60, VW - 60); y = w2sy(p.y) - p.t * 34;
+    c.globalAlpha = a; c.font = '900 ' + (p.big ? 26 : 19) + 'px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.lineWidth = 5; c.strokeStyle = INK; c.lineJoin = 'round'; c.strokeText(p.text, x, y); c.fillStyle = p.col; c.fillText(p.text, x, y);
+  }
+  c.globalAlpha = 1;
+  if (gstate === 'collapsing' && collapsePhase === 0) {     // slow-motion vignette
+    var g = c.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.35, VW / 2, VH / 2, Math.max(VW, VH) * 0.75);
+    g.addColorStop(0, 'rgba(40,20,60,0)'); g.addColorStop(1, 'rgba(40,20,60,' + (0.4 * Math.min(1, collapseT * 4)) + ')');
+    c.fillStyle = g; c.fillRect(0, 0, VW, VH);
+  }
+}
+var elHv = document.getElementById('hHv'), elCnt = document.getElementById('hCnt'), elBest = document.getElementById('hBest'), elHud = document.getElementById('hud');
+function updateHud() {
+  var h = (shownH / UPM).toFixed(1), n = '' + Math.max(maxCount, stack.length), b = Math.max(best, 0).toFixed(1);
+  if (h !== hudCache.h) { hudCache.h = h; elHv.textContent = h; }
+  if (n !== hudCache.n) { hudCache.n = n; elCnt.textContent = n; }
+  if (b !== hudCache.b) { hudCache.b = b; elBest.textContent = b; }
+}
+updateFx = function (dt) {
+  handleEvents();
+  updateFaces(dt);
+  updateParticles(dt);
+  updateCamera(dt);
+  if (gstate === 'playing' && sway > 0.42) { whimperT -= dt * (0.6 + sway); if (whimperT <= 0 && stack.length) { whimperT = 0.5 + 0.7 * frnd(); sfxWhimper(stack[(frnd() * stack.length) | 0].voice, sway); } }
+  audioWind(gstate === 'playing' ? wind.leaf * 0.6 + windNow * 0.6 : 0);
+};
+function render() {
+  setScreen();
+  drawSky();
+  drawGround();
+  drawPeople();
+  setWorld();
+  drawCarrier();
+  drawParticles(true);
+  if (gstate !== 'ready') drawRuler();
+  drawOverlays();
+  updateHud();
+}
+// =====================================================================
+//  UI, input, main loop, test hook
+// =====================================================================
+var elStart = document.getElementById('start'), elOver = document.getElementById('over'), elMute = document.getElementById('mute'), elAgain = document.getElementById('again');
+var overAt = 0, MUTE_KEY = 'dieluohan_xpbd_mute';
+function showOver(h, n, rec) {
+  document.getElementById('oHv').textContent = h.toFixed(1);
+  document.getElementById('oCnt').textContent = '' + n;
+  document.getElementById('oBest').textContent = best.toFixed(1);
+  document.getElementById('oTitle').textContent = rec ? '太厉害啦！' : (n >= 12 ? '好高的一座塔！' : n >= 6 ? '哗啦啦，塔倒啦！' : '哎呀，塔倒啦！');
+  document.getElementById('oNew').className = rec ? 'on' : '';
+  elOver.classList.add('on'); overAt = realTime;
+  if (rec) { sfxJingle(); vib([20, 30, 20, 30, 40]); }
+}
+function hideOver() { elOver.classList.remove('on'); }
+function uiSync() {
+  if (gstate === 'ready') { elStart.classList.add('on'); elHud.classList.remove('on'); }
+  else { elStart.classList.remove('on'); elHud.classList.add('on'); }
+  if (gstate !== 'over') hideOver();
+}
+function beginGame() { startGame(); camInit = gstate === 'playing' && camInit; uiSync(); }
+function userTap() {
+  userActed = true; audioResume();
+  if (gstate === 'ready') { beginGame(); sfxClick(); }
+  else if (gstate === 'playing') { if (doDrop()) vib(8); }
+}
+function inUi(t) { while (t && t !== document.body) { if (t === elMute || t === elAgain) return true; t = t.parentNode; } return false; }
+window.addEventListener('pointerdown', function (e) {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (inUi(e.target)) return;
+  userTap();
+}, { passive: true });
+// some mobile browsers only unlock audio on the "up" half of a tap
+function unlockAudio() { userActed = true; audioResume(); }
+window.addEventListener('pointerup', unlockAudio, { passive: true });
+window.addEventListener('touchend', unlockAudio, { passive: true });
+window.addEventListener('click', unlockAudio, { passive: true });
+window.addEventListener('keydown', function (e) {
+  var k = e.key || '', c = e.code || '';
+  if (c === 'Space' || k === ' ' || k === 'Spacebar' || k === 'Enter') {
+    e.preventDefault();
+    if (e.repeat) return;
+    if (gstate === 'over') { if (realTime - overAt > 0.45) { userActed = true; audioResume(); beginGame(); sfxClick(); } }
+    else userTap();
+  } else if (k === 'm' || k === 'M') toggleMute();
+});
+elAgain.addEventListener('click', function (e) {
+  e.preventDefault(); userActed = true; audioResume(); elAgain.blur();
+  if (gstate === 'over' || gstate === 'collapsing') { beginGame(); sfxClick(); }
+});
+function applyMuteUi() { elMute.className = muted ? 'muted' : ''; }
+function toggleMute() {
+  userActed = true; setMuted(!muted); applyMuteUi();
+  if (!muted) { audioResume(); sfxClick(); }
+  try { window.localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch (e) {}
+}
+elMute.addEventListener('click', function (e) { e.preventDefault(); elMute.blur(); toggleMute(); });
+// no scrolling, pinch / double-tap zoom, long-press menus or text selection
+document.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
+document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, { passive: false });
+document.addEventListener('gesturechange', function (e) { e.preventDefault(); }, { passive: false });
+document.addEventListener('dblclick', function (e) { e.preventDefault(); }, { passive: false });
+document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+document.addEventListener('selectstart', function (e) { e.preventDefault(); });
+var lastTouchEnd = 0;
+document.addEventListener('touchend', function (e) { var n = Date.now(); if (n - lastTouchEnd < 320 && !inUi(e.target)) e.preventDefault(); lastTouchEnd = n; }, { passive: false });
+function onResize() { resize(); render(); }
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', function () { setTimeout(onResize, 60); setTimeout(onResize, 400); });
+if (window.visualViewport && window.visualViewport.addEventListener) window.visualViewport.addEventListener('resize', onResize);
+// ---- main loop: fixed-step simulation inside update(), rendering once per display frame ----
+var lastNow = 0, perf = { phys: 0, rend: 0, physMax: 0, rendMax: 0, frames: 0 };
+function frame(now) {
+  window.requestAnimationFrame(frame);
+  if (document.hidden) { lastNow = now; return; }
+  var dt = (now - lastNow) / 1000; lastNow = now;
+  if (!(dt > 0)) return;
+  if (dt > 0.05) dt = 0.05;                     // long frames are clamped (no spiral of death, no jumps)
+  var t0 = performance.now();
+  update(dt);
+  var t1 = performance.now();
+  render();
+  var t2 = performance.now();
+  perf.frames++; perf.phys += t1 - t0; perf.rend += t2 - t1;
+  if (t1 - t0 > perf.physMax) perf.physMax = t1 - t0;
+  if (t2 - t1 > perf.rendMax) perf.rendMax = t2 - t1;
+}
+document.addEventListener('visibilitychange', function () {
+  lastNow = performance.now();
+  try { if (AC) { if (document.hidden) AC.suspend(); else if (userActed) AC.resume(); } } catch (e) {}
+});
+// ---- boot ----
+try { if (!muteParam && window.localStorage.getItem(MUTE_KEY) === '1') muted = true; } catch (e) {}
+applyMuteUi();
+loadBest();
+resize();
+resetWorld('ready');
+uiSync();
+update(0); render();
+lastNow = performance.now();
+window.requestAnimationFrame(frame);
+// ---- test hook ----
+window.__game = {
+  unitsPerMeter: UPM,
+  getState: function () { return gstate; },
+  start: function () { beginGame(); },
+  drop: function () { return doDrop(); },
+  aim: function () { return aimInfo(); },
+  stats: function () { return computeStats(); },
+  advance: function (seconds) {
+    var rem = +seconds || 0, n = 0, st;
+    while (rem > 1e-9 && n < 200000) { st = rem < 1 / 60 ? rem : 1 / 60; update(st); rem -= st; n++; }
+  },
+  setWind: function (v) { wind.forced = (v === null || v === undefined) ? null : clamp(+v || 0, -40, 40); }
+};
+window.__dlhPerf = perf;
+})();
+</script>
+</body>
+</html>
