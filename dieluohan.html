@@ -79,6 +79,11 @@ h1 span:nth-child(3){color:#8ee3b4;animation-delay:.36s;}
   background:rgba(255,255,255,.86);border:3px solid var(--ink);border-radius:18px;padding:9px 18px 10px;
   box-shadow:0 5px 0 rgba(59,49,72,.2);
 }
+#sBest{
+  display:none;margin-top:12px;font-size:min(4.2vw,17px);font-weight:900;color:var(--ink);
+  background:#ffd166;border:3px solid var(--ink);border-radius:999px;padding:4px 16px 5px;box-shadow:0 4px 0 rgba(59,49,72,.2);
+}
+#sBest.on{display:inline-block;}
 #tap{
   margin-top:auto;margin-bottom:min(9vh,70px);font-size:min(5.4vw,23px);font-weight:900;color:#fff;
   text-shadow:-2px -2px 0 var(--ink),2px -2px 0 var(--ink),-2px 2px 0 var(--ink),2px 2px 0 var(--ink),0 4px 0 var(--ink);
@@ -111,6 +116,10 @@ h1 span:nth-child(3){color:#8ee3b4;animation-delay:.36s;}
   box-shadow:0 6px 0 var(--ink);cursor:pointer;touch-action:manipulation;outline:none;
 }
 #again:active{transform:translateY(4px);box-shadow:0 2px 0 var(--ink);}
+@media (max-height:460px) and (min-aspect-ratio:3/2){
+  #over{align-items:flex-end;padding-right:max(4vw,env(safe-area-inset-right));}
+  #over #card{width:min(44vw,360px);}
+}
 @media (max-height:460px){
   h1{font-size:min(11vw,21vh);text-shadow:-2px -2px 0 var(--ink),2px -2px 0 var(--ink),-2px 2px 0 var(--ink),2px 2px 0 var(--ink),0 -3px 0 var(--ink),0 3px 0 var(--ink),-3px 0 0 var(--ink),3px 0 0 var(--ink),0 6px 0 var(--ink);} #start .sp{flex-basis:2%;} #how{margin-top:8px;font-size:12.5px;line-height:1.45;padding:4px 14px 5px;border-width:2.5px;}
   #tap{margin-bottom:5vh;font-size:18px;}
@@ -133,6 +142,7 @@ h1 span:nth-child(3){color:#8ee3b4;animation-delay:.36s;}
   <div class="sp"></div>
   <h1><span>叠</span><span>罗</span><span>汉</span></h1>
   <div id="how">小人在天上晃来晃去<br>点击屏幕（或按空格）把他放下去<br>叠得越高越好，塔倒了就结束！</div>
+  <div id="sBest"></div>
   <div id="tap">点击任意位置开始</div>
 </div>
 <div id="over" class="panel">
@@ -155,10 +165,11 @@ var SUB = 10;               // physics substeps per 1/60 s
 var HS = 1 / 600;           // substep length (the fixed timestep)
 var GRAV = 1250;            // world units / s^2 (y points down, ground at y = 0)
 var NP = 13, NB = 16, MAXR = 64;
-var GROUND_HALF = 205;      // half width of the ground platform
+var GROUND_HALF = 480;      // half width of the ground platform (a wide floating island)
 var WIND_ACC = 100;          // lateral acceleration of wind strength 1.0
 var VMAX = 1700;
 var MU = 0.9, MU_G = 1.0, MU_HEAD = 0.12, FOOT_GRACE = 40;
+var HANG_SHARE = 0.4;        // share of an emergency hold's pull that the tower actually feels
 // particle indices
 var P_H = 0, P_SL = 1, P_SR = 2, P_HL = 3, P_HR = 4, P_EL = 5, P_ER = 6, P_AL = 7, P_AR = 8, P_KL = 9, P_KR = 10, P_FL = 11, P_FR = 12;
 var BONES = [1,2, 3,4, 1,3, 2,4, 1,4, 2,3, 0,1, 0,2, 1,5, 5,7, 2,6, 6,8, 3,9, 9,11, 4,10, 10,12];
@@ -211,33 +222,47 @@ function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 // ---------- ragdoll construction ----------
-var PALETTE = ['#ff8fab', '#ffd166', '#8ee3b4', '#7cc6fe', '#c3a6ff', '#ffa770', '#f6e58d', '#7eddd3', '#ff9aa2', '#b5ead7', '#a0c4ff', '#ffc6ff', '#fdffb6', '#9bf6ff', '#ffb4a2'];
+var SKINS = ['#ffe8d2', '#ffdcc0', '#f3c9a2', '#dba87f', '#b98560'];
+var hueNext = 0, lastSpecial = 0;
+function hslHex(h, sat, li) {             // h in degrees, sat / li in 0..1 -> '#rrggbb'
+  h = ((h % 360) + 360) % 360;
+  var c = (1 - Math.abs(2 * li - 1)) * sat, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = li - c / 2, r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; } else if (h < 180) { g = c; b = x; } else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+  var v = (Math.round((r + m) * 255) << 16) | (Math.round((g + m) * 255) << 8) | Math.round((b + m) * 255);
+  return '#' + ('000000' + v.toString(16)).slice(-6);
+}
+function pickColor() {                    // golden-angle hue rotation: neighbours never share a colour
+  hueNext = (hueNext + 137.508 + rr(-14, 14)) % 360;
+  var h = hueNext, li = (h > 40 && h < 190) ? 0.66 : 0.73;         // yellows / greens a touch darker so they stay readable
+  return hslHex(h, rr(0.78, 0.95), li + rr(-0.03, 0.03));
+}
 function newRag(kind) {
   var slot = -1, i;
   for (i = 0; i < MAXR; i++) if (!slots[i]) { slot = i; break; }
   if (slot < 0) return null;
   var k = rr(0.86, 1.14), fat = rr(0.05, 0.6), massMul;
-  if (kind === 'fat') { k = rr(0.92, 1.02); fat = rr(1.25, 1.45); }
-  else if (kind === 'long') { k = rr(1.42, 1.58); fat = rr(0.0, 0.2); }
+  if (kind === 'fat') { k = rr(0.88, 0.98); fat = rr(1.4, 1.6); }
+  else if (kind === 'long') { k = rr(1.5, 1.66); fat = rr(0.0, 0.15); }
   massMul = kind === 'fat' ? 2.0 : kind === 'long' ? 1.35 : (0.55 + 0.45 * k) * (0.85 + 0.35 * fat);
   var r = {
     slot: slot, base: slot * NP, sbase: slot * NSH, kind: kind, k: k, fat: fat, massMul: massMul,
-    color: PALETTE[(rnd() * PALETTE.length) | 0], skin: rnd() < 0.5 ? '#ffe8d2' : (rnd() < 0.5 ? '#ffdcc0' : '#f5cfa8'),
-    hair: (rnd() * 5) | 0, blush: rnd() < 0.7,
+    color: pickColor(), skin: SKINS[Math.min(4, (rnd() * rnd() * 6.2) | 0)],
+    hair: (rnd() * 8) | 0, blush: rnd() < 0.7, pants: rnd() < 0.5,
     rl: 5.5 + (kind === 'fat' ? 1.2 : 0), ra: 4.4 + (kind === 'fat' ? 0.8 : 0), rt: 6, rb: 6 + 3.6 * fat,
     rh: (kind === 'fat' ? 14.2 : rr(12.4, 13.6)), fs: 19.5,
     lt: 22 * k, ls: 22 * k, th: 33 * (kind === 'long' ? k * 0.92 : k),
     hw: 9 + 4.5 * fat, sw: 21 + 3 * Math.min(fat, 1.4),
     au: 18.5 * (0.45 + 0.55 * k), af: 18.5 * (0.45 + 0.55 * k),
     blen: new Float64Array(NB), armLen: new Float64Array(12), rx: new Float64Array(NP), ry: new Float64Array(NP), qx: new Float64Array(NP), qy: new Float64Array(NP),
-    cmSum: 0, height: 0, shoulderH: 0,
+    cmSum: 0, height: 0, shoulderH: 0, shear: 0, lean: 0, leanT: 0, swayS: 0, poseC: 0, poseS: 0,
     state: 'carried', tone: 0.004, armTone: 0.006, upK: 0, upMax: 0.0004, massScale: 1, windF: 1,
     armOn: [true, true], grab: [null, null], grabCool: [0, 0], hold: [null, null], holdCool: 0, above: 0, armA1: [1.0, 1.0], armA2: [1.3, 1.3],
     tilt: 0, comx: 0, comy: 0, cvx: 0, cvy: 0, speed: 0, maxSpeed: 0,
     minx: 0, miny: 0, maxx: 0, maxy: 0, gc: 0, touch: 0, touchRag: null, hitSpeed: 0, hitX: 0, hitY: 0, hitOther: null,
     footL: 0, footR: 0, pivot: 0, dampRel: 0, dampC0: 0.1, dampC1: 0, dampV0: 1, isBase: false, age: 0, landT: -1, calmT: 0, stacked: false, stackIdx: -1, settleHeadY: 0, tiltT: 0, feetOn: null,
     face: 'nervous', faceT: 0, blinkT: rr(1, 4), blink: 0, squash: 0, squashV: 0, sweatT: 0, lookX: 0, lookY: 0,
-    flail: 0, flailPh: rr(0, 6.28), crouch: 0, crouchV: 0, dead: false, reliefT: 0, dizzyPh: rr(0, 6.28), voice: rr(0.75, 1.45)
+    flail: 0, flailPh: rr(0, 6.28), crouch: 0, crouchV: 0, dead: false, reliefT: 0, dizzyPh: rr(0, 6.28), voice: rr(0.75, 1.45),
+    legDrag: 0, swPhi: 1, swU: 0, swUv: 0, swStepU: 0, swStepF: 0, landOff: 0, ghost: [null, null], ghostT: [0, 0], heldBy: 0, kick: 0, kickT: 0, limpAt: 0, slip: false, slipT: 0, hangT: 0, hung: false, gaveUp: false, hop: 0, hopT: 0, hopLand: 0, slipMode: 0, noCol: false, pivFoot: P_FL, stanceT: 0, grabN: 0, limpT: 0, tipT: 0, reach: [null, null], ripT: -1, ripK: 0, lostT: 0
   };
   buildPose(r, 0);
   // bones from the rest pose
@@ -264,18 +289,24 @@ function newRag(kind) {
 // Standing rest pose in local coordinates (origin between the feet on the floor, y negative = up).
 // crouch 0..1 lowers the hips and bends the knees outward. Arm targets come from armA1/armA2.
 function buildPose(r, crouch) {
-  var rx = r.rx, ry = r.ry, L = r.lt + r.ls, D = L * (0.965 - 0.3 * crouch);
-  var dxh = r.fs - r.hw, yh = -r.rl - Math.sqrt(Math.max(1, D * D - dxh * dxh));
+  // r.shear shifts the whole upper body sideways relative to the planted feet (lean memory + tower sway);
+  // only the legs change shape, so no bone length is violated.
+  var rx = r.rx, ry = r.ry, L = r.lt + r.ls, D = L * (0.965 - 0.3 * crouch), sh = r.shear;
+  var dxh = r.fs - r.hw, dxm = dxh + Math.abs(sh), yh = -r.rl - Math.sqrt(Math.max(1, D * D - dxm * dxm));
+  r.poseC = crouch; r.poseS = sh;
   rx[P_FL] = -r.fs; ry[P_FL] = -r.rl; rx[P_FR] = r.fs; ry[P_FR] = -r.rl;
-  rx[P_HL] = -r.hw; ry[P_HL] = yh; rx[P_HR] = r.hw; ry[P_HR] = yh;
-  // knee: circle intersection (hip, lt) & (foot, ls), outward solution
-  var ex = dxh, ey = -r.rl - yh, d = Math.hypot(ex, ey), a = (r.lt * r.lt - r.ls * r.ls + d * d) / (2 * d);
-  var h = Math.sqrt(Math.max(0, r.lt * r.lt - a * a)), ux = ex / d, uy = ey / d;
-  var kx = r.hw + ux * a + uy * h, ky = yh + uy * a - ux * h;
-  rx[P_KR] = kx; ry[P_KR] = ky; rx[P_KL] = -kx; ry[P_KL] = ky;
+  rx[P_HL] = -r.hw + sh; ry[P_HL] = yh; rx[P_HR] = r.hw + sh; ry[P_HR] = yh;
+  // knees: circle intersection (hip, lt) & (foot, ls), outward solution, one leg at a time
+  var sd, hi, fi, ki, ex, ey, d, a, h, ux, uy;
+  for (sd = -1; sd <= 1; sd += 2) {
+    hi = sd > 0 ? P_HR : P_HL; fi = sd > 0 ? P_FR : P_FL; ki = sd > 0 ? P_KR : P_KL;
+    ex = rx[fi] - rx[hi]; ey = ry[fi] - ry[hi]; d = Math.hypot(ex, ey); if (d > L * 0.999) d = L * 0.999;
+    a = (r.lt * r.lt - r.ls * r.ls + d * d) / (2 * d); h = Math.sqrt(Math.max(0, r.lt * r.lt - a * a)); ux = ex / d; uy = ey / d;
+    rx[ki] = rx[hi] + ux * a + sd * uy * h; ry[ki] = ry[hi] + uy * a - sd * ux * h;
+  }
   var ys = yh - r.th;
-  rx[P_SL] = -r.sw; ry[P_SL] = ys; rx[P_SR] = r.sw; ry[P_SR] = ys;
-  rx[P_H] = 0; ry[P_H] = ys - (r.rh + r.rt - 4);
+  rx[P_SL] = -r.sw + sh; ry[P_SL] = ys; rx[P_SR] = r.sw + sh; ry[P_SR] = ys;
+  rx[P_H] = sh; ry[P_H] = ys - (r.rh + r.rt - 4);
   r.height = -(ry[P_H] - r.rh); r.shoulderH = -ys + r.rt;
   poseArms(r);
   var cx = 0, cy = 0, m = 0, i, j;
@@ -318,7 +349,7 @@ function dropHold(g) {
   g.on = false;
 }
 function addHold(ra, side, rb, b1, b2, t, rest) {
-  var g = { on: true, ra: ra, side: side, hi: ra.base + (side ? P_FR : P_FL), rb: rb, b1: b1, b2: b2, t: t, rest: rest, comp: 0.0005, stretch: 0, age: 0, over: 0 };
+  var g = { on: true, ra: ra, side: side, hi: ra.base + (side ? P_FR : P_FL), rb: rb, b1: b1, b2: b2, t: t, rest: rest, comp: 0.0005, stretch: 0, age: 0, over: 0, teeter: false };
   ra.hold[side] = g; holds.push(g);
   return g;
 }
@@ -330,7 +361,7 @@ function dropGrab(g) {
 function addGrab(ra, side, rb, b1, b2, t) {
   var hi = ra.base + (side ? P_AR : P_AL);
   var tx = px[b1] * (1 - t) + px[b2] * t, ty = py[b1] * (1 - t) + py[b2] * t;
-  var g = { on: true, ra: ra, side: side, hi: hi, rb: rb, b1: b1, b2: b2, t: t, rest: Math.hypot(tx - px[hi], ty - py[hi]), comp: 0.0012, stretch: 0, age: 0, over: 0, held: 0 };
+  var g = { on: true, ra: ra, side: side, hi: hi, rb: rb, b1: b1, b2: b2, t: t, rest: Math.hypot(tx - px[hi], ty - py[hi]), comp: 0.0012, stretch: 0, age: 0, over: 0, held: 0, hang: false };
   ra.grab[side] = g; ra.armOn[side] = false; grabs.push(g);
   return g;
 }
@@ -404,6 +435,7 @@ function shapeMatch(r) {
       dth *= fc >= FOOT_GRACE ? 1 : fc / FOOT_GRACE;
     }
     else if (r.pivot === 2) { pvx = (px[b + P_AL] + px[b + P_AR]) * 0.5; pvy = (py[b + P_AL] + py[b + P_AR]) * 0.5; }
+    else if (r.pivot === 3) { pvx = px[b + r.pivFoot]; pvy = py[b + r.pivFoot]; }       // teetering on one foot
     else {                                                   // airborne: true centre of mass, so no momentum is injected
       pvx = 0; pvy = 0; m = 0;
       for (i = 0; i < NP; i++) { k = b + i; pvx += px[k] * BASEM[i]; pvy += py[k] * BASEM[i]; m += BASEM[i]; }
@@ -422,7 +454,7 @@ function shapeMatch(r) {
   }
 }
 function solveLinks(arr) {      // soft, pull-only springs: hand grabs and foot-holds
-  var n = arr.length, i, g, t, tx, ty, dx, dy, d, C, wh, w1, w2, wb, lam, hi, b1, b2, nx, ny;
+  var n = arr.length, i, g, t, tx, ty, dx, dy, d, C, wh, w1, w2, wb, lam, hi, b1, b2, nx, ny, kh, kb;
   for (i = 0; i < n; i++) {
     g = arr[i]; hi = g.hi; b1 = g.b1; b2 = g.b2; t = g.t;
     tx = px[b1] * (1 - t) + px[b2] * t; ty = py[b1] * (1 - t) + py[b2] * t;
@@ -431,8 +463,11 @@ function solveLinks(arr) {      // soft, pull-only springs: hand grabs and foot-
     C = d - g.rest; if (C <= 0 || d < 1e-9) continue;
     wh = pw[hi]; w1 = pw[b1] * (1 - t); w2 = pw[b2] * t; wb = w1 * (1 - t) + w2 * t;
     lam = C / (wh + wb + g.comp / (HS * HS)); nx = dx / d; ny = dy / d;
-    px[hi] += nx * lam * wh; py[hi] += ny * lam * wh;
-    px[b1] -= nx * lam * w1; py[b1] -= ny * lam * w1; px[b2] -= nx * lam * w2; py[b2] -= ny * lam * w2;
+    // emergency holds (a dangling body, a toe-hold): the tower braces itself and only feels part of the pull
+    kh = 1; kb = 1;
+    if (g.hang) { if (g.ra.slip) kb = HANG_SHARE; else kh = HANG_SHARE; } else if (g.teeter) kb = HANG_SHARE;
+    px[hi] += nx * lam * wh * kh; py[hi] += ny * lam * wh * kh;
+    px[b1] -= nx * lam * w1 * kb; py[b1] -= ny * lam * w1 * kb; px[b2] -= nx * lam * w2 * kb; py[b2] -= ny * lam * w2 * kb;
   }
 }
 // the base ragdoll digs its feet in: pull-only springs to the spots where its feet were planted
@@ -564,21 +599,21 @@ function buildPairs() {
   }
   nPairs = 0;
   for (q = 0; q < n; q++) {
-    var A = rags[q]; if (A.state === 'carried') continue;
+    var A = rags[q]; if (A.state === 'carried' || A.noCol) continue;
     for (p = q + 1; p < n; p++) {
-      var B = rags[p]; if (B.state === 'carried') continue;
+      var B = rags[p]; if (B.state === 'carried' || B.noCol) continue;
       if (A.maxx < B.minx || B.maxx < A.minx || A.maxy < B.miny || B.maxy < A.miny) continue;
-      ga = A.grab; gb = B.grab;
+      ga = A.grab; gb = B.grab; var hA = A.ghost, hB = B.ghost;
       for (i = 0; i < NSH; i++) {
         sa = A.sbase + i; ca = scat[sa];
         sideA = ca === 2 ? ((i - 5) & 1) : -1;
-        if (sideA >= 0 && ga[sideA] && ga[sideA].rb === B) continue;        // an arm does not collide with what it holds
+        if (sideA >= 0 && ((ga[sideA] && ga[sideA].rb === B) || (hA[sideA] === B && A.ghostT[sideA] > 0))) continue;        // an arm does not collide with what it holds (or has only just let go of)
         for (k = 0; k < NSH; k++) {
           sb = B.sbase + k; cb = scat[sb];
           if (sminx[sa] > smaxx[sb] || sminx[sb] > smaxx[sa] || sminy[sa] > smaxy[sb] || sminy[sb] > smaxy[sa]) continue;
           if (ca === 2 && cb === 2) continue;                                // arms pass arms (keeps grabbing calm)
           sideB = cb === 2 ? ((k - 5) & 1) : -1;
-          if (sideB >= 0 && gb[sideB] && gb[sideB].rb === A) continue;
+          if (sideB >= 0 && ((gb[sideB] && gb[sideB].rb === A) || (hB[sideB] === A && B.ghostT[sideB] > 0))) continue;
           if (nPairs < MAXPAIR) { pairA[nPairs] = sa; pairB[nPairs] = sb; nPairs++; }
         }
       }
@@ -593,6 +628,11 @@ function substep() {
   var gy = GRAV * HS;
   for (q = 0; q < n; q++) {
     r = rags[q]; b = r.base; f = ax * r.windF;
+    if (r.swStepU !== 0 || r.swStepF !== 0) {          // tower sway: imposed displacement (adds no velocity)
+      c = r.swStepU; sp = r.swStepF;
+      for (i = 0; i < 9; i++) px[b + i] += c;
+      px[b + P_KL] += (c + sp) * 0.5; px[b + P_KR] += (c + sp) * 0.5; px[b + P_FL] += sp; px[b + P_FR] += sp;
+    }
     for (i = 0; i < NP; i++) {
       k = b + i;
       if (pw[k] === 0) { ox[k] = px[k]; oy[k] = py[k]; continue; }
@@ -626,6 +666,10 @@ function substep() {
       if (i < 5) { mvx += vxx; mvy += vyy; }
     }
     r.maxSpeed = ms; r.cvx = mvx * 0.2; r.cvy = mvy * 0.2;
+    if (r.legDrag > 0) {            // air drag on the dangling legs of the carried one: they trail behind the swing
+      c = r.legDrag * HS;
+      for (i = 9; i < 13; i++) { k = b + i; vx[k] -= vx[k] * c; }
+    }
     if (r.dampRel > 0) {            // balance damping: lateral motion relative to the own feet
       var vf = r.pivot === 2 ? carrier.vx : (vx[b + P_FL] + vx[b + P_FR]) * 0.5, cr = r.dampRel * HS;
       for (i = 0; i < 11; i++) { k = b + i; vx[k] -= (vx[k] - vf) * cr; }
@@ -638,19 +682,25 @@ function substep() {
 var gstate = 'ready';
 var stack = [];                 // ragdolls counted as stacked, in landing order (stack[0] = base)
 var carried = null, faller = null, baseRag = null;
-var carrier = { x: 0, y: -330, vx: 0, phase: 0, cx: 0, amp: 80, omega: 1.15, readyT: 0, emptyT: 0, bob: 0 };
+var carrier = { x: 0, y: -330, vx: 0, phase: 0, cx: 0, amp: 72, omega: 1.7, readyT: 0, emptyT: 0, bob: 0 };
 var gameTime = 0, realTime = 0, subCount = 0, physAcc = 0, timeScale = 1;
-var sway = 0, swayRaw = 0, shownH = 0, maxCount = 0, dropCount = 0, towerTopY = 0, towerTopYs = 0;
-var best = 0, bestCount = 0, newRecord = false, runBestAtStart = 0;
-var collapseT = 0, collapsePhase = 0, failX = 0, failY = 0, spawnDelay = 0;
-var wind = { forced: null, cur: 0, target: 0, phase: 0, t: 0, next: 9, hold: 2, leaf: 0 };
-var camBump = 0, shakeT = 0;
-var fxLand = [], fxEvents = [];     // event queues consumed by the renderer / audio layer
+var sway = 0, swayRaw = 0, shownH = 0, maxCount = 0, dropCount = 0, towerTopY = 0;
+var best = 0, bestCount = 0, newRecord = false, hadBest = false, beatBest = false, failReason = '';
+var collapseT = 0, collapsePhase = 0, failX = 0, failY = 0, failDir = 0, spawnDelay = 0, limpFront = 0;
+var wind = { forced: null, cur: 0, target: 0, phase: 0, t: 0, next: 9, hold: 2, leaf: 0, str: 0 };
+var camBump = 0;
+// whole-tower sway: one damped oscillator (top displacement in world units) that every stacked ragdoll follows by
+// shifting its upper body over its planted feet; landings kick it, wind and hanging people pull it.
+var swX = 0, swV = 0, swW = 4.2, swPull = 0, swKick = 0, risk = 0, riskDir = 0;
+var tip = { on: false, j: -2, t: 0, over: 0, dir: 0 };
+var fxEvents = [];                  // event queue consumed by the renderer / audio layer
 var TONE0 = 0.035, TONE_K = 0.9, UP0 = 0.0002, UP_K = 0, UP_LIM = 0.03, MASS_K = 0.5, DAMP_REL = 4.5, BASE_UP = 0.0002, GH_C = 0.5, GH_BREAK = 3;
 var TONE_P = 2, PAN_SOFT = 0.35;
 var FALL_TONE = 0.02, FALL_ARM = 0.004, FALL_UP = 0.012;
-var GRAB_C = 0.0012, GRAB_BREAK = 16;
+var GRAB_C = 0.0012, GRAB_BREAK = 16, HANG_C = 0.0022, HANG_BREAK = 84, HANG_REACH = 34;
 var HOLD_C = 0.0006, HOLD_K = 0.6, HOLD_BREAK = 6, HOLD_P = 3;
+var ABSORB_T = 0.22, ABSORB_Y = 0.5, ABSORB_X = 0.22;
+var KEEP = 0.45, LEAN_MAX = 9, SUP_B = 23, SW_ZETA = 0.15, SW_P = 1.15, SW_KICK = 1;
 var STORE_KEY = 'dieluohan_xpbd_best_v1';
 function loadBest() {
   try {
@@ -664,16 +714,18 @@ function saveBest() {
 function emit(type, a, b, c, d) { if (fxEvents.length < 200) fxEvents.push({ type: type, a: a, b: b, c: c, d: d }); }
 
 function setState(r, st) {
-  r.state = st; r.faceT = 0;
-  if (st === 'carried') { r.tone = 0.008; r.armTone = 0; r.upK = 0.0007; r.upMax = 0.002; r.dampC0 = 1.6; r.dampC1 = 0; r.dampV0 = 1; r.windF = 0.25; r.face = 'nervous'; r.pivot = 2; r.dampRel = 30; }
+  r.state = st; r.faceT = 0; r.legDrag = 0; if (st !== 'falling') r.noCol = false;
+  if (st === 'carried') { r.tone = 0.0045; r.armTone = 0; r.upK = 0.0005; r.upMax = 0.0016; r.dampC0 = 0.9; r.dampC1 = 0; r.dampV0 = 1; r.windF = 0.25; r.face = 'nervous'; r.pivot = 2; r.dampRel = 7; r.legDrag = 2.2; }
   else if (st === 'falling') { r.tone = FALL_TONE; r.armTone = FALL_ARM; r.upK = FALL_UP; r.upMax = 0.01; r.dampC0 = 0.05; r.dampC1 = 0; r.dampV0 = 1; r.windF = 1; r.face = 'terror'; r.pivot = 0; r.dampRel = 0; }
   else if (st === 'landed') { r.dampC0 = 0.55; r.dampC1 = 24; r.dampV0 = 9; r.windF = 1; r.pivot = 1; r.dampRel = DAMP_REL; }
-  else if (st === 'limp') { r.tone = 0; r.armTone = 0; r.upK = 0; r.dampC0 = 0.22; r.dampC1 = 16; r.dampV0 = 8; r.windF = 0.12; r.armOn[0] = r.armOn[1] = true; r.pivot = 0; r.dampRel = 0; }
+  else if (st === 'limp') { r.tone = 0; r.armTone = 0; r.upK = 0; r.dampC0 = 0.22; r.dampC1 = 16; r.dampV0 = 8; r.windF = 0.12; r.armOn[0] = r.armOn[1] = true; r.pivot = 0; r.dampRel = 0; r.slip = false; }
 }
 function pickKind() {
   if (dropCount < 2) return 'normal';
-  var u = rnd();
-  return u < 0.11 ? 'fat' : u < 0.22 ? 'long' : 'normal';
+  var u = rnd(), gap = dropCount - lastSpecial, k = 'normal';
+  if (gap >= 2) { if (u < 0.12) k = 'fat'; else if (u < 0.24) k = 'long'; else if (gap >= 7) k = u < 0.62 ? 'fat' : 'long'; }
+  if (k !== 'normal') lastSpecial = dropCount;
+  return k;
 }
 function hangLen(r) { return r.au + r.af + r.shoulderH - r.rt; }       // hands -> soles when dangling
 function carrierTargetY(r) { return towerTopY - 78 - (r ? hangLen(r) : 125); }
@@ -684,7 +736,6 @@ function spawnCarried() {
   r.armA1[0] = r.armA1[1] = 3.05; r.armA2[0] = r.armA2[1] = 3.1; poseArms(r);
   var ty = carrierTargetY(r);
   if (stack.length === 0 && gstate !== 'playing') carrier.y = ty;
-  // hang it from the carrier: local origin (feet) below the hands
   // hang it under the carrier with straight arms reaching up to the two grip points
   var L = r.au + r.af, dxs = r.sw - 4.5, drop = Math.sqrt(Math.max(1, L * L - dxs * dxs)) * 0.985, b = r.base, sd, sh, k;
   placeRag(r, carrier.x, carrier.y + drop - r.ry[P_SL]);
@@ -711,11 +762,12 @@ function pinCarried() {         // runs every substep (prePhysics)
   }
 }
 prePhysics = pinCarried;
+var REL_KEEP = 0.2;             // share of the swing speed a released ragdoll keeps
 function releaseCarried() {
   var r = carried; if (!r) return false;
-  var b = r.base, i;
+  var b = r.base, i, m = 0, cx = 0, cy = 0, w;
   pw[b + P_AL] = 1 / (BASEM[P_AL] * r.massMul); pw[b + P_AR] = 1 / (BASEM[P_AR] * r.massMul);
-  var rvx = r.cvx * 0.2;                                   // keep only a little of the swing, no spin
+  var rvx = carrier.vx * REL_KEEP;                         // keep only a little of the swing, and none of the dangling spin
   for (i = 0; i < NP; i++) { vx[b + i] = rvx; vy[b + i] = 0; }
   r.armOn[0] = r.armOn[1] = true;
   r.armA1[0] = r.armA1[1] = 2.5; r.armA2[0] = r.armA2[1] = 2.9; poseArms(r);
@@ -730,71 +782,96 @@ function doDrop() {
   return releaseCarried();
 }
 function fallTime(r) {
-  var soles = py[r.base + P_FL] + r.rl, sup = stack.length ? supportY() : 0;
+  var soles = Math.max(py[r.base + P_FL], py[r.base + P_FR]) + r.rl, sup = stack.length ? supportY() : 0;
   var d = sup - soles; if (d < 1) d = 1;
   return Math.sqrt(2 * d / GRAV);
 }
 function topRag() { return stack.length ? stack[stack.length - 1] : null; }
 function supportY() { var t = topRag(); return t ? (py[t.base + P_SL] + py[t.base + P_SR]) * 0.5 - t.rt : 0; }
 function supportX() { var t = topRag(); return t ? (px[t.base + P_SL] + px[t.base + P_SR]) * 0.5 : carrier.cx; }
+function feetX(r) { return (px[r.base + P_FL] + px[r.base + P_FR]) * 0.5; }
+// where the tower top will have swayed to after tau seconds (closed form of the sway oscillator)
+function swayAhead(tau) {
+  if (stack.length < 2) return 0;
+  var w = swW, z = SW_ZETA, wd = w * Math.sqrt(1 - z * z), e = Math.exp(-z * w * tau), x0 = swX - swPull;
+  return swPull + e * (x0 * Math.cos(wd * tau) + (swV + z * w * x0) / wd * Math.sin(wd * tau)) - swX;
+}
 function aimInfo() {
   var r = carried, can = gstate === 'playing' && !!r && carrier.readyT <= 0;
   if (!r) return { canDrop: false, x: carrier.x, targetX: supportX() };
-  var t = fallTime(r), drift = 0.2 * r.cvx * t + 0.5 * windNow * WIND_ACC * t * t;
-  return { canDrop: can, x: r.comx, targetX: supportX() - drift };
+  var t = fallTime(r), drift = REL_KEEP * carrier.vx * t + 0.5 * windNow * WIND_ACC * t * t;
+  // x = where the feet are now; targetX = where they have to be at the moment of release for a centred landing
+  return { canDrop: can, x: feetX(r), targetX: supportX() + swayAhead(t) - drift };
 }
 // ---------- per-tick ragdoll upkeep ----------
 function updateTone() {
-  var n = stack.length, i, r, above, pan, extra = 0;
-  for (i = 0; i < rags.length; i++) if (rags[i].state === 'landed' && !rags[i].stacked) extra++;
+  var n = stack.length, i, r, above, pan, extra = 0, wf = clamp(3.2 / Math.max(1, n), 0.12, 0.6);
+  for (i = 0; i < rags.length; i++) if (rags[i].state === 'landed' && !rags[i].stacked && !rags[i].slip) extra++;
   for (i = 0; i < rags.length; i++) {
     r = rags[i];
     if (r.state !== 'landed') continue;
+    if (r.slip) {                                    // lost its footing: goes limp, only the arms still try
+      r.tone = r.slipMode === 1 ? 0.012 : 0.0025; r.armTone = 0.004; r.upK = 0; r.upMax = 0; r.above = 0; r.windF = 1; r.dampRel = 0; r.pivot = 0;
+      if (r.slipMode === 1 && (r.hold[0] || r.hold[1])) { r.pivot = 3; r.pivFoot = r.hold[0] ? P_FL : P_FR; r.upK = 0.004; r.upMax = TEETER_UP; }   // windmilling on one foot
+      r.dampC0 = r.slipMode === 1 ? 1.4 : (r.grab[0] || r.grab[1] || r.heldBy > 0 ? 1.6 : 0.3); r.dampC1 = 0;
+      setMassScale(r, 1); continue;
+    }
     above = r.stacked ? (n - 1 - r.stackIdx + extra) : 0;
     pan = clamp(sway * 1.1, 0, 1);
-    var soft = gstate === 'collapsing' ? 0.25 : 1;
+    var soft = gstate === 'collapsing' ? 0.25 : (tip.on && r.stacked && r.stackIdx > tip.j ? 0.5 : 1);
     r.tone = Math.min(0.5, TONE0 * Math.pow(1 + TONE_K * above, TONE_P)) * (1 - PAN_SOFT * pan) * soft;
     r.armTone = 0.003 * soft;
     r.above = above;
-    r.upK = gstate === 'collapsing' ? 0 : (r === baseRag || r.isBase ? BASE_UP : Math.min(0.03, UP0 * (1 + UP_K * above)) * (1 - PAN_SOFT * pan));
+    r.upK = (gstate === 'collapsing' || soft < 1) ? 0 : (r === baseRag || r.isBase ? BASE_UP : Math.min(0.03, UP0 * (1 + UP_K * above)) * (1 - PAN_SOFT * pan));
     r.upMax = r.upK * UP_LIM;
+    r.windF = r.stacked ? wf : 1; r.dampRel = DAMP_REL; r.dampC0 = 0.55; r.dampC1 = 24; r.pivot = 1;
     setMassScale(r, 1 + MASS_K * above);
   }
 }
 function landFx(r, other, speed) {
-  var k = clamp(speed / 520, 0.15, 1.3);
+  var k = clamp(speed / 520, 0.15, 1.3), i, d, s;
   r.crouchV += 3.2 * k; r.squashV += 5 * k;
-  if (other) { other.crouchV += 1.9 * k; other.squashV += 3.5 * k; var o2 = other.feetOn; if (o2) o2.crouchV += 0.8 * k; }
+  if (other && other.stacked) {                    // the squash travels down the tower like a ripple
+    for (i = other.stackIdx, d = 0; i >= 0 && d < 9; i--, d++) { s = stack[i]; s.kick = 2.0 * k * Math.pow(0.74, d); s.kickT = 0.001 + d * 0.045; }
+  } else if (other) { other.crouchV += 1.9 * k; other.squashV += 3.5 * k; }
   camBump += 5 * k;
   emit('land', r, other, speed);
 }
 function stepCrouch(r, dt) {
+  if (r.kickT > 0) { r.kickT -= dt; if (r.kickT <= 0) { r.crouchV += r.kick; r.squashV += r.kick * 1.8; r.kickT = 0; } }
   if (r.crouch === 0 && r.crouchV === 0) return;
   r.crouchV += (-190 * r.crouch - 15 * r.crouchV) * dt; r.crouch += r.crouchV * dt;
   if (r.crouch > 0.55) { r.crouch = 0.55; if (r.crouchV > 0) r.crouchV = 0; }
   if (r.crouch < -0.04) { r.crouch = -0.04; if (r.crouchV < 0) r.crouchV = 0; }
   if (Math.abs(r.crouch) < 0.0015 && Math.abs(r.crouchV) < 0.02) { r.crouch = 0; r.crouchV = 0; }
-  buildPose(r, r.crouch);
 }
 function headTop(r) { return py[r.base + P_H] - r.rh; }
 function becomeStacked(r) {
+  var pt = topRag();
+  r.swPhi = 1; r.swU = pt ? pt.swU : 0; r.swUv = 0;
   r.stacked = true; r.stackIdx = stack.length; stack.push(r);
-  r.settleHeadY = headTop(r); r.reliefT = 1.6; r.face = 'relief';
+  r.settleHeadY = headTop(r) - 3 * r.crouch * (r.lt + r.ls) * 0.3; r.reliefT = 1.6; r.face = 'relief';
+  r.slip = false;
   if (stack.length === 1) baseRag = r;
-  var top = 0, i;
-  for (i = 0; i < stack.length; i++) top = Math.min(top, headTop(stack[i]));
-  towerTopY = top;
-  var h = -top;
-  if (h > shownH) shownH = h;
   if (stack.length > maxCount) maxCount = stack.length;
-  emit('stacked', r, h / UPM);
-  if (faller === r) { faller = null; spawnDelay = 0.3; }
+  measureTop();
+  emit('stacked', r, shownH / UPM, stack.length);
+  if (faller === r) { faller = null; spawnDelay = 0.22; }
+}
+function measureTop() {
+  var top = 0, i, h;
+  for (i = 0; i < stack.length; i++) { h = headTop(stack[i]); if (h < top) top = h; }
+  towerTopY = top;
+  if (-top > shownH) shownH = -top;
+  if (hadBest && !beatBest && Math.round(shownH / UPM * 10) / 10 > best + 1e-9) { beatBest = true; emit('record'); }
 }
 function fail(reason, x, y) {
   if (gstate !== 'playing') return;
-  gstate = 'collapsing'; collapseT = 0; collapsePhase = 0; failX = x; failY = y;
+  gstate = 'collapsing'; collapseT = 0; collapsePhase = 0; failX = x; failY = y; failReason = reason;
+  failDir = tip.on ? tip.dir : (Math.abs(swX) > 6 ? (swX > 0 ? 1 : -1) : (stack.length > 1 && Math.abs(x - stack[0].comx) > 8 ? (x > stack[0].comx ? 1 : -1) : 0));
+  if (Math.abs(windNow) > 0.25 && (reason === 'lean' || reason === 'tilt' || reason === 'drop' || reason === 'base')) failReason = 'wind';
   for (var i = 0; i < rags.length; i++) { rags[i].face = 'scream'; rags[i].faceT = 0; }
-  emit('collapse', reason);
+  emit('collapse', failReason);
 }
 var G_FOOTBITS = (1 << P_FL) | (1 << P_FR) | (1 << P_KL) | (1 << P_KR) | (1 << P_AL) | (1 << P_AR) | (1 << P_EL) | (1 << P_ER);
 function checkRag(r, dt) {
@@ -802,14 +879,111 @@ function checkRag(r, dt) {
   for (i = 0; i < NP; i++) { y = py[b + i]; if (y > lowest) { lowest = y; lx = px[b + i]; } }
   if (lowest > 34) { fail('off', lx, lowest); return; }                    // fell off the platform
   if (r.gc) {
-    if (r !== baseRag && !r.isBase) { fail('ground', r.comx, 0); return; }  // missed the tower / fell to the ground
+    if (r !== baseRag && !r.isBase) { fail(r.stacked ? 'lean' : 'ground', r.comx, 0); return; }  // missed the tower / fell to the ground
     if (r.gc & ~G_FOOTBITS) { fail('base', r.comx, 0); return; }             // the base ragdoll fell over
   }
   if (r.stacked) {
-    var ht = headTop(r);
+    var ht = headTop(r), tl = tip.on ? 0.62 : 0.95;
     if (ht < r.settleHeadY) r.settleHeadY += (ht - r.settleHeadY) * 0.02;
-    if (ht - r.settleHeadY > 0.42 * r.height) { fail('drop', r.comx, r.comy); return; }
-    if (Math.abs(r.tilt) > 0.95) { r.tiltT += dt; if (r.tiltT > 0.25) { fail('tilt', r.comx, r.comy); return; } } else r.tiltT = 0;
+    if (ht - r.settleHeadY > 0.42 * r.height) { fail(tip.on ? 'lean' : 'drop', r.comx, r.comy); return; }
+    if (Math.abs(r.tilt) > tl) { r.tiltT += dt; if (r.tiltT > (tip.on ? 0.1 : 0.25)) { fail(tip.on ? 'lean' : 'tilt', r.comx, r.comy); return; } } else r.tiltT = 0;
+  } else if (r.slip && !r.grab[0] && !r.grab[1]) {
+    // nobody caught him: once he has dropped well below the top the run is lost (no need to wait for the ground)
+    r.lostT += dt;
+    if (r.lostT > 0.3 && r.comy > towerTopY + 300 && r.cvy > 150) { fail('fell', r.comx, r.comy); return; }
+  } else r.lostT = 0;
+}
+// ---------- the newcomer: stance, teetering, hanging on, hopping back ----------
+function saveMax(n) { return clamp(37 - 0.6 * n, 26, 36); }      // widest first-touch offset that can still be rescued
+function rescueOK() { return risk < 0.85 && !tip.on && Math.hypot(swX, swV / swW) < 34 + stack.length; }
+function startSlip(r) {
+  if (r.slip) return;
+  var top = topRag(), i, b = r.base;
+  r.slip = true; r.slipT = 0; r.hangT = 0; r.lostT = 0; r.face = 'terror'; r.slipMode = 2;
+  if (r.state === 'falling') { setState(r, 'landed'); r.landT = gameTime; r.face = 'terror'; }
+  for (i = holds.length - 1; i >= 0; i--) if (holds[i].ra === r) dropHold(holds[i]);
+  for (i = grabs.length - 1; i >= 0; i--) if (grabs[i].ra === r && !grabs[i].hang) breakGrab(grabs[i], true);
+  r.grabCool[0] = r.grabCool[1] = 0;
+  // partial support: the first touch was close, he is still up there -> one foot keeps a toe-hold and he teeters
+  if (top && !r.gaveUp && r.hop === 0 && Math.abs(r.landOff) <= saveMax(stack.length) && r.comy < supportY() - 6 && rescueOK()) {
+    var sl = top.base + P_SL, sr = top.base + P_SR, f = feetX(r) > supportX() ? 0 : 1, k = b + (f ? P_FR : P_FL);
+    var ax = px[sl], ay = py[sl], dx = px[sr] - ax, dy = py[sr] - ay, l2 = dx * dx + dy * dy, t, d;
+    r.slipMode = 1;
+    if (l2 > 1) {
+      t = clamp(((px[k] - ax) * dx + (py[k] - ay) * dy) / l2, 0.03, 0.97); d = Math.hypot(ax + dx * t - px[k], ay + dy * t - py[k]);
+      if (d < 34) { i = addHold(r, f, top, sl, sr, t, Math.max(top.rt + r.rl, d - 4)); i.teeter = true; i.comp = 0.0012; }
+    }
+  }
+  emit('slip', r, r.slipMode);
+}
+function endSlip(r) { r.slip = false; r.slipT = 0; r.hangT = 0; r.slipMode = 0; }
+function dropAllHolds(r) { for (var i = holds.length - 1; i >= 0; i--) if (holds[i].ra === r) dropHold(holds[i]); }
+function letGo(r, quiet) {
+  var s, any = false;
+  for (s = 0; s < 2; s++) if (r.grab[s]) { breakGrab(r.grab[s], quiet || any); any = true; }
+  for (s = grabs.length - 1; s >= 0; s--) if (grabs[s].rb === r) { breakGrab(grabs[s], quiet || any); any = true; }
+  dropAllHolds(r);
+  r.gaveUp = true; r.grabCool[0] = r.grabCool[1] = 99; r.slipMode = 2;
+}
+var HOP_CLEAR = 44, TEETER_UP = 0.00003, TEETER_T = 0.55;
+function doHop(r) {                    // scramble back: a little jump from the edge onto the middle of the shoulders
+  var b = r.base, i, s, sy = supportY();
+  // the centre of mass has to rise until the (straightened) feet clear the head below, then drop onto the shoulders
+  var rise = clamp(r.comy - (sy + r.cy0 - HOP_CLEAR), 22, 100), vy0 = Math.sqrt(2 * GRAV * rise), T = vy0 / GRAV + Math.sqrt(2 * HOP_CLEAR / GRAV);
+  var dx = supportX() + swayAhead(T) - r.comx, vx0 = clamp(dx / T, -260, 260);
+  for (s = 0; s < 2; s++) if (r.grab[s]) breakGrab(r.grab[s], true);
+  for (i = grabs.length - 1; i >= 0; i--) if (grabs[i].rb === r) breakGrab(grabs[i], true);
+  dropAllHolds(r);
+  endSlip(r);
+  setState(r, 'falling'); r.upK = 0.03; r.upMax = 0.03; r.tone = 0.05; r.windF = 0.3;
+  r.touch = 0; r.gc = 0; r.hop++; r.hopT = gameTime; r.hopLand = gameTime + T; r.holdCool = 0; r.stanceT = 0;
+  r.grabCool[0] = r.grabCool[1] = 0.4;
+  for (i = 0; i < NP; i++) { vx[b + i] = vx0; vy[b + i] = -vy0; }
+  r.armOn[0] = r.armOn[1] = true;
+  r.armA1[0] = r.armA1[1] = 2.5; r.armA2[0] = r.armA2[1] = 2.9; poseArms(r);
+  r.noCol = true;                      // he vaults over the head below; contact is back on for the landing
+  emit('hop', r);
+}
+function hopSteer(r) {                 // in the air: keep heading for the (swaying) shoulders
+  var T = r.hopLand - gameTime, b = r.base, i, dv;
+  if (r.noCol) { r.touch = 0; if (T < 0.15 && r.cvy > 0) r.noCol = false; }
+  if (T < 0.05 || !stack.length) return;
+  dv = clamp(((supportX() + swayAhead(T) - r.comx) / T - r.cvx) * 0.35, -40, 40);
+  for (i = 0; i < NP; i++) vx[b + i] += dv;
+}
+function newcomerTick(r, dt) {
+  var since = gameTime - r.landT, top = topRag(), b = r.base, sp = Math.hypot(r.cvx, r.cvy), i, k;
+  if (since < ABSORB_T && !r.slip) {                          // legs soak up the landing: no bouncing back off the shoulders
+    var rv = top && !r.isBase ? top.cvx : 0, dvx = (rv - r.cvx) * ABSORB_X;
+    for (i = 0; i < NP; i++) { k = b + i; if (vy[k] < 0) vy[k] *= ABSORB_Y; vx[k] += dvx; }
+  }
+  if (r.isBase) {                                             // the first one only has to stand on the ground
+    if (since > 0.2 && r.footL > 0 && r.footR > 0 && sp < 70 && Math.abs(r.tilt) < 0.4) r.stanceT += dt; else r.stanceT = 0;
+    if (r.stanceT > 0.2 || since > 6) becomeStacked(r);
+    return;
+  }
+  var two = !!(r.hold[0] && r.hold[1]) && !r.slip, rel = top ? Math.hypot(r.cvx - top.cvx, r.cvy - top.cvy) : sp, sy = supportY();
+  if (two && Math.abs(r.tilt) < 0.42 && rel < 70) r.stanceT += dt; else r.stanceT = 0;
+  if (r.stanceT > 0.2) { becomeStacked(r); return; }
+  if (!r.slip) {
+    if (since > 0.18 && !two) {
+      var aoff = Math.abs(feetX(r) - supportX());
+      if (r.comy > sy - 8 || Math.abs(r.tilt) > 0.62 || aoff > 19.5 || (since > 0.8 && r.footL <= 0 && r.footR <= 0)) { startSlip(r); return; }
+    }
+    if (since > 0.95 && !two) startSlip(r);                    // perched in some odd way without a real stance
+    return;
+  }
+  // ---- lost his footing: terror, hands snatch at the tower ----
+  r.slipT += dt;
+  var holding = !!(r.grab[0] || r.grab[1] || r.heldBy > 0), up = r.comy < sy + 4;
+  if (holding) { r.hangT += dt; r.hung = true; }
+  if (r.slipMode === 1) {
+    // teetering on one foot: after a moment of drama he hops back -- unless the tower cannot take it any more
+    if (!up || r.slipT > 1.5) { r.slipMode = 2; dropAllHolds(r); }
+    else if (r.slipT > TEETER_T && rescueOK()) { doHop(r); return; }
+  }
+  if (r.slipMode === 2 && holding) {
+    if (r.hangT > 1.3 + (sway < 0.8 ? 0.5 : 0)) letGo(r, false);
   }
 }
 function supported(r) {
@@ -818,15 +992,14 @@ function supported(r) {
   return false;
 }
 function logicTick() {
-  var dt = 1 / 60, i, r;
+  var dt = 1 / 60, i, r, f, top;
   gameTime += dt;
   if (carrier.readyT > 0) carrier.readyT -= dt;
-  // carrier height / swing parameters follow the tower
-  var n = stack.length;
-  carrier.amp += ((n === 0 ? 80 : 120) - carrier.amp) * 0.04;
-  var om = 1.15 + 0.105 * n, omMax = 322 / carrier.amp;
-  carrier.omega += ((om > omMax ? omMax : om) - carrier.omega) * 0.05;
-  if (baseRag) carrier.cx += (clamp(baseRag.comx, -60, 60) - carrier.cx) * 0.02;
+  // carrier height / swing parameters follow the tower: faster (and wider) the higher it gets
+  var n = stack.length, spd = Math.min(322, 122 + 14.5 * n), amp = Math.min(120, 72 + 6 * n);
+  carrier.amp += (amp - carrier.amp) * 0.04;
+  carrier.omega += (spd / amp - carrier.omega) * 0.05;
+  if (n) carrier.cx += (clamp(supportX() - swX * 0.6, -GROUND_HALF + 170, GROUND_HALF - 170) - carrier.cx) * 0.025;
   var cy = carrierTargetY(carried);
   carrier.y += (cy - carrier.y) * 0.07;
   if (gstate === 'playing' || gstate === 'ready') {
@@ -834,12 +1007,17 @@ function logicTick() {
   }
   for (i = 0; i < rags.length; i++) {
     r = rags[i]; r.age += dt;
-    if (r.state === 'falling' && r.touch > 0) {                // first contact
-      setState(r, 'landed'); r.landT = gameTime; r.calmT = 0; r.face = 'land';
-      landFx(r, r.hitOther, r.hitSpeed);
-      r.armA1[0] = r.armA1[1] = 1.05; r.armA2[0] = r.armA2[1] = 1.45; poseArms(r);
+    if (r.state === 'falling' && r.touch > 0 && !r.noCol) onLand(r);          // first contact
+    else if (r.state === 'falling' && r.hop > 0 && gstate === 'playing') hopSteer(r);
+    else if (r.state === 'falling' && !r.isBase && gstate === 'playing' && r.hop === 0 && stack.length) {
+      // went past the shoulders without touching anything: a clean miss, grab for dear life on the way down
+      top = topRag(); f = Math.min(py[r.base + P_FL], py[r.base + P_FR]) + r.rl;
+      if (f > supportY() + 14) { r.landOff = feetX(r) - supportX(); startSlip(r); }
     }
     stepCrouch(r, dt);
+    if (r.leanT !== r.lean) { f = r.leanT - r.lean; r.lean += Math.abs(f) < 0.25 ? f : f * 0.14; }
+    if (r.state === 'landed' || r.state === 'limp') { f = r.state === 'limp' || r.slip ? 0 : r.lean + r.swayS; if (r.state === 'limp') { r.lean *= 0.9; r.swayS = 0; f = r.lean; } r.shear = f; }
+    if (r.poseC !== r.crouch || Math.abs(r.poseS - r.shear) > 0.004) buildPose(r, r.crouch);
     if (r.grabCool[0] > 0) r.grabCool[0] -= dt;
     if (r.grabCool[1] > 0) r.grabCool[1] -= dt;
   }
@@ -851,15 +1029,12 @@ function logicTick() {
       if (r.state === 'carried') continue;
       checkRag(r, dt);
       if (gstate !== 'playing') break;
-      if (r.state === 'landed' && !r.stacked) {
-        var since = gameTime - r.landT;
-        if (since > 0.3 && r.maxSpeed < 30 && supported(r)) r.calmT += dt; else r.calmT = 0;
-        if (r.calmT > 0.3 || (since > 5 && r.maxSpeed < 90 && supported(r)) || since > 9) becomeStacked(r);
-      }
+      if (r.state === 'landed' && !r.stacked) newcomerTick(r, dt);
     }
-    if (faller && faller.state === 'falling' && faller.age > 6) fail('lost', faller.comx, faller.comy);
+    if (gstate === 'playing' && faller && faller.state === 'falling' && faller.age > 6) fail('lost', faller.comx, faller.comy);
+    if (gstate === 'playing') measureTop();
   }
-  if (gstate === 'playing' || gstate === 'collapsing') { updateGrabs(dt); updateHolds(dt); updateGroundHold(dt); updateSway(dt); }
+  if (gstate === 'playing' || gstate === 'collapsing') { updateGrabs(dt); updateHolds(dt); updateGroundHold(dt); updateTower(dt); updateSway(dt); }
   else { updateGrabs(dt); sway *= 0.97; }
   updateWind(dt);
   for (i = 0; i < rags.length; i++) rags[i].gc = 0;
@@ -868,6 +1043,20 @@ function logicTick() {
     r = rags[i];
     if (r.state !== 'carried' && r.comy > 900) { if (faller === r) faller = null; var si = stack.indexOf(r); if (si >= 0 && gstate !== 'playing') stack.splice(si, 1); removeRag(r); }
   }
+}
+function onLand(r) {
+  var top = topRag(), k, d, n = stack.length, hopLanding = r.hop > 0 && gameTime - r.hopT < 2;
+  setState(r, 'landed'); r.landT = gameTime; r.calmT = 0; r.stanceT = 0; r.face = 'land';
+  landFx(r, r.hitOther, hopLanding ? r.hitSpeed * 0.6 : r.hitSpeed);
+  r.armA1[0] = r.armA1[1] = 1.05; r.armA2[0] = r.armA2[1] = 1.45; poseArms(r);
+  if (r.isBase || !top) return;
+  d = feetX(r) - supportX();
+  if (!hopLanding) { r.landOff = d; r.leanT = clamp(KEEP * d, -LEAN_MAX, LEAN_MAX); }
+  else r.leanT = clamp(KEEP * r.landOff, -LEAN_MAX, LEAN_MAX) * 0.9;
+  // the landing kicks the whole tower: a little even when centred, a lot when sloppy
+  var dir = Math.abs(d) > 1.5 ? (d > 0 ? 1 : -1) : (r.cvx >= 0 ? 1 : -1), ad = Math.min(30, Math.abs(d));
+  k = (36 + 3.2 * ad) * clamp(0.22 + 0.078 * n, 0.3, 1.6) * clamp(0.6 + 0.4 * r.massMul, 0.8, 1.5) * (hopLanding ? 0.6 : 1);
+  swKick += dir * k * SW_KICK;
 }
 // ---------- grabbing ----------
 var grabTick = 0;
@@ -879,7 +1068,7 @@ function segPoint(x, y, a, b) {       // closest point on segment a-b (global pa
 }
 function breakGrab(g, quiet) {
   var x = px[g.hi], y = py[g.hi];
-  g.ra.grabCool[g.side] = 2.5;
+  g.ra.grabCool[g.side] = g.hang ? 1.2 : 2.5;
   dropGrab(g);
   if (!quiet) emit('pop', x, y);
 }
@@ -903,43 +1092,83 @@ function findFeetOn() {
 }
 function tryGrab(A, s) {
   var hand = A.base + (s ? P_AR : P_AL), sh = A.base + (s ? P_SR : P_SL), reach = (A.au + A.af) * 0.9;
-  var hx = px[hand], hy = py[hand], i, B, k, d, t, ax, ay, bestD = 1e9, bB = null, b1 = 0, b2 = 0, bt = 0, sp, q1, q2;
-  // 1) someone stands on my shoulders: hold the ankle on my side
-  for (i = 0; i < rags.length; i++) {
-    B = rags[i]; if (B.feetOn !== A) continue;
-    q1 = B.base + (s ? P_KR : P_KL); q2 = B.base + (s ? P_FR : P_FL); t = 0.7;
-    ax = px[q1] * (1 - t) + px[q2] * t; ay = py[q1] * (1 - t) + py[q2] * t;
-    d = Math.hypot(ax - px[sh], ay - py[sh]);
-    if (d < reach && d < bestD) { bestD = d; bB = B; b1 = q1; b2 = q2; bt = t; }
-  }
-  // 2) newcomers and danglers grab whatever is next to the hand
-  if (!bB && (gameTime - A.landT < 1.5 || (!A.feetOn && A !== baseRag && !A.isBase))) {
+  var hx = px[hand], hy = py[hand], i, B, k, d, t, ax, ay, bestD = 1e9, bB = null, b1 = 0, b2 = 0, bt = 0, sp, q1, q2, hang = false;
+  if (A.slip) {
+    // lost his footing: snatch at the nearest torso / limb of the tower within arm's reach (the arm then stretches like a spring)
+    if (A.gaveUp || A.grabN >= 4) return;
+    var sx = px[sh], sy = py[sh], R = A.au + A.af + HANG_REACH;
     for (i = 0; i < rags.length; i++) {
-      B = rags[i]; if (B === A || B.state !== 'landed') continue;
-      if (hx < B.minx - 14 || hx > B.maxx + 14 || hy < B.miny - 14 || hy > B.maxy + 14) continue;
-      for (k = 3; k < NSH; k++) {
+      B = rags[i]; if (B === A || !B.stacked || B.state !== 'landed') continue;
+      if (sx < B.minx - R || sx > B.maxx + R || sy < B.miny - R || sy > B.maxy + R) continue;
+      for (k = 1; k < NSH; k++) {
         sp = B.sbase + k; q1 = s1[sp]; q2 = s2[sp];
-        d = segPoint(hx, hy, q1, q2) - srad[sp]; t = cS;
-        if (d > 13 || d >= bestD) continue;
-        ax = px[q1] * (1 - t) + px[q2] * t; ay = py[q1] * (1 - t) + py[q2] * t;
-        if (Math.hypot(ax - px[sh], ay - py[sh]) > reach) continue;
+        d = segPoint(sx, sy, q1, q2); t = cS;
+        if (d > R || d >= bestD) continue;
         bestD = d; bB = B; b1 = q1; b2 = q2; bt = t;
+      }
+    }
+    hang = true;
+  } else {
+    // 1) someone stands on my shoulders: hold the ankle on my side
+    for (i = 0; i < rags.length; i++) {
+      B = rags[i]; if (B.feetOn !== A || B.slip) continue;
+      q1 = B.base + (s ? P_KR : P_KL); q2 = B.base + (s ? P_FR : P_FL); t = 0.7;
+      ax = px[q1] * (1 - t) + px[q2] * t; ay = py[q1] * (1 - t) + py[q2] * t;
+      d = Math.hypot(ax - px[sh], ay - py[sh]);
+      if (d < reach && d < bestD) { bestD = d; bB = B; b1 = q1; b2 = q2; bt = t; }
+    }
+    // 2) somebody is slipping past: catch a leg or an arm if it comes within reach
+    if (!bB && A.stacked && !tip.on) {
+      for (i = 0; i < rags.length; i++) {
+        B = rags[i]; if (!B.slip || B.gaveUp || B === A || B.heldBy >= 2) continue;
+        if (px[sh] < B.minx - reach || px[sh] > B.maxx + reach || py[sh] < B.miny - reach || py[sh] > B.maxy + reach) continue;
+        for (k = 5; k < NSH; k++) {
+          sp = B.sbase + k; q1 = s1[sp]; q2 = s2[sp];
+          d = segPoint(px[sh], py[sh], q1, q2); t = cS;
+          if (d > reach || d >= bestD) continue;
+          bestD = d; bB = B; b1 = q1; b2 = q2; bt = t; hang = true;
+        }
+      }
+    }
+    // 3) newcomers and danglers grab whatever is next to the hand
+    if (!bB && (gameTime - A.landT < 1.5 || (!A.feetOn && A !== baseRag && !A.isBase))) {
+      for (i = 0; i < rags.length; i++) {
+        B = rags[i]; if (B === A || B.state !== 'landed') continue;
+        if (hx < B.minx - 14 || hx > B.maxx + 14 || hy < B.miny - 14 || hy > B.maxy + 14) continue;
+        for (k = 3; k < NSH; k++) {
+          sp = B.sbase + k; q1 = s1[sp]; q2 = s2[sp];
+          d = segPoint(hx, hy, q1, q2) - srad[sp]; t = cS;
+          if (d > 13 || d >= bestD) continue;
+          ax = px[q1] * (1 - t) + px[q2] * t; ay = py[q1] * (1 - t) + py[q2] * t;
+          if (Math.hypot(ax - px[sh], ay - py[sh]) > reach) continue;
+          bestD = d; bB = B; b1 = q1; b2 = q2; bt = t;
+        }
       }
     }
   }
   if (!bB) return;
-  addGrab(A, s, bB, b1, b2, bt);
+  var g = addGrab(A, s, bB, b1, b2, bt);
+  if (hang) { g.hang = true; g.rest = 0; g.comp = HANG_C; if (A.slip) A.grabN++; else bB.grabN++; }
   A.grabCool[s] = 0.5;
-  emit('grab', A, px[b1] * (1 - bt) + px[b2] * bt, py[b1] * (1 - bt) + py[b2] * bt);
+  emit('grab', A, px[b1] * (1 - bt) + px[b2] * bt, py[b1] * (1 - bt) + py[b2] * bt, hang);
 }
 function updateGrabs(dt) {
   var i, g, r, s;
+  for (i = 0; i < rags.length; i++) { r = rags[i]; r.heldBy = 0; if (r.ghostT[0] > 0) r.ghostT[0] -= dt; if (r.ghostT[1] > 0) r.ghostT[1] -= dt; }
   for (i = grabs.length - 1; i >= 0; i--) {
     g = grabs[i]; g.age += dt;
     if (g.rest > 0) { g.rest -= 170 * dt; if (g.rest < 0) g.rest = 0; }
     if (g.ra.dead || g.rb.dead || g.ra.state === 'limp') { dropGrab(g); continue; }
+    if (g.hang) {
+      // an emergency hold: soft and very stretchy; it lets go when torn too far or when its owner gives up
+      g.comp = HANG_C;
+      if (g.stretch > HANG_BREAK || (!g.ra.slip && !g.rb.slip)) { breakGrab(g, !(g.ra.slip || g.rb.slip)); continue; }
+      g.rb.heldBy++;
+      continue;
+    }
     g.comp = GRAB_C / g.ra.massScale;                 // same springiness for heavy (deep) ragdolls
     if (g.rest === 0) g.held += dt;
+    if (g.rb.slip) { breakGrab(g, true); continue; }
     if ((g.held > 0.4 && g.stretch > GRAB_BREAK) || g.stretch - g.rest > 34) { g.over += dt; if (g.over > 0.07) { breakGrab(g, false); continue; } } else g.over = 0;
   }
   if (gstate === 'collapsing' && collapsePhase >= 1) return;
@@ -948,7 +1177,9 @@ function updateGrabs(dt) {
   if (grabTick % 5 === 0) findFeetOn();
   for (i = 0; i < rags.length; i++) {
     r = rags[i];
-    if (r.state !== 'landed' || (grabTick + r.slot) % 5 !== 0) continue;
+    if (r.state !== 'landed') continue;
+    if (!r.slip && (grabTick + r.slot) % 5 !== 0) continue;
+    if (r.slip && (grabTick & 1)) continue;
     for (s = 0; s < 2; s++) if (!r.grab[s] && r.grabCool[s] <= 0) tryGrab(r, s);
   }
 }
@@ -957,15 +1188,16 @@ function updateHolds(dt) {
   var i, g, B, A, f, k, sl, sr, ax, ay, dx, dy, l2, t, d, cand = [0, 0], cd = [0, 0], ok;
   for (i = holds.length - 1; i >= 0; i--) {
     g = holds[i]; g.age += dt;
-    if (g.ra.dead || g.rb.dead || g.ra.state !== 'landed' || g.rb.state !== 'landed') { dropHold(g); continue; }
-    g.comp = HOLD_C / Math.pow(1 + HOLD_K * g.ra.above, HOLD_P);
-    if (g.stretch - g.rest > HOLD_BREAK) { g.over += dt; if (g.over > 0.04) { g.ra.holdCool = 0.4; emit('peel', px[g.hi], py[g.hi]); dropHold(g); continue; } } else g.over = 0;
+    if (g.ra.dead || g.rb.dead || g.ra.state !== 'landed' || g.rb.state !== 'landed' || (g.ra.slip && !g.teeter) || (g.teeter && !g.ra.slip)) { dropHold(g); continue; }
+    g.comp = g.teeter ? 0.0012 : HOLD_C / Math.pow(1 + HOLD_K * g.ra.above, HOLD_P);
+    if (g.teeter && g.rest > g.rb.rt + g.ra.rl) g.rest = Math.max(g.rb.rt + g.ra.rl, g.rest - 60 * dt);
+    if (g.stretch - g.rest > (g.teeter ? 26 : HOLD_BREAK)) { g.over += dt; if (g.over > 0.04) { g.ra.holdCool = 0.4; emit('peel', px[g.hi], py[g.hi]); dropHold(g); continue; } } else g.over = 0;
   }
   if (gstate !== 'playing' || grabTick % 3 !== 0) return;
   for (i = 0; i < rags.length; i++) {
     B = rags[i]; if (B.holdCool > 0) B.holdCool -= dt * 3;
     A = B.feetOn;
-    if (B.state !== 'landed' || !A || B.holdCool > 0 || (B.hold[0] && B.hold[1])) continue;
+    if (B.state !== 'landed' || B.slip || !A || A.slip || B.holdCool > 0 || (B.hold[0] && B.hold[1])) continue;
     if (B.footL <= 0 || B.footR <= 0) continue;                 // needs a proper two-footed stance
     if (Math.abs(B.cvx - A.cvx) + Math.abs(B.cvy - A.cvy) > 140) continue;
     sl = A.base + P_SL; sr = A.base + P_SR; ok = true;
@@ -978,7 +1210,7 @@ function updateHolds(dt) {
       if (d > A.rt + B.rl + 3) { ok = false; break; }
       cand[f] = t; cd[f] = d;
     }
-    if (!ok) continue;
+    if (!ok || cand[0] > 0.5 || cand[1] < 0.5) continue;       // one foot on each side of the head
     for (f = 0; f < 2; f++) if (!B.hold[f]) addHold(B, f, A, sl, sr, cand[f], A.rt + B.rl - 0.25);
   }
 }
@@ -997,20 +1229,96 @@ function updateGroundHold(dt) {
   g.comp = GH_BREAK / (GH_C * M * GRAV);            // strength grows with the weight it carries
   if (g.stretch[0] > GH_BREAK || g.stretch[1] > GH_BREAK) { g.over += dt; if (g.over > 0.05) { g.on = false; g.cool = 1.2; emit('peel', px[r.base + P_FL], 0); } } else g.over = 0;
 }
+// ---------- whole-tower sway, lean budget and tipping ----------
+function startTip(j, dir) {
+  var i, g, A = j >= 0 ? stack[j] : null, B = stack[j + 1];
+  tip.on = true; tip.j = j; tip.dir = dir; tip.t = 0;
+  if (j < 0) { gHold.on = false; gHold.cool = 99; }
+  else {
+    for (i = holds.length - 1; i >= 0; i--) if (holds[i].ra === B) dropHold(holds[i]);
+    B.holdCool = 99;
+    for (i = grabs.length - 1; i >= 0; i--) { g = grabs[i]; if ((g.ra === A && g.rb === B) || (g.ra === B && g.rb === A)) breakGrab(g, false); }
+    A.grabCool[0] = A.grabCool[1] = 99;
+  }
+  emit('tip', dir);
+}
+function updateTower(dt) {
+  var n = stack.length, i, k, r, m, pull = 0, playing = gstate === 'playing', dv;
+  swW = 6.2832 / clamp(1.0 + 0.05 * n, 1.1, 2.0);
+  if (n >= 2 && playing) {
+    pull = windNow * Math.min(14.5, 3.4 + 0.75 * n);
+    for (i = 0; i < rags.length; i++) {            // somebody hanging on the side drags the tower that way
+      r = rags[i];
+      if (r.slip && (r.grab[0] || r.grab[1] || r.heldBy > 0)) pull += (r.comx > supportX() ? 1 : -1) * (5 + 0.9 * n) * Math.min(1.6, r.massMul);
+    }
+  }
+  swPull += (pull - swPull) * 0.1;
+  if (n < 2) { swX *= 0.9; swV *= 0.8; swKick = 0; }
+  else {
+    if (swKick !== 0) { dv = Math.abs(swKick) < 0.5 ? swKick : swKick * 0.3; swV += dv; swKick -= dv; }
+    // lightly damped while it really swings, then it dies away quickly so a calm tower is truly still
+    var za = Math.hypot(swX - swPull, swV / swW), zeta = SW_ZETA + 0.4 * (1 - Math.min(1, za / 5));
+    swV += (-swW * swW * (swX - swPull) - 2 * zeta * swW * swV) * dt;
+    swX += swV * dt;
+    if (swX > 170) { swX = 170; if (swV > 0) swV = 0; } else if (swX < -170) { swX = -170; if (swV < 0) swV = 0; }
+    if (Math.abs(swPull) < 1e-3 && Math.abs(swX) < 0.04 && Math.abs(swV) < 0.25) { swX = 0; swV = 0; swPull = 0; }
+  }
+  // every layer shifts a little more than the one below: a smooth bend from the base to the top.
+  // The bend is imposed as a displacement field spread over the next substeps (upper body by its own share, feet by
+  // the share of the shoulders they stand on) together with the matching pose shear, so the whole tower sways as one
+  // without the motion having to be dragged up through the feet (which would only make the top people rock).
+  var U, dU, dPrev = 0, uPrev = 0, tgt, live = playing || (gstate === 'collapsing' && collapsePhase === 0);
+  for (i = 0; i < rags.length; i++) { r = rags[i]; r.swStepU = 0; r.swStepF = 0; if (!r.stacked) r.swUv = 0; }
+  for (i = 0; i < n; i++) {
+    r = stack[i]; tgt = Math.pow((i + 1) / n, SW_P);
+    r.swPhi += (tgt - r.swPhi) * 0.08; if (Math.abs(tgt - r.swPhi) < 1e-4) r.swPhi = tgt;
+    U = swX * r.swPhi; dU = U - r.swU; r.swU = U; r.swUv = dU / dt;
+    r.swayS = U - uPrev; uPrev = U;
+    if (live && r.state === 'landed') { r.swStepU = dU / SUB; r.swStepF = dPrev / SUB; }
+    dPrev = dU;
+  }
+  if (live && dPrev !== 0) for (i = 0; i < rags.length; i++) {       // whoever stands on top (not counted yet) rides along
+    r = rags[i];
+    if (r.state === 'landed' && !r.stacked && !r.slip && !r.isBase && (r.hold[0] || r.hold[1] || r.feetOn === stack[n - 1])) { r.swStepU = r.swStepF = dPrev / SUB; r.swUv = dPrev / dt; }
+  }
+  // lean budget: how far the weight above each pair of shoulders hangs out over them (1 = at the edge)
+  var M = 0, Mx = 0, rk = 0, rd = 0, rj = -2, c, q;
+  for (i = 0; i < rags.length; i++) { r = rags[i]; if (r.state === 'landed' && !r.stacked && !r.slip && !r.isBase && r.hold[0] && r.hold[1]) { m = r.massMul; M += m; Mx += m * r.comx; } }
+  for (i = n - 1; i >= -1; i--) {
+    if (M > 0) {
+      if (i >= 0) { k = stack[i].base; c = (px[k + P_SL] + px[k + P_SR]) * 0.5; q = (Mx / M - c) / SUP_B; }
+      else { c = feetX(stack[0]); q = (Mx / M - c) / (SUP_B + 3); }
+      if (i < n - 1 && Math.abs(q) > rk) { rk = Math.abs(q); rd = q > 0 ? 1 : -1; rj = i; }
+    }
+    if (i >= 0) { r = stack[i]; m = r.massMul * r.massScale; M += m; Mx += m * r.comx; }
+  }
+  risk = rk; riskDir = rd;
+  if (!playing) return;
+  if (!tip.on) {
+    if (rk > 1) { tip.over += dt; if (tip.over > 0.22) startTip(rj, rd); } else if (tip.over > 0) tip.over = Math.max(0, tip.over - dt * 2);
+  } else {
+    // past the point of no return: everything above the failed pair of shoulders keels over
+    tip.t += dt;
+    var acc = tip.dir * Math.min(260, 60 + 160 * tip.t) * dt, y0 = tip.j >= 0 ? stack[tip.j].comy : 0;
+    for (i = tip.j + 1; i < n; i++) {
+      r = stack[i]; k = r.base; m = clamp((y0 - r.comy) / 300, 0.15, 1.4);
+      for (q = 0; q < NP; q++) vx[k + q] += acc * m;
+    }
+    if (tip.t > 3.5) { r = stack[n - 1]; fail('lean', r.comx, r.comy); }
+  }
+}
 // ---------- sway / panic level ----------
 function updateSway(dt) {
-  var n = stack.length, i, r, a, v, maxTilt = 0, maxV = 0, lean = 0;
+  var n = stack.length, i, r, a, v, maxTilt = 0, maxV = 0, hang = 0;
   if (!n) { swayRaw = 0; sway *= 0.95; return; }
   for (i = 0; i < n; i++) {
     r = stack[i]; a = Math.abs(r.tilt); if (a > maxTilt) maxTilt = a;
-    if (i >= (n - 1) * 0.5) { v = Math.abs(r.cvx); if (v > maxV) maxV = v; }
+    if (i >= (n - 1) * 0.5) { v = Math.abs(r.cvx + r.swUv); if (v > maxV) maxV = v; }
   }
-  if (n > 1) {
-    var top = stack[n - 1], hgt = baseRag.comy - top.comy;
-    if (hgt > 30) lean = Math.abs(Math.atan2(top.comx - baseRag.comx, hgt));
-  }
-  var raw = Math.max(maxTilt / 0.23, maxV / 80, lean / 0.115);
-  if (gstate === 'collapsing') raw = 1;
+  for (i = 0; i < rags.length; i++) if (rags[i].slip && rags[i].state === 'landed') hang = 0.62;
+  var amp = Math.hypot(swX, swV / swW), ref = 12 + 1.3 * n;
+  var raw = Math.max(maxTilt / 0.23, maxV / 130, 0.95 * amp / ref, risk > 0.4 ? 0.3 + (risk - 0.4) * 1.3 : 0, hang);
+  if (gstate === 'collapsing' || tip.on) raw = 1;
   swayRaw = clamp((raw - 0.07) / 0.93, 0, 1);
   sway += (swayRaw - sway) * (swayRaw > sway ? 0.22 : 0.03);
 }
@@ -1023,7 +1331,8 @@ function updateWind(dt) {
     w.target = 0; w.leaf *= 0.9;
     if (stack.length >= 4) {
       w.next -= dt;
-      if (w.next <= 0) { w.phase = 1; w.t = 0; w.str = (rnd() < 0.5 ? -1 : 1) * rr(0.85, 1.15) * Math.min(0.9, 5.9 / stack.length); w.hold = rr(1.8, 3.2); emit('gust', w.str); }
+      // gusts get stronger the higher the tower is
+      if (w.next <= 0) { w.phase = 1; w.t = 0; w.str = (rnd() < 0.5 ? -1 : 1) * rr(0.85, 1.15) * Math.min(1.3, 0.5 + 0.03 * stack.length); w.hold = rr(1.8, 3.2); emit('gust', w.str); }
     }
   } else {
     w.t += dt;
@@ -1035,37 +1344,46 @@ function updateWind(dt) {
   windNow = w.cur;
 }
 // ---------- game-over sequence ----------
+function limpOne(r) {
+  var k, b = r.base, s, g, dir, kx, ky, hgt = clamp(-r.comy / 500, 0, 1.5);
+  for (s = grabs.length - 1; s >= 0; s--) { g = grabs[s]; if (g.ra === r || g.rb === r) { g.ra.ghost[g.side] = g.rb; g.ra.ghostT[g.side] = 0.6; dropGrab(g); } }
+  for (s = holds.length - 1; s >= 0; s--) if (holds[s].ra === r || holds[s].rb === r) dropHold(holds[s]);
+  if (r.state === 'carried') { pw[b + P_AL] = 1 / (BASEM[P_AL] * r.massMul); pw[b + P_AR] = 1 / (BASEM[P_AR] * r.massMul); if (carried === r) carried = null; }
+  setState(r, 'limp'); setMassScale(r, 1); r.face = 'scream'; r.limpT = gameTime;
+  // the push follows the direction the tower was failing in; only a little is random
+  dir = failDir !== 0 && rnd() < 0.82 ? failDir : (rnd() < 0.5 ? -1 : 1);
+  kx = dir * rr(18, 70) * (0.5 + 0.7 * hgt); ky = -rr(0, 45);
+  for (k = 0; k < NP; k++) { vx[b + k] = vx[b + k] * 0.6 + kx; vy[b + k] += ky; }
+}
 function goLimp() {
-  var i, r, k, cx = failX, dir, kx, ky, lean = 0;
-  if (stack.length > 1) lean = stack[stack.length - 1].comx - stack[0].comx;
-  for (i = grabs.length - 1; i >= 0; i--) dropGrab(grabs[i]);
-  for (i = holds.length - 1; i >= 0; i--) dropHold(holds[i]);
-  gHold.on = false;
-  for (i = 0; i < rags.length; i++) {
-    r = rags[i];
-    if (r.state === 'carried') { pw[r.base + P_AL] = 1 / (BASEM[P_AL] * r.massMul); pw[r.base + P_AR] = 1 / (BASEM[P_AR] * r.massMul); if (carried === r) carried = null; }
-    setState(r, 'limp'); setMassScale(r, 1); r.face = 'scream';
-    dir = (Math.abs(lean) > 12 && rnd() < 0.7) ? (lean > 0 ? 1 : -1) : (rnd() < 0.5 ? -1 : 1);
-    kx = dir * rr(30, 150); ky = -rr(10, 140);
-    for (k = 0; k < NP; k++) { vx[r.base + k] = vx[r.base + k] * 0.42 + kx * rr(0.7, 1.3); vy[r.base + k] += ky * rr(0.5, 1.2); }
+  var i, r, d;
+  gHold.on = false; limpFront = 0;
+  for (i = 0; i < rags.length; i++) {              // the collapse spreads out from the point of failure
+    r = rags[i]; d = Math.hypot(r.comx - failX, r.comy - failY);
+    r.limpAt = r.state === 'limp' ? -1 : Math.min(0.34, d / 2300) + rr(0, 0.04);
   }
   emit('scatter');
 }
 function finishRun() {
   gstate = 'over';
-  var h = Math.round(shownH / UPM * 10) / 10;
-  newRecord = h > best + 1e-9 && h > 0;
-  if (newRecord) { best = h; bestCount = maxCount; saveBest(); }
+  var h = Math.round(shownH / UPM * 10) / 10, isBest = h > best + 1e-9 && h > 0;
+  // a first-ever result is only celebrated when it is a real tower
+  newRecord = isBest && (hadBest || maxCount >= 4);
+  if (isBest) { best = h; bestCount = maxCount; saveBest(); }
   emit('over', h, maxCount, newRecord);
 }
 function updateCollapse(dt) {
+  var i, r, busy = false;
   collapseT += dt;
   if (collapsePhase === 0) {
     timeScale += (0.2 - timeScale) * Math.min(1, dt * 20);
-    if (collapseT >= 1.0) { collapsePhase = 1; goLimp(); }
+    if (collapseT >= 1.1) { collapsePhase = 1; goLimp(); }
   } else if (collapsePhase === 1) {
     timeScale += (1 - timeScale) * Math.min(1, dt * 6);
-    if (collapseT >= 3.9) { collapsePhase = 2; timeScale = 1; finishRun(); }
+    limpFront += dt * timeScale;
+    for (i = 0; i < rags.length; i++) { r = rags[i]; if (r.state !== 'limp') { if (r.limpAt <= limpFront) limpOne(r); } if (r.comy < -260 && r.cvy > 60) busy = true; }
+    // wait for the last ones to rain down (but never too long)
+    if ((collapseT >= 3.8 && !busy) || collapseT >= 6.2) { collapsePhase = 2; timeScale = 1; finishRun(); }
   }
 }
 function resetWorld(state) {
@@ -1074,9 +1392,12 @@ function resetWorld(state) {
   gstate = state; timeScale = 1; physAcc = 0; sway = 0; swayRaw = 0; shownH = 0; maxCount = 0; dropCount = 0;
   towerTopY = 0; collapseT = 0; collapsePhase = 0; spawnDelay = 0; newRecord = false; gameTime = 0; subCount = 0; grabTick = 0;
   camBump = 0; fxEvents.length = 0; gHold.on = false; gHold.rag = null; gHold.cool = 0;
+  swX = 0; swV = 0; swPull = 0; swKick = 0; risk = 0; riskDir = 0; tip.on = false; tip.j = -2; tip.t = 0; tip.over = 0; tip.dir = 0; failReason = ''; failDir = 0; limpFront = 0;
+  hadBest = best > 0; beatBest = false; lastSpecial = 0;
   wind.cur = 0; wind.target = 0; wind.phase = 0; wind.t = 0; wind.next = 8; wind.leaf = 0;
   if (seedParam !== null) rngState = ((seedParam * 2654435761 + 97) >>> 0) || 1;
-  carrier.cx = 0; carrier.amp = 80; carrier.omega = 1.15; carrier.phase = -1.3; carrier.x = carrier.amp * Math.sin(carrier.phase); carrier.vx = 0;
+  hueNext = rr(0, 360);
+  carrier.cx = 0; carrier.amp = 72; carrier.omega = 122 / 72; carrier.phase = -1.3; carrier.x = carrier.amp * Math.sin(carrier.phase); carrier.vx = 0;
   carrier.y = carrierTargetY(null);
   spawnCarried();
   emit('reset');
@@ -1100,7 +1421,7 @@ function update(dt) {
 }
 function computeStats() {
   var i, k, r, ms = 0, mp = 0, nan = false, v;
-  for (i = 0; i < stack.length; i++) { r = stack[i]; if (!r.dead && r.maxSpeed > ms) ms = r.maxSpeed; }
+  for (i = 0; i < stack.length; i++) { r = stack[i]; v = r.maxSpeed + Math.abs(r.swUv); if (!r.dead && v > ms) ms = v; }   // physical speed + imposed sway speed
   buildPairs();
   for (i = 0; i < nPairs; i++) { if (pairGeom(pairA[i], pairB[i]) && cgPen > mp) mp = cgPen; }
   for (i = 0; i < rags.length; i++) {
@@ -1110,6 +1431,7 @@ function computeStats() {
       if (r.state !== 'carried' && px[k] >= -GROUND_HALF && px[k] <= GROUND_HALF) { v = py[k] + pr[k]; if (v > mp && py[k] < pr[k]) mp = v; }
     }
   }
+  if (!isFinite(swX) || !isFinite(swV)) nan = true;
   return {
     count: gstate === 'playing' || gstate === 'ready' ? stack.length : maxCount, heightM: Math.round(shownH / UPM * 10) / 10, bestM: best, sway: sway,
     maxSettledSpeed: ms, maxPenetration: mp, wind: windNow, hasNaN: nan
@@ -1140,13 +1462,13 @@ function audioInit() {
 }
 function audioResume() {
   audioInit();
-  try { if (AC && AC.state === 'suspended') { var p = AC.resume(); if (p && p.catch) p.catch(function () {}); } } catch (e) {}
+  try { if (AC && AC.state !== 'running') { var p = AC.resume(); if (p && p.catch) p.catch(function () {}); } } catch (e) {}
 }
 function setMuted(m) {
   muted = m;
   try { if (AC && aMaster) aMaster.gain.setTargetAtTime(m ? 0 : 0.85, AC.currentTime, 0.03); } catch (e) {}
 }
-function aReady() { return !!AC && !muted && AC.state === 'running' && aVoices < 16; }
+function aReady() { return !!AC && !muted && AC.state === 'running' && aVoices < 26; }
 function aEnd(node, nodes) {
   aVoices++;
   node.onended = function () { aVoices--; try { for (var i = 0; i < nodes.length; i++) nodes[i].disconnect(); } catch (e) {} };
@@ -1230,7 +1552,7 @@ function audioWind(level) {
 //  rendering: view, sky, ground, ruler, carrier
 // =====================================================================
 var cv = document.getElementById('c'), ctx = cv.getContext('2d');
-var VW = 360, VH = 640, DPR = 1, vScale = 1, camX = 0, camY = -300, camZoom = 1, camInit = false, safeT = 0, safeL = 0, safeB = 0;
+var VW = 360, VH = 640, DPR = 1, vScale = 1, camX = 0, camY = -300, camZoom = 1, camHi = 0, camInit = false, safeT = 0, safeL = 0, safeB = 0;
 var INK = '#3b3148', FONT = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif';
 var skyH = 0;                 // smoothed tower height (m) that drives the sky colours
 var stars = [], clouds = [], shoot = { t: 9, x: 0, y: 0, life: 0 };
@@ -1264,12 +1586,18 @@ function camTargetY(sc) {
 function updateCamera(dt) {
   var zt = 1, ty, tx = 0, k = 1 - Math.pow(0.0025, dt);
   if (gstate === 'collapsing' || gstate === 'over') {
-    var need = (shownH + 330) * vScale, fit = (VH - groundMargin() - 30) / Math.max(1, need);
-    zt = clamp(fit, 0.5, 0.84);
+    // slow motion: fit the whole tower (or, when it is far too tall, look at the point of failure);
+    // afterwards follow the highest body down so the scene always ends on the ground with the pile in view
+    var hi = shownH, ci, cr;
+    if (collapsePhase >= 1) { hi = 0; for (ci = 0; ci < rags.length; ci++) { cr = rags[ci]; if (-cr.comy > hi) hi = -cr.comy; } }
+    camHi += (hi - camHi) * (hi > camHi ? 1 : 1 - Math.pow(0.03, dt));
+    var need = (camHi + 330) * vScale, fit = (VH - groundMargin() - 30) / Math.max(1, need);
+    zt = clamp(fit, 0.27, 0.84);
     ty = -(VH * 0.5 - groundMargin()) / (vScale * zt);
-    var cy = failY - 80; if (cy < ty && fit < 0.5) ty = Math.max(cy, ty - 500);
+    if (collapsePhase === 0 && fit < 0.27) { var cy = failY - 80; if (cy < ty) ty = cy; }
     tx = clamp(failX * 0.35, -80, 80);
-  } else { ty = camTargetY(vScale); if (baseRag) tx = clamp(baseRag.comx, -60, 60) * 0.6; }
+    if (VH <= 460 && VW >= VH * 1.5) tx += VW * 0.22 / (vScale * zt);        // short landscape screens: the result card sits on the right, the pile on the left
+  } else { camHi = shownH; ty = camTargetY(vScale); if (baseRag) tx = clamp(baseRag.comx, -60, 60) * 0.6; }
   if (!camInit) { camY = ty; camX = tx; camZoom = zt; camInit = true; }
   camZoom += (zt - camZoom) * (1 - Math.pow(0.02, dt));
   camY += (ty - camY) * k; camX += (tx - camX) * k;
@@ -1383,8 +1711,8 @@ function drawRuler() {
   ctx.lineWidth = 2; ctx.beginPath();
   for (m = mMin - (mMin % stepM); m <= mMax; m += stepM) { if (m < 0) continue; y = w2sy(-m * UPM); ctx.moveTo(x0, y); ctx.lineTo(x0 + (m % (lab) === 0 ? 12 : 7), y); }
   ctx.stroke();
-  ctx.fillStyle = nightT > 0.5 ? 'rgba(255,255,255,0.92)' : 'rgba(59,49,72,0.9)';
-  for (m = mMin - (mMin % lab); m <= mMax; m += lab) { if (m <= 0) continue; y = w2sy(-m * UPM); ctx.fillText(m + '', x0 + 16, y); }
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(59,49,72,0.9)'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  for (m = mMin - (mMin % lab); m <= mMax; m += lab) { if (m <= 0) continue; y = w2sy(-m * UPM); ctx.strokeText(m + '', x0 + 16, y); ctx.fillText(m + '', x0 + 16, y); }
   // record marker
   if (best > 0) {
     y = w2sy(-best * UPM);
@@ -1596,7 +1924,11 @@ function handleEvents() {
         break;
       case 'pop': case 'peel': sfxPop(); spawnPart(5, e.a, e.b, 0, 0, 0.3, 6, '#fff'); break;
       case 'release': sfxWhoosh(); break;
-      case 'spawn': r = e.a; if (gstate === 'playing' && r.kind !== 'normal') addPopup(r.kind === 'fat' ? '胖墩来啦！' : '大长腿来啦！', carrier.x, carrier.y - 62, '#ffd166', false); break;
+      case 'record':
+        addPopup('破纪录啦！', (baseRag ? baseRag.comx : 0) + 112, towerTopY + 26, '#ffd166', true); sfxJingle(); vib([15, 30, 15]);
+        for (n = 0; n < 22; n++) spawnPart(3, (baseRag ? baseRag.comx : 0) + (frnd() - 0.5) * 60, towerTopY - 60, (frnd() - 0.5) * 260, -60 - 200 * frnd(), 0.7 + 0.5 * frnd(), 3 + 2 * frnd(), ['#ffd166', '#ff8fab', '#8ee3b4', '#7cc6fe'][n & 3]);
+        break;
+      case 'spawn': r = e.a; if (gstate === 'playing' && r.kind !== 'normal') addPopup(r.kind === 'fat' ? '胖墩来啦！' : '大长腿来啦！', carrier.x, carrier.y + 172, '#ffd166', false); break;
       case 'collapse':
         n = Math.min(9, rags.length + 1);
         for (r = 0; r < n; r++) sfxScream(rags[r % rags.length].voice, r * 0.09 + frnd() * 0.12);
@@ -1702,6 +2034,7 @@ function drawParticles(world) {
   }
   c.globalAlpha = 1;
 }
+var windBadge = 0, windBadgeDir = 1;
 function drawOverlays() {
   var c = ctx, i, p, a, x, y, w = Math.abs(windNow);
   setScreen();
@@ -1714,6 +2047,23 @@ function drawOverlays() {
     c.globalAlpha = 1;
   }
   drawParticles(false);
+  var wl = gstate === 'playing' ? (Math.abs(wind.leaf) > Math.abs(windNow) ? wind.leaf : windNow) : 0;
+  windBadge += ((Math.abs(wl) > 0.06 ? 1 : 0) - windBadge) * 0.18;
+  if (windBadge > 0.03) {
+    if (Math.abs(wl) > 0.06) windBadgeDir = wl > 0 ? 1 : -1;
+    var bw = 96, bh = 30, bx = VW * 0.5 - bw * 0.5, by = safeT + 14 - (1 - windBadge) * 12, nch = Math.abs(wl) > 0.85 ? 3 : Math.abs(wl) > 0.45 ? 2 : 1, cx0, ph = (realTime * 1.6) % 1;
+    c.globalAlpha = windBadge; c.fillStyle = 'rgba(255,255,255,0.9)'; c.strokeStyle = INK; c.lineWidth = 2.5; c.lineJoin = 'round'; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(bx + 15, by); c.arcTo(bx + bw, by, bx + bw, by + bh, 15); c.arcTo(bx + bw, by + bh, bx, by + bh, 15); c.arcTo(bx, by + bh, bx, by, 15); c.arcTo(bx, by, bx + bw, by, 15); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = INK; c.font = '900 16px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('风', windBadgeDir > 0 ? bx + 22 : bx + bw - 22, by + bh * 0.5 + 1);
+    c.lineWidth = 3;
+    for (i = 0; i < nch; i++) {
+      cx0 = (windBadgeDir > 0 ? bx + 44 + i * 14 : bx + bw - 44 - i * 14) + windBadgeDir * 3 * Math.sin((ph - i * 0.18) * 6.283);
+      c.globalAlpha = windBadge * (0.55 + 0.45 * Math.sin((ph - i * 0.18) * 6.283) * 0.5 + 0.2);
+      c.beginPath(); c.moveTo(cx0 - windBadgeDir * 4, by + 8); c.lineTo(cx0 + windBadgeDir * 4, by + bh * 0.5); c.lineTo(cx0 - windBadgeDir * 4, by + bh - 8); c.stroke();
+    }
+    c.globalAlpha = 1;
+  }
   for (i = 0; i < popups.length; i++) {
     p = popups[i]; a = p.t < 0.15 ? p.t / 0.15 : p.t > 0.95 ? Math.max(0, (1.3 - p.t) / 0.35) : 1;
     x = clamp(w2sx(p.x), 60, VW - 60); y = w2sy(p.y) - p.t * 34;
@@ -1757,7 +2107,7 @@ function render() {
 // =====================================================================
 //  UI, input, main loop, test hook
 // =====================================================================
-var elStart = document.getElementById('start'), elOver = document.getElementById('over'), elMute = document.getElementById('mute'), elAgain = document.getElementById('again');
+var elStart = document.getElementById('start'), elOver = document.getElementById('over'), elMute = document.getElementById('mute'), elAgain = document.getElementById('again'), elSBest = document.getElementById('sBest');
 var overAt = 0, MUTE_KEY = 'dieluohan_xpbd_mute';
 function showOver(h, n, rec) {
   document.getElementById('oHv').textContent = h.toFixed(1);
@@ -1770,7 +2120,10 @@ function showOver(h, n, rec) {
 }
 function hideOver() { elOver.classList.remove('on'); }
 function uiSync() {
-  if (gstate === 'ready') { elStart.classList.add('on'); elHud.classList.remove('on'); }
+  if (gstate === 'ready') {
+    elStart.classList.add('on'); elHud.classList.remove('on');
+    if (best > 0) { elSBest.textContent = '最高纪录 ' + best.toFixed(1) + ' 米'; elSBest.className = 'on'; } else elSBest.className = '';
+  }
   else { elStart.classList.remove('on'); elHud.classList.add('on'); }
   if (gstate !== 'over') hideOver();
 }
@@ -1802,7 +2155,7 @@ window.addEventListener('keydown', function (e) {
 });
 elAgain.addEventListener('click', function (e) {
   e.preventDefault(); userActed = true; audioResume(); elAgain.blur();
-  if (gstate === 'over' || gstate === 'collapsing') { beginGame(); sfxClick(); }
+  if (gstate === 'over' && realTime - overAt > 0.45) { beginGame(); sfxClick(); }     // guard against an impatient tap landing on the button
 });
 function applyMuteUi() { elMute.className = muted ? 'muted' : ''; }
 function toggleMute() {
@@ -1831,7 +2184,7 @@ function frame(now) {
   if (document.hidden) { lastNow = now; return; }
   var dt = (now - lastNow) / 1000; lastNow = now;
   if (!(dt > 0)) return;
-  if (dt > 0.05) dt = 0.05;                     // long frames are clamped (no spiral of death, no jumps)
+  if (dt > 0.1) dt = 0.1;                       // long frames are clamped (no spiral of death, no jumps)
   var t0 = performance.now();
   update(dt);
   var t1 = performance.now();
@@ -1843,7 +2196,7 @@ function frame(now) {
 }
 document.addEventListener('visibilitychange', function () {
   lastNow = performance.now();
-  try { if (AC) { if (document.hidden) AC.suspend(); else if (userActed) AC.resume(); } } catch (e) {}
+  try { if (AC) { var pr = document.hidden ? AC.suspend() : (userActed ? AC.resume() : null); if (pr && pr.catch) pr.catch(function () {}); } } catch (e) {}
 });
 // ---- boot ----
 try { if (!muteParam && window.localStorage.getItem(MUTE_KEY) === '1') muted = true; } catch (e) {}
@@ -1869,7 +2222,6 @@ window.__game = {
   },
   setWind: function (v) { wind.forced = (v === null || v === undefined) ? null : clamp(+v || 0, -40, 40); }
 };
-window.__dlhPerf = perf;
 })();
 </script>
 </body>
