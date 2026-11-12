@@ -5,22 +5,28 @@
 //  · meta.js 启动时问 Resume.holdPending：有能继续的存档点就先不结算，留给主菜单的「继续上一局」「放弃」
 //  · 每次结算（knightmeta:settle）都清掉存档点；resume.js 没加载成功时，页面加载完把留着的那一局按退出结算
 //  · 数据表变了（id 改名、存档版本升级）：指纹对不上，存档点直接丢掉，照原来的样子结算
+//  · 存档点只在 meta.js 查过这一页的数据表、没冻结（Meta.frozen === false）时才写、才删（第 13 块 M1，Resume.canWrite）
 // ============================================================
 var Resume = {
   KEY: 'knight_magic_resume',
-  VER: 1,              // 存档点格式的版本（字段结构变了就加一）
+  VER: 3,              // 存档点格式的版本（字段结构变了就加一；2：加了临时属性 p.temp；3：纹章两行（value2，去掉 mult）、武器专属次数 perkN）
   held: null,          // 启动时留下来的一局 { cp, pending }
   ready: false,        // resume.js 加载完了
-  MAX_W: 12            // 最多几把武器
+  MAX_W: 12,           // 最多几把武器
+  MAX_TEMP: 64         // 最多几条临时属性（P.temp）
 };
 
 // ---------------- 存取（全部 try/catch：隐私模式、禁用存储都不报错） ----------------
+// 能不能写存档点（第 13 块 M1）：这个文件在 meta.js 之前加载，但下面的写和删都在 meta.js 启动以后才发生（Meta.load 之后的
+// holdPending、结算事件、页面的 load）。那时 Meta.frozen === false 才写才删；冻结的一页（数据表是旧的）、meta.js 没加载成功
+// 或者没跑到 Meta.load、是一份旧的 meta.js（没有 Meta.frozen）：存档点原样留给下次正常打开
+Resume.canWrite = function () { return typeof Meta !== 'undefined' && !!Meta && Meta.frozen === false; };
 Resume.read = function () { try { return window.localStorage ? window.localStorage.getItem(Resume.KEY) : null; } catch (e) { return null; } };
-Resume.write = function (s) { try { window.localStorage.setItem(Resume.KEY, s); return true; } catch (e) { return false; } };
-Resume.drop = function () { try { window.localStorage.removeItem(Resume.KEY); } catch (e) { /* 忽略 */ } };
+Resume.write = function (s) { if (!Resume.canWrite()) return false; try { window.localStorage.setItem(Resume.KEY, s); return true; } catch (e) { return false; } };
+Resume.drop = function () { if (!Resume.canWrite()) return; try { window.localStorage.removeItem(Resume.KEY); } catch (e) { /* 忽略 */ } };
 Resume.err = function (e) { try { console.error('[resume]', e && e.stack ? e.stack : e); } catch (e2) { /* 忽略 */ } };
 
-// ---------------- 数据指纹：骑士、武器（和它们的基础属性名）、纹章、物品、属性、超武、关卡数、局外存档版本 ----------------
+// ---------------- 数据指纹：骑士、武器（和它们的基础属性名）、纹章、宝物、属性、超武、关卡数、局外存档版本 ----------------
 Resume.keys = function (o) { return o && typeof o === 'object' ? Object.keys(o).sort() : []; };
 Resume.fnv = function (s) {
   var h = 0x811c9dc5;
@@ -74,13 +80,20 @@ Resume.check = function (cp) {
     var m = p.mods[i];
     if (!Array.isArray(m) || typeof m[0] !== 'string' || !STATS[m[0]] || !R.fin(m[1])) return 'p.mods';
   }
+  // 临时属性（P.temp）：[属性, 数值, 剩下几秒（-1 = 一直在）, key（null 或字符串）]
+  if (!Array.isArray(p.temp) || p.temp.length > R.MAX_TEMP) return 'p.temp';
+  for (i = 0; i < p.temp.length; i++) {
+    var e = p.temp[i];
+    if (!Array.isArray(e) || e.length !== 4 || typeof e[0] !== 'string' || !STATS[e[0]] || !R.fin(e[1])) return 'p.temp';
+    if (!R.fin(e[2]) || !(e[2] > 0 || e[2] === -1) || (e[3] !== null && typeof e[3] !== 'string')) return 'p.temp';
+  }
   if (!R.obj(p.items)) return 'p.items';
   for (k in p.items) if (!ITEMS[k] || !R.int(p.items[k], 1, 99)) return 'p.items';
   if (!Array.isArray(p.tomes)) return 'p.tomes';
   var seen = {};
   for (i = 0; i < p.tomes.length; i++) {
     var t = p.tomes[i];
-    if (!R.obj(t) || typeof t.id !== 'string' || !TOMES[t.id] || seen[t.id] || !R.int(t.level, 1, 99) || !R.fin(t.value) || !R.fin(t.mult)) return 'p.tomes';
+    if (!R.obj(t) || typeof t.id !== 'string' || !TOMES[t.id] || seen[t.id] || !R.int(t.level, 1, 99) || !R.fin(t.value) || !R.fin(t.value2)) return 'p.tomes';
     seen[t.id] = 1;
   }
   if (!Array.isArray(p.weapons) || p.weapons.length < 1 || p.weapons.length > R.MAX_W) return 'p.weapons';
@@ -88,7 +101,7 @@ Resume.check = function (cp) {
   for (i = 0; i < p.weapons.length; i++) {
     var w = p.weapons[i];
     if (!R.obj(w) || typeof w.id !== 'string' || !WEAPONS[w.id] || seen[w.id] || !R.int(w.level, 1, 99)) return 'p.weapons';
-    if (!R.pos(w.kills) || !R.pos(w.dmg) || !R.fin(w.charges) || !R.obj(w.s)) return 'p.weapons';
+    if (!R.pos(w.kills) || !R.pos(w.dmg) || !R.fin(w.charges) || !R.int(w.perkN, 0, 99) || !R.obj(w.s)) return 'p.weapons';
     for (k in w.s) if (!R.fin(w.s[k])) return 'p.weapons';
     if (typeof w.evo !== 'boolean' || (w.evo && (typeof EVO === 'undefined' || !EVO[w.id]))) return 'p.weapons';
     if (w.evoHow != null && typeof w.evoHow !== 'string') return 'p.weapons';
@@ -142,7 +155,10 @@ Resume.release = function () {
   var h = Resume.held;
   Resume.held = null;
   try {
-    if (h && typeof Meta !== 'undefined' && Meta.p && Meta.p.pending) Meta.restored = Meta.finish(Meta.p.pending, 'quit');
+    if (h && typeof Meta !== 'undefined' && Meta.p && Meta.p.pending) {
+      Meta.restored = Meta.finish(Meta.p.pending, 'quit');
+      if (Meta.uiReady && Meta.showKeptNote) Meta.showKeptNote();   // 菜单已经建好了：提示现在排上（第 13 块 O5）
+    }
   } catch (e) { Resume.err(e); try { Meta.p.pending = null; Meta.save(); } catch (e2) { /* 忽略 */ } }
   Resume.clear();
 };

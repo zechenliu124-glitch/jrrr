@@ -6,7 +6,7 @@
 //  · 敌人死亡碎块；精英、小 Boss 爆炸 + 金币雨 + 冲击环；Boss 死亡慢动作 + 连环爆炸
 //  · 升级金光、卡片落下来、选卡时弹一下；开宝箱：抖动、开盖、光圈（史诗以上才有光柱）、揭晓
 //  · Boss 出场过场（黑边 + 像素横幅），强敌出现的公告；受伤方向红光、低血量硬边红框
-//  · 换关的像素点阵 + 关卡卡片；关卡完成；最终虫潮；阵亡和通关（公告、横幅都用 kit.js 的，样子在 kit.css）
+//  · 换关的像素点阵 + 关卡卡片；关卡完成；午夜钟声；阵亡和通关（公告、横幅都用 kit.js 的，样子在 kit.css）
 //  过场都会自己播完（测试只调用 Game.update），点一下或按空格/回车/Esc 可以跳过
 //  设置：Feel.opts = { shake: 屏幕震动, flash: 闪光 }（0~1），存在 localStorage 'knight_magic_feel'
 // ============================================================
@@ -28,19 +28,40 @@ var Feel = {
 
 // Boss / 小 Boss 的称号（原创）
 Feel.EPI = {
-  ent: '千年古木的怒火',
-  pharaoh: '沉睡沙海的不朽之王',
-  bigbob: '墓园里最大的一把骨头',
-  golemboss: '会走路的小山',
-  chunkham: '吃遍整片森林的大胃王',
-  sandgolem: '流沙堆成的巨人',
-  scorpboss: '沙丘下的剧毒女王',
-  ghostham: '死了也要吃到饱',
-  skelking: '骷髅大军的老祖宗'
+  oakking: '林子里最老的那棵树醒了',
+  hourglass: '会走路的大沙漏',
+  sunkenbell: '钟里住着最后一任敲钟人',
+  greenknight: '脑袋掉了还能接着打',
+  shroomking: '伞盖比房顶还大',
+  wormqueen: '沙丘下面最大的那张嘴',
+  lizardlord: '举着铜盾的蜥人头领',
+  ghostchamp: '输了最后一场，不肯下场',
+  gravehound: '墓园巡夜，眼里烧着绿火',
+  nightshade: '午夜钟声里走出来的影子',
+  mimic: '看起来像金宝箱，其实长着牙'
 };
 // 关卡副标题
-Feel.STAGE_SUB = ['雾气缭绕的古老林地', '烈日炙烤的流沙王国', '月光下不得安息的亡者'];
-Feel.RHEX = ['#5ee35e', '#4ea8ff', '#c46bff', '#ff4b5a', '#ffc928'];
+Feel.STAGE_SUB = ['雾气缭绕的古老林地', '烈日炙烤的古老商道', '沉钟夜夜作响的古城'];
+// 稀有度颜色都从 RARITY（progression.js）来：卡片边框、光圈、闪屏用 color；3D 火花用 world（普通是灰色，不发白光，UI_STYLE §2.4）
+Feel.RHEX = RARITY.map(function (r) { return r.color; });
+// 3D 颜色（0xRRGGBB）：有 world 用 world，没有就用 color
+Feel.worldHex = function (i) {
+  var r = RARITY[clamp(i | 0, 0, RARITY.length - 1)];
+  return r.world != null ? r.world : parseInt(String(r.color).slice(1), 16);
+};
+Feel.GREY = 0xb9c2d2;
+// 往白色提亮 k（0~1）；提完三个通道都 ≥ 0xe0（发白）就改用调色板灰提亮——火花不发白光
+Feel.lift = function (hex, k) {
+  var up = function (h) {
+    var c = [(h >> 16) & 255, (h >> 8) & 255, h & 255].map(function (v) { return Math.round(v + (255 - v) * k); });
+    return { c: c, hex: (c[0] << 16) | (c[1] << 8) | c[2] };
+  };
+  var o = up(hex);
+  if (o.c[0] >= 0xe0 && o.c[1] >= 0xe0 && o.c[2] >= 0xe0) o = up(Feel.GREY);
+  return o.hex;
+};
+// 选卡火花：稀有度 3D 颜色提亮 35%
+Feel.sparkHex = function (i) { return Feel.lift(Feel.worldHex(i), 0.35); };
 
 // ---------------- 设置 ----------------
 Feel.loadOpts = function () {
@@ -115,7 +136,7 @@ Feel.tickTimers = function (dt, held) {
 //  时间：顿帧（≤60 毫秒）和慢动作
 // ============================================================
 // ms：时长（最多 60 毫秒）；scale：这段时间的速度
-// prio 0：大命中、超大暴击（两次之间至少隔 0.25 秒，还要给击杀留一点预算）
+// prio 0：大命中（两次之间至少隔 0.25 秒，还要给击杀留一点预算）
 // prio 1：击杀精英 / 小 Boss、普通受伤（只看预算：大命中刚顿过，击杀那一下也照样顿）
 // prio 2：Boss 倒下、重伤（不限）
 // 预算每秒只回 0.04 秒：一直打精英、Boss 或者一直挨打时，大约一秒一次，不会一直卡顿
@@ -287,9 +308,7 @@ Feel.onHit = function (e, dealt, crit, kx, kz, opts, pf) {
   if (now < (e._fN || 0)) e.flash = pf;
   else { e.flash = big ? 0.075 : 0.1; e._fN = now + (big ? 0.17 : 0.15); }
   if (FX.tickDmg || (opts && opts.quiet)) return;
-  if (crit >= 2) {
-    if (Feel.hitStop(45, 0.08, 0)) Feel.kick(e.x - P.pos.x, e.z - P.pos.z, 0.16, -1.2);
-  } else if (big && (crit || dealt >= e.maxHp * (e.boss ? 0.012 : 0.04)) && Feel.rt >= Feel.bigHitT) {
+  if (big && (crit || dealt >= e.maxHp * (e.boss ? 0.012 : 0.04)) && Feel.rt >= Feel.bigHitT) {
     // 用真实时间限流（Game.time 换关时会归零）
     Feel.bigHitT = Feel.rt + (e.boss ? 0.9 : 0.6);
     if (Feel.hitStop(e.boss ? 32 : 38, 0.16, 0)) Feel.kick(e.x - P.pos.x, e.z - P.pos.z, e.boss ? 0.12 : 0.09, -0.8);
@@ -442,7 +461,7 @@ Feel.popCard = function (card, rect, r) {
   document.body.appendChild(ring);
   Feel.later(0.5, function () { [c, ring].forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); }); }, 'pop', true);
   if (Feel.ok3d() && P.pos) {
-    var hex = [0x9dff9d, 0x8fc8ff, 0xd9a0ff, 0xff8a94, 0xffe27a][clamp(r | 0, 0, 4)];
+    var hex = Feel.sparkHex(r);
     FeelFX.sparkBurst(P.pos.x, P.pos.y + 1.2, P.pos.z, 10 + (r | 0) * 4, hex, 5, 0.09, 0.6, -1);
     FeelFX.ring(P.pos.x, P.pos.y, P.pos.z, 0.4, 2.2, hex, 0.35, 0.8);
   }
@@ -523,10 +542,10 @@ Feel.chestShow = function () {
   var C = typeof FeelFX !== 'undefined' && FeelFX.chest;
   if (C && C.on && !C.opened) C.t = Math.max(C.t, C.wait);
   if (s.rar >= 3) Feel.screenFlash(Feel.RHEX[s.rar], s.rar >= 4 ? 0.5 : 0.28, 0.45);
-  if (s.rar >= 4) { Game.shake(0.35); if (Feel.ok3d()) FeelFX.sparkBurst(s.chest.x, s.chest.y + 1.2, s.chest.z, 24, 0xffe27a, 9, 0.12, 0.9, 6); }
+  if (s.rar >= 4) { Game.shake(0.35); if (Feel.ok3d()) FeelFX.sparkBurst(s.chest.x, s.chest.y + 1.2, s.chest.z, 24, Feel.sparkHex(4), 9, 0.12, 0.9, 6); }
 };
 
-// 宝箱弹窗关了（收下物品）
+// 宝箱弹窗关了（收下宝物）
 Feel.chestEnd = function () {
   var s = Feel.chestSeq;
   if (!s || s.closing >= 0) return;
@@ -537,7 +556,7 @@ Feel.chestEnd = function () {
 };
 
 // ============================================================
-//  局内公告（关卡卡片、强敌出现、关卡完成、最终虫潮）
+//  局内公告（关卡卡片、强敌出现、关卡完成、午夜钟声）
 // ============================================================
 // 和 CONTENT 的事件、秘密地点是同一个公告系统 Kit.announce（kit.js）：一次一条，排在正上方那一列下面，跟游戏钟走。
 // 小事是没有底板的描边像素字（文字公告），关卡完成是燕尾横幅；颜色按用途（金 = 好事，橙 = 强敌，红 = 危险）
@@ -545,7 +564,7 @@ Feel.BAN = {
   stage: { role: 'gold', big: true, life: 2.4, prio: 2 },
   mini: { role: 'org', icon: 'crown', life: 2.2, prio: 1 },
   clear: { look: 'rib', size: 'l', role: 'gold', icon: 'star', life: 2.8, prio: 3 },
-  swarm: { role: 'red', big: true, icon: 'skull', life: 2.8, prio: 3 }
+  swarm: { role: 'red', big: true, icon: 'bell', life: 2.8, prio: 3 }
 };
 // o: { kind: 'stage'|'mini'|'clear'|'swarm', top（小标签）, title, sub, life }；返回显示出来的公告元素（排队了返回 null）
 Feel.banner = function (o) {
@@ -556,6 +575,7 @@ Feel.banner = function (o) {
   a.title = o.title || '';
   if (o.sub) a.sub = o.sub;
   if (o.life) a.life = o.life;
+  if (o.key != null) a.key = o.key;
   return Kit.announce(a);
 };
 
@@ -564,7 +584,7 @@ Feel.stageCard = function () {
   var sd = Game.stageDef;
   if (!sd) return;
   Feel.emit('stage', { stage: Game.stage, name: sd.name });
-  Feel.banner({ kind: 'stage', title: sd.name, sub: Feel.STAGE_SUB[Game.stage - 1] || '' });
+  Feel.banner({ kind: 'stage', title: sd.name, sub: Feel.STAGE_SUB[Game.stage - 1] || '', key: 'stageCard' });
 };
 
 // ============================================================
@@ -600,25 +620,69 @@ Feel.abortSeq = function () {
   Feel.cineOut();
 };
 
-// Boss 出场的名字：大号红色燕尾横幅 + 骷髅，称号写在上面的小标签里；放在上面那条黑边下面、天空的位置（kit.css）
-Feel.cineTitle = function (name, epi) {
+// Boss 出场的名字：大号红色燕尾横幅 + 骷髅，称号写在上面的小标签里；放在上面那条黑边下面、天空的位置（kit.css）。
+// sub：横幅下面的一行（「被烽火引来了！」：过场时 main.js 的同一句提示不出，第 13 块 T4 把它挪到这里）
+Feel.cineTitle = function (name, epi, sub) {
   var t = Feel.$('fxCineT');
   if (!t) return;
   t.innerHTML = '';
-  if (typeof Kit !== 'undefined') t.appendChild(Kit.ribbon({ role: 'red', size: Kit.heroSize(), tab: epi || '', title: name, icon: 'skull' }));
+  if (typeof Kit !== 'undefined') t.appendChild(Kit.ribbon({ role: 'red', size: Kit.heroSize(), tab: epi || '', title: name, icon: 'skull', sub: sub || '' }));
   t.classList.remove('off');
   void t.offsetWidth;
   t.classList.add('on');
 };
 
 // 镜头 (qx, qy, qz) 看向 (tx, ty, tz) 的视线有没有被地形、建筑挡住（镜头本身在建筑底下也算）
+// 每 0.5 米看一次（城墙只有 1.6 米厚，隔太远会漏过去）；烽火台的塔身（没有碰撞盒）当成一根半径 2.9、高 4.4 米的柱子（带木梯）
 Feel.blocked = function (qx, qy, qz, tx, ty, tz) {
   if (!W.noise) return false;
-  for (var k = 0; k <= 7; k++) {
-    var f = k / 8, y = qy + (ty - qy) * f;
-    if (W.groundAt(qx + (tx - qx) * f, qz + (tz - qz) * f, 999) > y - 0.2) return true;
+  var L = Math.sqrt(dist2(qx, qz, tx, tz)), n = Math.max(8, Math.ceil(L / 0.5));
+  var tw = Feel._tw || Feel.towers();
+  for (var k = 0; k <= n - 1; k++) {
+    var f = k / n, x = qx + (tx - qx) * f, z = qz + (tz - qz) * f, y = qy + (ty - qy) * f;
+    if (W.groundAt(x, z, 999) > y - 0.2) return true;
+    for (var j = 0; j < tw.length; j++) if (y < tw[j].top && y > (tw[j].bot || -1e9) && dist2(x, z, tw[j].x, tw[j].z) < tw[j].r * tw[j].r) return true;
   }
   return false;
+};
+// 镜头本身贴着墙、塔（1.2 米以内）也不要：近裁剪面会切进模型里，整个画面一片砖色
+Feel.cramped = function (qx, qy, qz) {
+  if (!W.noise) return false;
+  var tw = Feel._tw || Feel.towers(), j, k;
+  for (j = 0; j < tw.length; j++) if (qy < tw[j].top + 1 && qy > (tw[j].bot || -1e9) - 1 && dist2(qx, qz, tw[j].x, tw[j].z) < (tw[j].r + 1.2) * (tw[j].r + 1.2)) return true;
+  for (k = 0; k < 8; k++) {
+    var a = k * Math.PI / 4;
+    if (W.groundAt(qx + Math.cos(a) * 1.2, qz + Math.sin(a) * 1.2, 999) > qy - 0.4) return true;
+  }
+  return false;
+};
+// 没有碰撞盒、但挡视线的东西：烽火台（塔身 + 火盆到 4.1 米）
+Feel.towers = function () {
+  var out = [];
+  if (typeof Interact === 'undefined' || !Interact.list) return out;
+  for (var i = 0; i < Interact.list.length; i++) {
+    var o = Interact.list[i];
+    if (o.kind === 'bossportal') out.push({ x: o.x, z: o.z, r: 2.9, top: (o.y || 0) + 4.4 });   // 塔身 2.1 米 + 斜靠的木梯、垛口
+  }
+  // 钟楼顶上的残墩、断拱、钟梁（W.towerRuin，只是外观）：碰撞盒顶以上还有约 3 米；
+  // 倒在地上的塔顶（5×7×5 的壳子 + 攒尖顶，下面只垫了一块 2.2 米高的碰撞体）：靠塔那头高约 5 米、屋顶那头约 4 米，按倒下的方向分两段
+  var bt = W.bellTower;
+  if (bt) {
+    out.push({ x: bt.x, z: bt.z, r: 4.3, bot: bt.y - 1, top: bt.y + 3.2 });
+    if (bt.g != null) {
+      out.push({ x: bt.x + bt.sx * 5, z: bt.z + bt.sz * 5, r: 2.9, top: bt.g + 5.2 });
+      out.push({ x: bt.x + bt.sx * 9, z: bt.z + bt.sz * 9, r: 2.9, top: bt.g + 4.2 });
+    }
+  }
+  // 首领出场时：附近树的树冠（树干有碰撞圈，树冠没有）：碰撞圈 r = 0.6×大小，树冠半径约 2×大小、离地 1.6~6 倍大小
+  var nb = Feel._near;
+  if (nb && W.circles) for (i = 0; i < W.circles.length; i++) {
+    var c = W.circles[i], th = W.terrainH(c.x, c.z);
+    if (c.top - th < 15 || dist2(c.x, c.z, nb.x, nb.z) > nb.r * nb.r) continue;
+    var sc = c.r / 0.6;
+    out.push({ x: c.x, z: c.z, r: 2 * sc, bot: th + 1.6 * sc, top: th + 6 * sc });
+  }
+  return out;
 };
 
 // ---------------- Boss 出场 ----------------
@@ -634,20 +698,44 @@ Feel.bossIntro = function () {
     cx /= list.length; cz /= list.length;
     for (i = 0; i < list.length; i++) spread = Math.max(spread, Math.sqrt(dist2(cx, cz, list[i].x, list[i].z)));
     var gy = W.groundAt(cx, cz, 999), D = clamp(H * 1.45 + spread * 1.3 + 1, 8, 26);
+    Feel._near = { x: cx, z: cz, r: D + 8 }; Feel._tw = null; Feel._tw = Feel.towers();
+    var BR = 0; for (i = 0; i < list.length; i++) BR = Math.max(BR, (list[i].r || 1) * (list[i].scale || 1)); BR = BR * 0.8 + spread;
     // 镜头在 Boss 前方偏一侧、略低往上看；挑一个玩家不挡在镜头和 Boss 之间、离玩家也不太近的角度
-    var a0 = Math.atan2(P.pos.x - cx, P.pos.z - cz), best = a0, bs = -1e9, camY = function (qx, qz) { return Math.max(gy + 1.6 + H * 0.12, W.groundAt(qx, qz, gy + H) + 1.2); };
-    [0.7, -0.7, 1.15, -1.15, 0.35, -0.35, 1.6, -1.6, 0, 2.2, -2.2, Math.PI].forEach(function (o) {
-      var a = a0 + o, qx = cx + Math.sin(a) * D, qz = cz + Math.cos(a) * D;
-      var sx = cx - qx, sz = cz - qz, L2 = sx * sx + sz * sz || 1;
-      var u = clamp(((P.pos.x - qx) * sx + (P.pos.z - qz) * sz) / L2, 0, 1);
-      var clear = Math.sqrt(dist2(P.pos.x, P.pos.z, qx + sx * u, qz + sz * u)), dp = Math.sqrt(dist2(P.pos.x, P.pos.z, qx, qz));
-      var sc = Math.min(clear, 5) * 2 + Math.min(dp, 7) - Math.abs(o) * 1.2;
-      // 地形、建筑挡住视线的角度基本不要
-      if (Feel.blocked(qx, camY(qx, qz), qz, cx, gy + H * 0.55, cz)) sc -= 30;
-      if (sc > bs) { bs = sc; best = a; }
+    var a0 = Math.atan2(P.pos.x - cx, P.pos.z - cz), best = a0, bestUp = 0, bs = -1e9, camY = function (qx, qz) { return Math.max(gy + 1.6 + H * 0.12, W.groundAt(qx, qz, gy + H) + 1.2); };
+    // 首领刷在烽火台旁边 8 米：玩家多半就站在烽火台那边，正对玩家的那个角度镜头会落进塔里（第 2、3 关一片砖色）。
+    // 烽火台、钟楼、城墙都算挡视线；平视的角度都被挡住时把镜头抬高（+4 / +9 米）往下看
+    [0, 4, 9].forEach(function (up) {
+      [0.7, -0.7, 1.15, -1.15, 0.35, -0.35, 1.6, -1.6, 0, 2.2, -2.2, Math.PI].forEach(function (o) {
+        var a = a0 + o, qx = cx + Math.sin(a) * D, qz = cz + Math.cos(a) * D, qy = camY(qx, qz) + up;
+        var sx = cx - qx, sz = cz - qz, L2 = sx * sx + sz * sz || 1;
+        var u = clamp(((P.pos.x - qx) * sx + (P.pos.z - qz) * sz) / L2, 0, 1);
+        var clear = Math.sqrt(dist2(P.pos.x, P.pos.z, qx + sx * u, qz + sz * u)), dp = Math.sqrt(dist2(P.pos.x, P.pos.z, qx, qz));
+        var sc = Math.min(clear, 5) * 2 + Math.min(dp, 7) - Math.abs(o) * 1.2 - up * 1.5;
+        // 地形、建筑、烽火台、钟楼挡住视线、镜头贴着墙的角度基本不要：看首领的身子、头和身子两边（半个身宽，首领常常就站在塔边上）。
+        // 分级扣分：贴墙、身子、头被挡扣得多，两边被挡扣得少（都被挡一点时，挑一个身子和头看得见的）
+        var L1 = Math.sqrt(L2), px1 = -sz / L1 * BR, pz1 = sx / L1 * BR;
+        if (Feel.cramped(qx, qy, qz)) sc -= 60;
+        if (Feel.blocked(qx, qy, qz, cx, gy + H * 0.55, cz)) sc -= 30;
+        if (Feel.blocked(qx, qy, qz, cx, gy + H * 0.95, cz)) sc -= 30;
+        if (Feel.blocked(qx, qy, qz, cx + px1, gy + H * 0.5, cz + pz1)) sc -= 8;
+        if (Feel.blocked(qx, qy, qz, cx - px1, gy + H * 0.5, cz - pz1)) sc -= 8;
+        if (sc > bs) { bs = sc; best = a; bestUp = up; }
+      });
     });
     var dx = Math.sin(best), dz = Math.cos(best), px = cx + dx * D, pz = cz + dz * D;
-    var py = camY(px, pz);
+    var py = camY(px, pz) + bestUp;
+    // 身子和头还是看不全（或者镜头贴墙）：退到首领上方偏后的高处往下看；先挑一个从那儿看得见首领身子和头的方向
+    if (bs < -45) {
+      var hi = gy + H + 12, D2 = D * 0.55, fb = null;
+      [best, a0, a0 + Math.PI / 2, a0 - Math.PI / 2, a0 + Math.PI].some(function (a) {
+        var qx = cx + Math.sin(a) * D2, qz = cz + Math.cos(a) * D2, qy = Math.max(hi, W.groundAt(qx, qz, 999) + 3);
+        if (Feel.cramped(qx, qy, qz) || Feel.blocked(qx, qy, qz, cx, gy + H * 0.55, cz) || Feel.blocked(qx, qy, qz, cx, gy + H * 0.95, cz)) return false;
+        fb = a; return true;
+      });
+      if (fb === null) fb = best;
+      dx = Math.sin(fb); dz = Math.cos(fb); D = D2; px = cx + dx * D; pz = cz + dz * D; py = Math.max(hi, W.groundAt(px, pz, 999) + 3);
+    }
+    Feel._near = null; Feel._tw = null;
     Feel.seq = { kind: 'boss', t: 0, len: 1.7, list: list, landed: false, x: cx, y: gy, z: cz, H: H, D: D, dx: dx, dz: dz, py: py };
     Feel.ov = { x: px, y: py, z: pz, lx: cx, ly: gy + H * 0.55, lz: cz, fov: 58, w: 0, own: 'cine' };
     Feel.cineIn();
@@ -669,7 +757,7 @@ Feel.bossLand = function (s) {
   Feel.screenFlash('#ffffff', 0.32, 0.35);
   var b = s.list[0], n = s.list.length;
   Feel.emit('bossLand', { id: b.def.id, count: n });
-  Feel.cineTitle(b.def.name + (n > 1 ? ' ×' + n : ''), Feel.EPI[b.def.id] || '');
+  Feel.cineTitle(b.def.name + (n > 1 ? ' ×' + n : ''), Feel.EPI[b.def.id] || '', '被烽火引来了！');
 };
 
 Feel.seqTick = function (dt) {
@@ -752,7 +840,7 @@ Feel.portalSwitch = function () {
 };
 
 // ============================================================
-//  Boss 倒下、关卡完成、最终虫潮
+//  Boss 倒下、关卡完成、午夜钟声
 // ============================================================
 Feel.onBossDown = function (e, last) {
   if (!e) return;
@@ -779,10 +867,10 @@ Feel.onBossDown = function (e, last) {
   }, 'stage');
 };
 
-// 最终虫潮：天空、倒计时都变红了，再加一条公告就够了（不再加一圈红边）
+// 午夜钟声：天空往深靛蓝偏、倒计时变红，再加一条公告就够了
 Feel.swarmStart = function () {
   Feel.emit('swarm', { stage: Game.stage });
-  Feel.banner({ kind: 'swarm', title: '最终虫潮', sub: '撑得越久越好' });
+  Feel.banner({ kind: 'swarm', title: '午夜钟声响了！', sub: '越来越多 · 越来越强' });
   Game.shake(0.4);
 };
 
@@ -866,10 +954,10 @@ Feel.endTick = function (dt) {
       ov.y = Math.max(P.pos.y + 3.2, W.noise ? W.groundAt(ov.x, ov.z, P.pos.y + 5) + 1.2 : 0);
       ov.lx = P.pos.x; ov.ly = P.pos.y + 1.3; ov.lz = P.pos.z;
     }
-    // 秀一下肌肉
+    // 赢了：骑士慢慢站定
     if (P.body && P.anim && typeof CHAR_MODELS !== 'undefined' && CHAR_MODELS.pose) {
       var a2 = P.anim;
-      a2.t += dt; a2.flex += (1 - a2.flex) * Math.min(1, dt * 6); a2.run *= 0.8; a2.slide *= 0.8; a2.air *= 0.8;
+      a2.t += dt; a2.run *= 0.8; a2.slide *= 0.8; a2.air *= 0.8;
       CHAR_MODELS.pose(P.body, a2);
     }
   }
@@ -968,7 +1056,7 @@ Feel.CSS = [
   '#fxCatch { position: fixed; inset: 0; z-index: 13; display: none; -webkit-tap-highlight-color: transparent; touch-action: none; }',
   '#fxCatch.on, #fxCatch.eat { display: block; }',
   '#fxCatch .hint { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; opacity: 0; }',
-  // 传送门：一格格变密的紫色像素点阵（换关时整个画面都盖住）
+  // 传送门：一格格变密的蓝白像素点阵，和出口传送门的漩涡同色（换关时整个画面都盖住；颜色在 kit.css 的 #fxWarp）
   '#fxWarp { position: fixed; inset: 0; z-index: 9; pointer-events: none; overflow: hidden; opacity: 0; visibility: hidden; }',
   '#fxWarp.in, #fxWarp.out { visibility: visible; }',
   '#fxWarp .core { position: absolute; inset: 0; opacity: 0; }',
@@ -1228,7 +1316,7 @@ Feel.hooks = function () {
       Feel.useChest = chest;
       var r;
       try { r = use.apply(this, arguments); } finally { Feel.useChest = null; }
-      // 免费金宝箱被超武接管（没有物品弹窗）：宝箱照样弹开、冒金色光柱，在觉醒弹窗后面亮一会儿再收起
+      // 免费金宝箱被超武接管（没有宝物弹窗）：宝箱照样弹开、冒金色光柱，在觉醒弹窗后面亮一会儿再收起
       // （记下这一次开箱的编号：期间又开了别的宝箱，就不去关它）
       if (chest && chest.used && !Feel.chestSeq && Feel.ok3d()) Feel.safe(function () {
         var C = FeelFX.openChest(chest, 4, 0.05);
@@ -1239,7 +1327,7 @@ Feel.hooks = function () {
       return r;
     };
   });
-  // ---- Boss、小 Boss、虫潮 ----
+  // ---- Boss、小 Boss、午夜钟声 ----
   W2(Game, 'summonBoss', function (sb) {
     return function () {
       var was = Game.bossAlive, r;
@@ -1271,7 +1359,7 @@ Feel.hooks = function () {
   W2(Director, 'startSwarm', function (ss) {
     return function () {
       var was = Director.swarm, r;
-      Feel.muteRe = /最终虫潮来袭/;
+      Feel.muteRe = /午夜钟声响了/;
       try { r = ss.apply(this, arguments); } finally { Feel.muteRe = null; }
       if (!was && Director.swarm) Feel.safe(Feel.swarmStart);
       return r;

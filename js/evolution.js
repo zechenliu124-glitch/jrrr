@@ -1,7 +1,7 @@
 'use strict';
 // ============================================================
 //  超武：武器进化（数据见 data_evo.js）
-//  · 条件：武器 Lv8 + 对应魔典 Lv2 → 在圣锻炉锻造，或打开免费金宝箱自动觉醒
+//  · 条件：武器 Lv8 + 对应纹章 Lv2 → 在圣锻炉锻造，或打开免费金宝箱自动觉醒
 //  · 圣锻炉（Interact.KINDS.holyforge）：每关 1 座，离出生点 40~90 米
 //  · 命中特性：Weapons.hit 末尾调用 Evo.onHit（特性打出的伤害不会再触发特性）
 //  · 外观：超武的弹丸、斩击、光环、场地都换成更亮的金色；觉醒时金色光柱 + 震屏 + 弹窗 + 提示
@@ -20,9 +20,8 @@ Evo.hex = function (c) { return '#' + ('000000' + (c >>> 0).toString(16)).slice(
 Evo.GOLD = 0xffc23a;     // 超武的金色（光晕、像素环）
 Evo.BOLT_C = 0xffd04a;   // 金色闪电
 
-// 靠颜色认出来的武器：超武保留本色（弹丸、拖尾、斩击），金色只做描边、光环和火星
-// （传说勇者剑的剑气也保留蓝白色，和全金的断罪圣剑分开）
-Evo.HUE = { bloodmagic: 0xd9233a, rocket: 0xb05aff, corrupted: 0xb050ff, frost: 0x9ff6ff, poison: 0x7dff4a, herosword: 0x9fd8ff };
+// 靠颜色认出来的武器：超武保留本色（多色的杂耍球、烟花弹），金色只做描边、光环和火星
+Evo.HUE = { juggle: 0xffb0a0, skyrocket: 0xffd27a };
 
 // ---------------- 规则 ----------------
 Evo.tomeLv = function (id) {
@@ -53,7 +52,7 @@ Evo.best = function () {
   return best;
 };
 
-// “大剑 Lv5/8 · 体积魔典 Lv1/2”
+// “骑士剑 Lv5/8 · 雄狮纹章 Lv1/2”
 Evo.reqText = function (w) {
   var ev = EVO[w.id];
   return w.def.name + ' Lv' + Math.min(w.level, EVO_REQ.level) + '/' + EVO_REQ.level + ' · ' +
@@ -64,21 +63,24 @@ Evo.reqText = function (w) {
 Evo.lines = function (id) {
   var ev = EVO[id], out = [ev.text];
   ev.traits.forEach(function (t) { out.push(EVO_TRAITS[t].name + '：' + EVO_TRAITS[t].desc); });
-  out.push('伤害 ×' + EVO_BONUS.damage + ' · 攻速 +25% · 范围 +25%' + (WEAPONS[id].base.count != null && WEAPONS[id].type !== 'trail' ? ' · 数量 +1' : ''));
+  var sc = ev.stats && ev.stats.count, dn = sc != null ? sc : WEAPONS[id].base.count != null && WEAPONS[id].type !== 'trail' ? EVO_BONUS.count : 0;
+  out.push('伤害 ×' + EVO_BONUS.damage + ' · 攻速 +25% · 范围 +25%' + (dn ? ' · 数量 +' + dn : ''));
   return out;
 };
 
 // ---------------- 进化 ----------------
-// 超武 def：基础 def 的拷贝 + 超武覆盖的字段
+// 超武 def：基础 def 的拷贝 + 超武覆盖的字段（对象按一层合并：ram 只改 minSpeed / arc，其余照旧）
+// 下划线开头的是按 def 缓存的东西（比如减速 _slow），不拷过来
+Evo.plain = function (v) { return !!v && typeof v === 'object' && !Array.isArray(v); };
 Evo.makeDef = function (w) {
   var base = WEAPONS[w.id], ev = EVO[w.id], d = {}, k;
-  for (k in base) d[k] = base[k];
-  if (ev.over) for (k in ev.over) d[k] = ev.over[k];
+  for (k in base) if (k.charAt(0) !== '_') d[k] = base[k];
+  if (ev.over) for (k in ev.over) d[k] = Evo.plain(base[k]) && Evo.plain(ev.over[k]) ? Object.assign({}, base[k], ev.over[k]) : ev.over[k];
   d.name = ev.name; d.icon = ev.icon; d.color = ev.color; d.desc = ev.text;
   d.evo = true; d.baseName = base.name;
   d.traits = ev.traits.slice();
   d.tGold = d.traits.indexOf('gold') >= 0;
-  if (d.proj) d.proj = Evo.kindOf((typeof PROJ_BY_WEAPON !== 'undefined' && PROJ_BY_WEAPON[w.id]) || d.proj, w.id);
+  if (d.proj) d.proj = Evo.kindOf(Weapons.projKind(d.proj), w.id);
   return d;
 };
 
@@ -90,23 +92,24 @@ Evo.evolve = function (w, how) {
   w.evo = true;
   w.evoHow = how || '';
   s.damage = (s.damage || 0) * EVO_BONUS.damage;
-  if (s.count != null) s.count += EVO_BONUS.count;
+  // 数量 +1 只给没写自己数量的超武；写了 stats.count 的，觉醒文字说的就是这个数（九命连爪三道、连珠弹弓三颗……，D-C4-24）
+  if (s.count != null && !(ev.stats && ev.stats.count != null)) s.count += EVO_BONUS.count;
   s.size = (s.size || 1) * EVO_BONUS.size;
   if (s.cd) s.cd *= EVO_BONUS.cd;
-  if (ev.stats) for (k in ev.stats) s[k] = (s[k] || 0) + ev.stats[k];
+  // 没有数量的武器（钓竿）按 1 算起：钓龙竿 +1 = 一次甩两竿
+  if (ev.stats) for (k in ev.stats) s[k] = (s[k] != null ? s[k] : k === 'count' ? 1 : 0) + ev.stats[k];
   Evo.dress(w);
   if (typeof UI !== 'undefined' && UI.cache) UI.cache.slots = null;   // 让 HUD 重画武器栏
   Evo.celebrate(w, how);
   return true;
 };
 
-// 常驻视觉换色：光环换成金色（光环是着色器，颜色在 uCol 里）并多一圈贴地的圣光像素环；锁链换成金色
-// 永冬领域保留冰蓝色的光墙（金色只在内圈的光环和星光上），不然和天使圣域分不出来
+// 常驻视觉换色：光环换成金色（光环是着色器，颜色在 uCol 里）并多一圈贴地的圣光像素环
 Evo.dress = function (w) {
   var def = w.def;
   if (def.type === 'aura') {
-    // 着色器里的颜色可以超过 1：叠加的光墙更亮、更金（冰霜是更亮的冰蓝）
-    var rgb = def.freeze ? [0.72, 1.12, 1.25] : [1.3, 0.9, 0.26];
+    // 着色器里的颜色可以超过 1：叠加的光墙更亮、更金
+    var rgb = [1.3, 0.9, 0.26];
     [w.ring, w.ring2].forEach(function (m) {
       if (!m || !m.material) return;
       var u = m.material.uniforms;
@@ -116,7 +119,6 @@ Evo.dress = function (w) {
     if (!w.evoRing) w.evoRing = Evo.haloMesh(w);
     if (!w.evoRing.parent && Weapons.scene && (!w.ring || w.ring.parent)) Weapons.scene.add(w.evoRing);
   }
-  if (def.type === 'tether' && w.beam && w.beam.material) w.beam.material.color.set(Evo.tint(w.id));
 };
 
 // 光环内圈的圣光环：用光环同一套几何体和地面高度（贴着坡面），只画外圈的像素格子，叠加发光
@@ -137,7 +139,7 @@ Evo.haloMesh = function (w) {
   if (u && u.uH && Weapons.auraGeo && Weapons.AURA_VS) {
     m = new THREE.Mesh(Weapons.auraGeo(), new THREE.ShaderMaterial({
       // uH 和光环共用同一个数组：光环每帧采样的地面高度这里直接用
-      uniforms: { uCol: { value: new THREE.Color(w.def.freeze ? 0xffd468 : 0xfff0c0) }, uA: { value: 0.6 }, uR: { value: 3 }, uHgt: { value: 0 }, uH: { value: u.uH.value } },
+      uniforms: { uCol: { value: new THREE.Color(0xfff0c0) }, uA: { value: 0.6 }, uR: { value: 3 }, uHgt: { value: 0 }, uH: { value: u.uH.value } },
       vertexShader: Weapons.AURA_VS, fragmentShader: Evo.HALO_FS,
       transparent: true, depthWrite: false, side: THREE.DoubleSide,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor
@@ -243,7 +245,8 @@ Evo.onHit = function (w, e, dealt, mult, kx, kz) {
   for (var i = 0; i < tr.length; i++) {
     switch (tr[i]) {
       case 'burn':
-        if (e.alive) { Enemies.applyDot(e, dealt * 0.4, 2); Evo.addBurn(e, def.burnColor || 0xff8a1a); }
+        // 和武器自己的燃烧一样染成橙色（e.fireT）：不然后一半时间露出绿色，看着像中毒
+        if (e.alive) { Enemies.applyDot(e, dealt * 0.4, 2); e.fireT = Math.max(e.fireT || 0, Game.time + 2); Evo.addBurn(e, def.burnColor || 0xff8a1a); }
         break;
       case 'chain':
         if (Evo.budget > 0 && proc(0.25)) { Evo.budget--; Evo.chain(w, e); }
@@ -270,7 +273,7 @@ Evo.onHit = function (w, e, dealt, mult, kx, kz) {
         }
         break;
       case 'split':
-        if (Evo.budget > 0 && Weapons.projs.length < 320) { Evo.budget--; Evo.split(w, e, mult, kx, kz); }
+        if (Evo.budget > 0 && Weapons.projs.length < 320) { Evo.budget--; Evo.split(w, e, mult, kx, kz, 2, 0.35); }
         break;
       case 'stun':
         if (e.alive && !e.boss && !e.mini && proc(0.1)) Evo.stun(e, 0.6);
@@ -288,7 +291,7 @@ Evo.onHit = function (w, e, dealt, mult, kx, kz) {
   if (def.tGold && !e.alive) Pickups.gold(e.x, e.y + 0.5, e.z, Math.ceil(Game.stage * P.st.goldGain * (e.elite || e.mini ? 4 : 1)));
 };
 
-// 特性打出的伤害：照常算暴击和物品效果，但不再触发特性
+// 特性打出的伤害：照常算暴击和宝物效果，但不再触发特性
 Evo.traitHit = function (w, e, mult, kx, kz) {
   if (!e.alive) return 0;
   Evo.busy = true;
@@ -312,7 +315,7 @@ Evo.chain = function (w, e) {
 // 圣光新星：5 米，120% 伤害
 Evo.nova = function (w, x, y, z) {
   FX.ring(x, y, z, 5, 0xfff1a8, 0.4);
-  FX.ring(x, y, z, 2.8, 0xffffff, 0.3);
+  FX.ring(x, y, z, 2.8, 0xfff2a8, 0.3);   // 不用纯白（UI_STYLE：没有白色光芯）
   FX.burst(x, y + 1, z, 10, 0xffe680, 6, 0.3);
   Enemies.inRadius(x, z, 5, function (o) {
     if (Math.abs(o.y - y) > 4) return;
@@ -329,19 +332,13 @@ Evo.freeze = function (w, e) {
   } else {
     e.frozen = Math.max(e.frozen, 1.2);
     FX.burst(e.x, e.y + e.r, e.z, 3, 0xbff4ff, 2.5, 0.2);
-    // 缚魂锁链冻住目标：脚下一圈白蓝色的小环
-    if (w.def.type === 'tether') FX.ring(e.x, e.y, e.z, 1, 0xd8f6ff, 0.3);
   }
 };
 
-// 斩杀：文字全场限流（FX.execText）；影舞飞刃在敌人身上划一道红色刀光
+// 斩杀：文字全场限流（FX.execText）；按普通暴击算（crit 1：暴击的声音、精英的大命中停顿）
 Evo.execute = function (w, e) {
   var hp = e.hp;
-  if (w.id === 'dagger') {
-    var sa = Math.random() * TAU;
-    FX.spawn('slash1.0', 0xff3030, { x: e.x - Math.sin(sa) * 0.9, y: e.y + e.r * 1.2, z: e.z - Math.cos(sa) * 0.9, s0: 0.7, s1: 1.15, life: 0.12, ry: sa, rz: rand(-0.6, 0.6), a0: 1 });
-  }
-  Enemies.damage(e, hp + 1, 2, 0, 0, { text: '斩杀' });
+  Enemies.damage(e, hp + 1, 1, 0, 0, { text: '斩杀' });
   w.dmg += hp;
   if (!e.alive) w.kills++;
 };
@@ -350,6 +347,7 @@ Evo.execute = function (w, e) {
 // 名单满了就只停顿：evoStun 只在名单里倒计时，不能留下永远不消失的金色
 Evo.stun = function (e, t) {
   e.frozen = Math.max(e.frozen, t);
+  e.stunEnd = Math.max(e.stunEnd || 0, Game.time + t);   // 列表满了也记下来：META 的冻住击杀不算眩晕
   if (!e.evoStunListed) {
     if (Evo.stunned.length >= 40) return;
     e.evoStunListed = true;
@@ -363,7 +361,8 @@ Evo.addBurn = function (e, color) {
   if (!e.evoBurnListed && Evo.burning.length < 40) { e.evoBurnListed = true; Evo.burning.push(e); }
 };
 
-// 分裂：命中点飞出两枚碎片（碎片用替身武器发射，不会再分裂、不触发特性；伤害和击杀在 Evo.tick 里记回本体）
+// 分裂：命中点飞出 n 枚碎片、每枚 k 倍伤害（分裂特性 2 枚 35%；弹弓 splitHit 2 枚 40%）
+// 碎片用替身武器发射，不会再分裂、不插地、不爆炸、不追踪、不触发特性；伤害和击杀在 Evo.tick 里记回本体
 Evo.fragOf = function (w) {
   var f = w.evoFrag || (w.evoFrag = { id: w.id, level: 1, kills: 0, dmg: 0, charges: 0, timer: 0, frag: true });
   f.def = w.def; f.s = w.s; f.level = w.level;
@@ -372,8 +371,9 @@ Evo.fragOf = function (w) {
 
 // 碎片优先飞向 7 米内最近的两个敌人，瞄准身体中心（坡上坡下都打得到）；
 // 附近没有敌人就沿弹丸方向左右散开，顺着前方地面的坡度飞（以前总是水平飞，下坡的敌人会被从头顶飞过去）
-Evo.split = function (w, e, mult, kx, kz) {
+Evo.split = function (w, e, mult, kx, kz, n, km) {
   var f = Evo.fragOf(w);
+  n = n || 2; km = km || 0.35;
   var base = kx || kz ? Math.atan2(kx, kz) : Math.random() * TAU;
   var o = Evo._splitO || (Evo._splitO = { x: 0, y: 0, z: 0 });
   o.x = e.x; o.y = e.y + e.r; o.z = e.z;
@@ -384,15 +384,15 @@ Evo.split = function (w, e, mult, kx, kz) {
     var d = dist2(o.x, o.z, q.x, q.z);
     if (d < da) { b = a; db = da; a = q; da = d; } else if (d < db) { b = q; db = d; }
   });
-  for (var k = 0; k < 2; k++) {
-    var t = k ? b : a, ang = t ? Math.atan2(t.x - o.x, t.z - o.z) : base + (k ? 0.55 : -0.55);
-    var p = Weapons.launch(f, o, null, ang, 0, 0.35 * (mult || 1));
+  for (var k = 0; k < n; k++) {
+    var t = k === 0 ? a : k === 1 ? b : null, side = k % 2 ? 1 : -1, ang = t ? Math.atan2(t.x - o.x, t.z - o.z) : base + side * 0.55 * (1 + (k >> 1));
+    var p = Weapons.launch(f, o, null, ang, 0, km * (mult || 1));
     if (!p) continue;
     p.pierce = 0; p.bounces = 0; p.boom = false; p.grav = 0; p.homing = 0; p.explode = false;
     p.r = Math.max(0.25, p.r * 0.6); p.scale *= 0.6;
     p.vx *= 0.7; p.vz *= 0.7;
     var hs = Math.sqrt(p.vx * p.vx + p.vz * p.vz) || 1, hd, ty;
-    if (t) { hd = Math.max(0.5, Math.sqrt(k ? db : da)); ty = t.y + t.r; }
+    if (t) { hd = Math.max(0.5, Math.sqrt(k === 1 ? db : da)); ty = t.y + t.r; }
     else { hd = 3; ty = W.groundAt(o.x + Math.sin(ang) * hd, o.z + Math.cos(ang) * hd, o.y + 2) + 0.6; }
     p.vy = clamp((ty - o.y) / hd, -1.5, 1.5) * hs;
     // 寿命够飞到目标（至少 0.42 秒）；有目标的碎片每帧朝目标修正（Evo.steerFrags）
@@ -483,8 +483,8 @@ Evo.goldify = function (geo, tint, amt) {
   return geo;
 };
 
-// 超武专用的弹丸网格（按武器分开，用到时才建）：亮金色、大一点，再配一个金色光晕 + 白色亮芯
-// 靠颜色认出来的武器（Evo.HUE）不染金色：保留本色，金色只在光晕的描边上
+// 超武专用的弹丸网格（按武器分开，用到时才建）：亮金色、大一点，再配一个金色光晕 + 亮芯
+// 靠颜色认出来的武器（Evo.HUE）不染金色：保留本色，金色只在光晕的描边上；models_proj.js 的 PROJ_EVO 有专门的超武模型就用它
 Evo.kindOf = function (kind, wid) {
   if (!kind || kind.indexOf('@') > 0) return kind;
   var ek = kind + '@' + wid;
@@ -492,11 +492,11 @@ Evo.kindOf = function (kind, wid) {
   if (!PROJ_MODELS[kind] || !Weapons.scene) return kind;
   var look = typeof PROJ_LOOK !== 'undefined' && PROJ_LOOK ? PROJ_LOOK[kind] : null;
   var build = typeof projGeo === 'function' ? projGeo : function (k, parts) { return MODEL.build(parts || PROJ_MODELS[k], parts ? false : undefined); };
-  // 有专门超武模型的用自己的（颜色已经是金色），其余把原模型染成金色
-  var own = (Evo.MODELS_W[wid] && Evo.MODELS_W[wid][kind]) || Evo.MODELS[kind];
+  var pe = typeof PROJ_EVO !== 'undefined' && PROJ_EVO ? PROJ_EVO[kind] : null;
+  var own = pe || Evo.MODELS[kind];
   var geo = own ? build(kind, own) : Evo.HUE[wid] ? build(kind) : Evo.goldify(build(kind), look ? Evo.tint(wid) : Evo.metalTint(wid), look ? 0.6 : 0.8);
-  // 环绕的流星锤本来就跟着范围变大，不再额外放大（盾牌的 0.8 在 Weapons.render 里按原来的种类算）
-  var s = kind === 'flail' ? 0.92 : 1.12;
+  // 环绕的东西本来就跟着范围变大，不再额外放大
+  var s = WEAPONS[wid] && WEAPONS[wid].type === 'orbit' ? 0.92 : 1.12;
   geo.scale(s, s, s);
   var mat = look === 'add' ? Evo.addMat() : look ? Evo.unlitMat() : Evo.shinyMat();
   var im = MODEL.instanced(geo, 500, Weapons.scene, mat);
@@ -506,110 +506,40 @@ Evo.kindOf = function (kind, wid) {
   return ek;
 };
 
-// 专门的超武模型：神盾原本就是金边红心，只染色看不出升级，换成白金盾面 + 金十字 + 中间的宝石
-Evo.MODELS = {
-  shield: [
-    ['cyl', [0.66, 0.66, 0.14, 8], [0, 0, 0], 0xe8a828, [Math.PI / 2, 0, 0]],
-    ['cyl', [0.5, 0.5, 0.17, 8], [0, 0, 0], 0xfff0c8, [Math.PI / 2, 0, 0]],
-    ['box', [0.13, 0.72, 0.21], [0, 0, 0], 0xf0b830],
-    ['box', [0.52, 0.13, 0.21], [0, 0.1, 0], 0xf0b830],
-    ['oct', [0.11], [0, 0.1, 0.11], 0xffffff],
-    ['oct', [0.11], [0, 0.1, -0.11], 0xffffff]
-  ],
-  // 陨星重锤：金色锤头 + 烧得发白的尖刺
-  flail: [['dodec', [0.42], [0, 0, 0], 0xe0a020, null, null, 'metal'], ['cone', [0.12, 0.4, 4], [0, 0.53, 0], 0xfff6d8], ['cone', [0.12, 0.4, 4], [0, -0.53, 0], 0xfff6d8, [Math.PI, 0, 0]], ['cone', [0.12, 0.4, 4], [0.53, 0, 0], 0xfff6d8, [0, 0, -Math.PI / 2]], ['cone', [0.12, 0.4, 4], [-0.53, 0, 0], 0xfff6d8, [0, 0, Math.PI / 2]], ['cone', [0.12, 0.4, 4], [0, 0, 0.53], 0xfff6d8, [Math.PI / 2, 0, 0]], ['cone', [0.12, 0.4, 4], [0, 0, -0.53], 0xfff6d8, [-Math.PI / 2, 0, 0]]],
-  // 月刃回旋镖：一弯月牙形的刀刃（淡金色，刃口发白），平着转
-  banana: [['fxCrescent3', [0.8, 0.3, 2.6, 0.07], [0, 0, -0.42], 0xfff0b8, null, null, 'plain'], ['fxCrescent3', [0.84, 0.08, 2.5, 0.09], [0, 0, -0.42], 0xffffff, null, null, 'plain']],
-  // 断头巨刃：金色的新月刀身 + 白亮的刃口 + 深色刀背（和普通的一样立起来转）
-  blade: [
-    ['fxCrescent3', [1.05, 0.42, 1.7, 0.08], [0, 0, -0.85], 0xf0b830, null, null, 'metal'],
-    ['fxCrescent3', [1.1, 0.1, 1.62, 0.1], [0, 0, -0.85], 0xfffbe8, null, null, 'plain'],
-    ['box', [0.8, 0.12, 0.1], [0, 0, -0.26], 0x5a3a14, null, null, 'metal']
-  ]
-};
+// 专门的超武模型（按弹丸种类；第 10 块加正式的）
+Evo.MODELS = {};
 
-// 按武器单独的超武模型：两把剑气不同色（堕落魔剑是紫色剑气 + 金边，传说勇者剑是蓝白剑气 + 金边；断罪圣剑是全金）
-Evo.MODELS_W = {
-  corrupted: { wave: [['fxCrescent', [1.15, 0.36, 2.3], [0, 0, -0.95], 0xb860ff], ['fxCrescent', [1.24, 0.1, 2.2], [0, 0, -0.95], 0xffc23a]] },
-  herosword: { wave: [['fxCrescent', [1.15, 0.36, 2.3], [0, 0, -0.95], 0xcfeaff], ['fxCrescent', [1.24, 0.1, 2.2], [0, 0, -0.95], 0xffc23a]] }
-};
-
-// 超武弹丸的光晕（Weapons.glowC）：原来有光晕的换成金色（亮度比原来低一点，靠白色亮芯显亮）；原来没有的也加上；
-// 圆球类的弹丸外面再套一圈金色细光环（超武的记号）；保留本色的武器光晕用本色
+// 超武弹丸的光晕（Weapons.glowC）：原来有光晕的换成金色（亮度比原来低一点，靠亮芯显亮）；原来没有的也加上；
+// 圆球类的弹丸（PROJ_ANIM[kind].orb）外面再套一圈金色细光环（超武的记号）；保留本色的武器光晕用本色
 Evo.addGlow = function (ek, kind, wid) {
   if (!Weapons.glowC) return;
-  var b = Weapons.glowC[kind], wave = kind === 'wave', hue = Evo.HUE[wid];   // 剑气本身就是发光的新月，光晕小一点
-  var orb = kind === 'fireball' || kind === 'bloodorb' || kind === 'arcane' || kind === 'orb';
+  var b = Weapons.glowC[kind], hue = Evo.HUE[wid];
+  var orb = !!Weapons.anim(kind).orb;
   Weapons.glowC[ek] = {
     c: hue ? new THREE.Color(hue) : new THREE.Color(EVO[wid] ? EVO[wid].color : Evo.GOLD).lerp(new THREE.Color(Evo.GOLD), 0.6),
-    s: b ? b.s * (wave ? 0.7 : 1) : 0.95, a: b ? Math.min(0.65, b.a * 0.75 + (wave ? 0 : 0.08)) : 0.36, byWeapon: false,
-    core: 0.38, cc: Evo.col('core', 0xfff4d0), ca: 0.6,
-    ring: orb ? (kind === 'fireball' ? 0.68 : 0.88) : 0, rc: Evo.col('gold', Evo.GOLD), ra: 0.5
+    s: b ? b.s : 0.95, a: b ? Math.min(0.65, b.a * 0.75 + 0.08) : 0.36, byWeapon: false,
+    core: 0.38, cc: Evo.col('core', 0xfff2a8), ca: 0.6,
+    ring: orb ? 0.88 : 0, rc: Evo.col('gold', Evo.GOLD), ra: 0.5
   };
 };
 
-// 场地类（龙卷风、火药桶、飞斧）用金色的几何体
+// 场地类（地雷、蜡烛、捕兽夹、飞锅）用金色的几何体
 Evo.goldGeo = function (key, makeSrc, tint, amt) {
   Evo._goldGeos = Evo._goldGeos || {};
   if (!Evo._goldGeos[key]) Evo._goldGeos[key] = Evo.goldify(makeSrc().clone(), tint, amt || 0.7);
   return Evo._goldGeos[key];
 };
 
-// 场地模型来自对象池（超武的单独一池），换过一次就一直是金色的；龙卷风保持白蓝色的风（金色只做点缀，见 Evo.tickZones）
+// 场地模型来自对象池（超武的单独一池）；拿出来时几何体放回原样（z.gkey 是它的名字），这里换成金色的
 Evo.dressZone = function (z) {
   var w = z && z.w;
-  if (!w || !w.evo || !z.mesh) return;
-  var zm = typeof ZONE_MODELS !== 'undefined' ? ZONE_MODELS : null;
-  if (z.type === 'mine' && zm && z.mesh.geometry === zm.mine) {
-    z.mesh.geometry = Evo.goldGeo('mine@' + w.id, function () { return zm.mine; }, Evo.metalTint(w.id), 0.7);
-    z.mesh.material = Evo.shinyMat();
-  } else if (z.type === 'axe') {
-    // 普通飞斧的几何体是大家共用的，不能释放
-    if (!Evo._axeGeo) Evo._axeGeo = MODEL.build(Evo.AXE_PARTS, false);
-    z.mesh.geometry = Evo._axeGeo;
-    z.mesh.material = Evo.shinyMat();
-  }
-};
-
-// 风暴战斧：双刃金斧，深色木柄、金箍、亮白的刃口、顶上一根尖刺（和原来的飞斧一样：柄沿 z，刃朝 +z）
-Evo.AXE_PARTS = [
-  ['box', [0.1, 0.1, 1.2], [0, 0, -0.06], 0x4a2c16],
-  ['box', [0.16, 0.16, 0.1], [0, 0, -0.64], 0xe8a828],
-  ['box', [0.15, 0.2, 0.2], [0, 0, 0.38], 0xe8a828],
-  ['box', [0.07, 0.44, 0.36], [0, 0.29, 0.42], 0xf0b830, [0.3, 0, 0]],
-  ['box', [0.07, 0.44, 0.36], [0, -0.29, 0.42], 0xf0b830, [-0.3, 0, 0]],
-  ['box', [0.08, 0.5, 0.07], [0, 0.33, 0.62], 0xfff2c0, [0.3, 0, 0]],
-  ['box', [0.08, 0.5, 0.07], [0, -0.33, 0.62], 0xfff2c0, [-0.3, 0, 0]],
-  ['cone', [0.07, 0.32, 4], [0, 0, 0.72], 0xfff0b0, [Math.PI / 2, 0, 0]]
-];
-
-// 近战超武的金色斩击在 FX.slash / FX.sweep 里画（Weapons.swing 传 def.evo）；绕身一圈的镰刀再加一圈金色像素环
-// （0.6 倍半径、最大 4.5 米：大镰刀的整圈会跑到镜头后面，内圈留在画面里）
-Evo.slashCore = function (w) {
-  var def = w.def;
-  if ((def.arc || 2) <= 4) return;
-  var r = (def.range || 4) * Weapons.size(w), o = Weapons.origin();
-  FX.ring(o.x, P.pos.y + 0.05, o.z, Math.min(r * 0.6, 4.5), Evo.GOLD, 0.28);
-};
-
-// 攻城巨弩：同一帧射出的是一轮齐射；弩箭散得更开、飞得更平（不会刚出手就炸在脚下）
-Evo.volley = function (w, p) {
-  if (w.evoVolT !== Game.time || !w.evoVolHit) { w.evoVolT = Game.time; w.evoVol = (w.evoVol || 0) + 1; w.evoVolI = 0; w.evoVolHit = new Set(); }
-  var n = Weapons.count(w), extra = (w.evoVolI - (n - 1) / 2) * 0.06;
-  w.evoVolI++;
-  if (extra) { var c = Math.cos(extra), s = Math.sin(extra), vx = p.vx, vz = p.vz; p.vx = vx * c + vz * s; p.vz = vz * c - vx * s; }
-  if (p.vy < 0) p.vy *= 0.35;
-  p.evoVol = w.evoVol;
-};
-
-// 暴风散弩：两边各多一支短箭
-Evo.extraBolts = function (w) {
-  var o = Weapons.origin(), dir = Weapons.aimDir(), base = Math.atan2(dir.x, dir.z);
-  var mult = 1 + (Weapons.count(w) - 1) * 0.35;
-  for (var i = 0; i < w.def.extraBolts; i++) {
-    var side = i % 2 ? 1 : -1, k = 4 + (i >> 1);
-    Weapons.launch(w, o, null, base + side * k * 0.09 + rand(-0.03, 0.03), dir.y + rand(-0.05, 0.05), mult);
-  }
+  if (!w || !w.evo || !z.mesh || !z.gkey) return;
+  var src = z.mesh.geometry;
+  if (src && src.userData && src.userData.evoGold) return;
+  var g = Evo.goldGeo(z.gkey + '@' + w.id, function () { return src; }, Evo.metalTint(w.id), 0.7);
+  g.userData.evoGold = true;
+  z.mesh.geometry = g;
+  z.mesh.material = Evo.shinyMat();
 };
 
 // ---------------- 每帧（跟在 Weapons.update 后面） ----------------
@@ -622,10 +552,7 @@ Evo.tick = function (dt) {
     if (w.evoFrag) { w.dmg += w.evoFrag.dmg; w.kills += w.evoFrag.kills; w.evoFrag.dmg = 0; w.evoFrag.kills = 0; }
     if (!w.evo) continue;
     if (w.evoRing) Evo.tickHalo(w, dt);
-    if (w.def.type === 'flame' && w.flaming > 0) Evo.dragonLook(w, dt);
-    if (w.def.type === 'tether' && w.target && w.beam && w.beam.visible) Evo.tetherGlow(w);
   }
-  Evo.tickZones(dt);
   Evo.tickStun(dt);
   Evo.tickBurn(dt);
   for (i = Evo.fx.length - 1; i >= 0; i--) {
@@ -634,23 +561,6 @@ Evo.tick = function (dt) {
   // 武器刚满足超武条件时提示一次
   Evo.readyT -= dt;
   if (Evo.readyT <= 0) { Evo.readyT = 0.5; Evo.checkReady(); }
-};
-
-// 真龙吐息：火焰锥中间一道白金色的火芯（前 60% 的距离），火里混着金白色的火星，末端每 0.3 秒一圈金色像素环
-Evo.dragonLook = function (w, dt) {
-  var fr = (w.def.range || 7) * Weapons.size(w), fx = Math.sin(w.fang), fz = Math.cos(w.fang);
-  var x0 = P.pos.x + fx * 0.8, y0 = P.pos.y + 1.05, z0 = P.pos.z + fz * 0.8, l = fr * 0.6, kc = w.flameK != null ? w.flameK : 1;
-  FX.trailSeg(x0, y0, z0, P.pos.x + fx * l, y0 + 0.2, P.pos.z + fz * l, 0.32, 0.5, kc, 0.35 * kc, Evo.col('dcore', 0xffe9a0), 0.4);
-  if (Math.random() < dt * 24) {
-    var d = rand(1, fr);
-    FX.burst(P.pos.x + fx * d, P.pos.y + 1, P.pos.z + fz * d, 1, Math.random() < 0.5 ? 0xffffff : 0xffe066, 2, 0.25);
-  }
-  w.evoRingT = (w.evoRingT || 0) - dt;
-  if (w.evoRingT <= 0) {
-    w.evoRingT = 0.3;
-    var ex = P.pos.x + fx * fr, ez = P.pos.z + fz * fr;
-    FX.ring(ex, W.groundAt(ex, ez, P.pos.y + 2), ez, 1.6, Evo.GOLD, 0.3);
-  }
 };
 
 // 超武光环：金色光墙更高；内圈的圣光像素环一呼一吸（跳伤时亮一下）；六颗金色星光在光环远处的半圈上滑过
@@ -687,52 +597,6 @@ Evo.tickHalo = function (w, dt) {
   }
 };
 
-// 缚魂锁链：链环本身是金色的（Weapons.renderLinks），锁住的敌人身上一团金光，锁链上两颗白光往敌人那边跑
-Evo.tetherGlow = function (w) {
-  var tg = w.target, gc = Evo.col('gold', Evo.GOLD), t = Game.time;
-  var ty = tg.y + tg.r, sy = P.pos.y + 1.1, pulse = 0.85 + Math.sin(t * 14) * 0.15;
-  FX.glow(tg.x, ty, tg.z, 1.6 * pulse, 1.6 * pulse, gc, 0.55, 0);
-  for (var k = 1; k <= 2; k++) {
-    var f = (k / 3 + t * 1.5) % 1;
-    FX.glow(lerp(P.pos.x, tg.x, f), lerp(sy, ty, f), lerp(P.pos.z, tg.z, f), 0.8, 0.8, Evo.col('white', 0xffffff), 0.6, 2);
-  }
-};
-
-// 超武场地的金色点缀：黑洞的金色视界、龙卷风里往上转的金光和金色碎屑、焦土上的金白火苗、
-// 火药桶上的闪光、飞斧的小光晕、毒云里冒的金色和白色气泡
-Evo.tickZones = function (dt) {
-  var zs = Weapons.zones, gc = Evo.col('gold', Evo.GOLD), wc = Evo.col('core', 0xfff4d0);
-  for (var i = 0; i < zs.length; i++) {
-    var z = zs[i], w = z.w;
-    if (!w || !w.evo) continue;
-    switch (z.type) {
-      case 'blackhole': {
-        var bs = Weapons.holeSize ? Weapons.holeSize(z) : z.r * 0.4;
-        FX.glow(z.x, z.y + 1.5, z.z, bs * 3.3, bs * 3.3, gc, 0.6, 1);
-        break;
-      }
-      case 'tornado': {
-        var vs = Weapons.windScale ? Weapons.windScale(w) : 1;
-        for (var k = 0; k < 2; k++) {
-          var h = (z.t * 0.6 + k * 0.5) % 1, a = -z.t * 5 + k * Math.PI, rad = lerp(0.4, 1.2, h) * vs;
-          FX.glow(z.x + Math.cos(a) * rad, z.y + 0.4 + h * 4 * vs, z.z + Math.sin(a) * rad, 0.8, 0.8, gc, 0.6 * (1 - h * 0.5), 0);
-        }
-        if (Math.random() < dt * 10) {
-          var da = Math.random() * TAU;
-          FX.part(z.x + Math.cos(da) * 0.8, z.y + rand(0.3, 2.5), z.z + Math.sin(da) * 0.8, -Math.sin(da) * 4, rand(1.5, 3), Math.cos(da) * 4, 0xffe066, 0.16, 0.7, -0.5);
-        }
-        break;
-      }
-      case 'fire':
-        if (Math.random() < dt * 4) FX.burst(z.x + rand(-z.r, z.r) * 0.5, z.y + 0.3, z.z + rand(-z.r, z.r) * 0.5, 1, 0xffd23a, 2, 0.16);
-        break;
-      case 'axe': FX.glow(z.x, z.y, z.z, z.r * 0.7, z.r * 0.7, gc, 0.3, 0); break;
-      case 'mine': if (Math.sin(z.t * 5 + i * 1.7) > 0.55) FX.glow(z.x, z.y + 0.95, z.z, 0.8, 0.8, wc, 0.8, 2); break;
-      case 'puddle': if (Math.random() < dt * 6) FX.mote(z.x + rand(-z.r, z.r) * 0.6, z.y + 0.2, z.z + rand(-z.r, z.r) * 0.6, Math.random() < 0.6 ? 0xffe680 : 0xffffff, 0.14, rand(0.8, 1.5), 0.8); break;
-    }
-  }
-};
-
 // 敌人头顶高度（按模型包围盒算一次，缓存在敌人 def 上）
 Evo.topOf = function (e) {
   var d = e.def;
@@ -748,7 +612,7 @@ Evo.topOf = function (e) {
 
 Evo.starMesh = function () {
   if (Evo._stars || !Game.scene) return Evo._stars || null;
-  var geo = MODEL.build([['oct', [0.26], [0, 0, 0], 0xffd23a, null, [1, 1, 0.35]], ['oct', [0.13], [0, 0, 0.02], 0xffffff, null, [1, 1, 0.6]]], false);
+  var geo = MODEL.build([['oct', [0.26], [0, 0, 0], 0xffd23a, null, [1, 1, 0.35]], ['oct', [0.13], [0, 0, 0.02], 0xfff2a8, null, [1, 1, 0.6]]], false);
   var im = MODEL.instanced(geo, 120, Game.scene);
   im.material = Evo.glowMat();
   Evo._stars = im;
@@ -793,13 +657,31 @@ Evo.tickBurn = function (dt) {
   }
 };
 
-Evo.checkReady = function () {
+// 每 0.5 秒：刚满足条件的武器提示一次（quiet = 不提示，圣锻炉、免费金宝箱自己调用时：人已经在那儿了），
+// 再趁现在画好一个超武图标（Evo.warmOne：一次最多现画一个，几把同时满足时分几次画，不在同一帧里卡）
+Evo.checkReady = function (quiet) {
+  if (!quiet) {
+    for (var i = 0; i < P.weapons.length; i++) {
+      var w = P.weapons[i];
+      if (w.evo || w.evoTold || !Evo.canEvolve(w)) continue;
+      w.evoTold = true;
+      UI.toast('「' + w.def.name + '」可以觉醒超武了！' + (Evo.liveForge() ? '去圣锻炉或开金宝箱' : '打开金宝箱就能觉醒'), Kit.color('gold'));
+    }
+  }
+  Evo.warmOne();
+};
+// 满足条件的武器里，第一把还没画好超武图标的：画它（缓存起来，之后开圣锻炉、开金宝箱觉醒时不用现画）；一次最多一个
+Evo.warmOne = function () {
+  if (typeof UI === 'undefined' || !UI.iconEl || typeof ICONS === 'undefined') return null;
   for (var i = 0; i < P.weapons.length; i++) {
     var w = P.weapons[i];
-    if (w.evo || w.evoTold || !Evo.canEvolve(w)) continue;
-    w.evoTold = true;
-    UI.toast('「' + w.def.name + '」可以觉醒超武了！' + (Evo.liveForge() ? '去圣锻炉或开金宝箱' : '打开金宝箱就能觉醒'), Kit.color('gold'));
+    if (w.evo || !Evo.canEvolve(w)) continue;
+    var n = ICONS.nameFor('evo', w.id);
+    if (!n || ICONS.urls[n] || UI.iconBad['evo:' + w.id]) continue;
+    UI.iconEl('evo', w.id);
+    return w.id;
   }
+  return null;
 };
 
 Evo.liveForge = function () {
@@ -956,7 +838,7 @@ Evo.forgeTick = function (o, dt, d2) {
 Evo.forgeLabel = function () {
   var ready = Evo.ready();
   if (ready.length) return '圣锻炉：' + ready.map(function (w) { return w.def.name; }).join('、') + '可以觉醒';
-  var lines = ['圣锻炉：武器 Lv' + EVO_REQ.level + ' + 对应魔典 Lv' + EVO_REQ.tome + ' 才能锻造超武'], reqs = [];
+  var lines = ['圣锻炉：武器 Lv' + EVO_REQ.level + ' + 对应纹章 Lv' + EVO_REQ.tome + ' 才能锻造超武'], reqs = [];
   P.weapons.forEach(function (w) { if (!w.evo && EVO[w.id]) reqs.push(Evo.reqText(w)); });
   // 三把以上时两条并成一行，提示框不会太高
   var pair = reqs.length > 2;
@@ -965,12 +847,25 @@ Evo.forgeLabel = function () {
   return lines.join('\n');
 };
 
+// 窄提示牌（Split View 靠左、12 号还超过 3 行）用的更短说法，从长到短（UI.promptAlts）：
+// ①「圣锻炉」/ 最接近的那把的条件 /「另有 n 把还不能觉醒」（缺的可能是等级，也可能是纹章）②「圣锻炉 · 还差等级」/ 最接近的那把 ③「圣锻炉 · n 把武器还差等级」④「圣锻炉 · 还差等级」。
+// 每把的等级在 HUD 的武器格和纹章盾上都看得到
+Evo.forgeShort = function (text) {
+  if (text !== Evo.forgeLabel() || Evo.ready().length) return null;
+  var ws = P.weapons.filter(function (w) { return !w.evo && EVO[w.id]; });
+  if (ws.length < 2) return null;
+  var sc = function (w) { return Math.min(w.level, EVO_REQ.level) / EVO_REQ.level + Math.min(Evo.tomeLv(EVO[w.id].tome), EVO_REQ.tome) / EVO_REQ.tome; };
+  var best = ws.reduce(function (a, w) { return sc(w) > sc(a) ? w : a; }), req = Evo.reqText(best);
+  return ['圣锻炉\n' + req + '\n另有 ' + (ws.length - 1) + ' 把还不能觉醒', '圣锻炉 · 还差等级\n' + req, '圣锻炉 · ' + ws.length + ' 把武器还差等级', '圣锻炉 · 还差等级'];
+};
+
 Evo.forgeOption = function (w) {
   var ev = EVO[w.id];
   return { kind: 'evo', id: w.id, rarity: 4, title: ev.name, icon: ev.icon, color: ev.color, sub: w.def.name + ' Lv' + w.level + ' → 超武', lines: Evo.lines(w.id), evoFoot: '觉醒' };
 };
 
 Evo.openForge = function (o) {
+  Evo.checkReady(true);   // 先画好一个还没画的超武图标（第 12 块）
   var list = Evo.ready();
   if (!list.length) return;
   FX.ring(o.x, o.y, o.z, 4, 0xffd84a, 0.35);
@@ -1025,7 +920,7 @@ Interact.KINDS.holyforge = {
   label: function () { return Evo.forgeLabel(); },
   canUse: function () { return Evo.anyReady(); },
   denied: function () {
-    return P.weapons.some(function (w) { return !w.evo; }) ? '超武条件：武器 Lv' + EVO_REQ.level + ' + 对应魔典 Lv' + EVO_REQ.tome : '你的武器都已经觉醒超武了';
+    return P.weapons.some(function (w) { return !w.evo; }) ? '超武条件：武器 Lv' + EVO_REQ.level + ' + 对应纹章 Lv' + EVO_REQ.tome : '你的武器都已经觉醒超武了';
   },
   use: function (o) { Evo.openForge(o); },
   update: function (o, dt, d2) { Evo.forgeTick(o, dt, d2); },
@@ -1046,10 +941,11 @@ Interact.KINDS.holyforge = {
   };
 })();
 
-// 免费金宝箱：有武器满足条件就觉醒它（代替物品）；付费宝箱不会触发
+// 免费金宝箱：有武器满足条件就觉醒它（代替宝物）；付费宝箱不会触发
 (function () {
   var prev = Interact.onFreeChest;
   Interact.onFreeChest = function (o) {
+    Evo.checkReady(true);   // 先画好一个还没画的超武图标（第 12 块）
     var w = Evo.best();
     if (w) { FX.ring(o.x, o.y, o.z, 5, 0xffd84a, 0.5); Evo.evolve(w, 'chest'); return true; }
     return prev ? prev(o) : false;
@@ -1067,46 +963,15 @@ Interact.KINDS.holyforge = {
   var updateProjs = Weapons.updateProjs;
   Weapons.updateProjs = function () { Evo.steerFrags(); return updateProjs.apply(this, arguments); };
 
-  // 超武的弹丸换成金色网格；勇者剑气更大；攻城巨弩见 Evo.volley
+  // 超武的弹丸换成金色网格（回程换的种类也换）
   var launch = Weapons.launch;
   Weapons.launch = function (w) {
     var p = launch.apply(this, arguments);
     if (p && w && w.evo) {
       p.kind = Evo.kindOf(p.kind, w.id);
-      if (w.def.waveScale && p.kind && p.kind.indexOf('wave') === 0) { p.r *= w.def.waveScale; p.scale *= w.def.waveScale; p.life *= 1.25; }
-      if (w.def.aimed && w.def.explode) Evo.volley(w, p);
+      if (p.kindB) p.kindB = Evo.kindOf(p.kindB, w.id);
     }
     return p;
-  };
-
-  // 攻城巨弩的爆炸：同一轮齐射炸到同一个敌人只算一次（多支弩箭负责覆盖更大的范围，而不是叠伤害）
-  var explode = Weapons.explode;
-  Weapons.explode = function (p) {
-    var w = p.w;
-    if (!(w && w.evo && p.evoVol)) return explode.apply(this, arguments);
-    var r = (w.def.blast || 3) * Weapons.size(w), hit = w.evoVol === p.evoVol ? w.evoVolHit : null;
-    FX.boom(p.x, p.y, p.z, r, w.def.color, Weapons.boomOpt ? Weapons.boomOpt(w) : null);
-    Enemies.inRadius(p.x, p.z, r, function (e) {
-      if (Math.abs(e.y - p.y) > r + 1.5) return;
-      if (hit) { if (hit.has(e.id)) return; hit.add(e.id); }
-      var dx = e.x - p.x, dz = e.z - p.z, d = Math.sqrt(dx * dx + dz * dz) || 1;
-      Weapons.hit(w, e, p.dmgMult, dx / d, dz / d);
-    });
-  };
-
-  var fire = Weapons.fire;
-  Weapons.fire = function (w) {
-    var ok = fire.apply(this, arguments);
-    if (ok && w.evo && w.def.extraBolts && w.def.type === 'shotgun') Evo.extraBolts(w);
-    return ok;
-  };
-
-  // 连砍好几下（数量 > 1）时金环只画第一下的
-  var swing = Weapons.swing;
-  Weapons.swing = function (w, ang, delay) {
-    var r = swing.apply(this, arguments);
-    if (w && w.evo && (w.def.arc || 2) > 4 && !(delay > 0)) Evo.slashCore(w);
-    return r;
   };
 
   // 天罚雷杖：调用期间把闪电的默认颜色换成金色（FX.bolt 不传颜色时用 FX.boltColor），连锁的闪电也分叉；
@@ -1132,7 +997,7 @@ Interact.KINDS.holyforge = {
       return r;
     };
   };
-  wrapZone('spawnZone'); wrapZone('throwAxe'); wrapZone('fireZone');
+  wrapZone('spawnZone'); wrapZone('throwAxe');
 
   var attach = Weapons.attach;
   Weapons.attach = function (w) {
@@ -1220,7 +1085,7 @@ Evo.renderPause = function () {
   if (!box) {
     box = document.createElement('div');
     box.id = 'evoPause';
-    // 放在右栏“物品”下面（不用往下翻）；找不到就放在按钮上面
+    // 放在右栏“宝物”下面（不用往下翻）；找不到就放在按钮上面
     var inv = document.getElementById('itemList'), row = null;
     if (inv && inv.parentNode && modal.contains(inv)) inv.parentNode.insertBefore(box, inv.nextSibling);
     else {
@@ -1236,7 +1101,7 @@ Evo.renderPause = function () {
   var hint = document.createElement('div');
   hint.className = 'evoPHint';
   // 按短语排（Kit.phrase）：竖屏那一栏窄，不会剩下「觉醒」两个字一行
-  var ht = '武器 Lv' + EVO_REQ.level + ' + 对应魔典 Lv' + EVO_REQ.tome + '：去圣锻炉锻造，或者打开免费金宝箱自动觉醒';
+  var ht = '武器 Lv' + EVO_REQ.level + ' + 对应纹章 Lv' + EVO_REQ.tome + '：去圣锻炉锻造，或者打开免费金宝箱自动觉醒';
   if (typeof Kit !== 'undefined' && Kit.phrase) Kit.phrase(hint, ht); else hint.textContent = ht;
   box.appendChild(hint);
 };
@@ -1344,7 +1209,7 @@ Evo.CSS = [
   '#levelModal.evoShow .cardTitle { font-size: var(--fs-l); line-height: 30px; }',
   '#levelModal.evoShow .cardSub { font-size: var(--fs-s); line-height: 18px; }',
   '#levelModal.evoShow .cardLines { font-size: var(--fs-m); line-height: 24px; }',
-  // 暂停界面的超武进度（右栏，物品下面）：每行一个凹槽（kit.css）；觉醒了的左边一条金边
+  // 暂停界面的超武进度（右栏，宝物下面）：每行一个凹槽（kit.css）；觉醒了的左边一条金边
   '#evoPause { margin: 10px 0 0; text-align: left; }',
   '#evoPause h3 { margin: 6px 0 5px; }',
   '.evoPRow { display: flex; align-items: center; gap: 9px; margin-top: 3px; padding: 3px 9px 3px 3px; background-color: rgba(255, 255, 255, 0.05); }',

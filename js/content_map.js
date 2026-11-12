@@ -1,12 +1,12 @@
 'use strict';
 // ============================================================
 //  地图内容（第二批）：
-//  - 地形地标：每关两处适合滑铲 / 坐骑的地形（林间长坡、U 形谷、大沙丘、沙坡跳台、陷落墓坑、坟丘长坡），
+//  - 地形地标：每关两处适合滑铲 / 坐骑的地形（林间长坡、林间深谷、大沙丘、沙坡跳台、陷落墓坑、坟丘长坡），
 //    长坡背后有跳台把人弹上坡顶；地标范围里不长树、不放建筑和互动物体
 //  - 秘密地点：每关三处（隐秘高台、裂墙密室、火盆宝库、藏宝图），找到之前小地图上看不到；
 //    找到时公告「发现秘密地点」+ 地点的名字，小地图上标一颗星
 //  - 随机事件：每关 3~4 次，按关卡进度错开（流星雨、金袋哥布林、旅行商人、奇怪的宝箱、血月），
-//    Boss 战和最终虫潮时不会出现；开始时公告（和 FEEL 同一个 Kit.announce）+ 小地图标记，30~60 秒
+//    Boss 战和午夜钟声时不会出现；开始时公告（和 FEEL 同一个 Kit.announce）+ 小地图标记，30~60 秒
 //  只用包装函数接入（W.generate / terrainH / freeSpot / buildRuins、Interact.populate、FX.boom、
 //  Director.update、Pickups.xp、Game.summonBoss），不改它们的源码
 // ============================================================
@@ -16,9 +16,9 @@
 // ============================================================
 // 每关两处（大小单位：米）：
 // slope 长坡：坡顶高 H，主坡长 L（越往下越陡、再变缓），顶上平台 T，背坡 Lb，中间宽 2Wc，两边缓坡 Ws，坡底一个跳包 kick
-// pipe U 形谷：长 L，宽 Wd，深 D，两边沿各有一道土坎 lip；dunes 大沙丘：半径 R，波长 lam，高 A；bowl 陷落墓坑：半径 R，深 D
+// pipe 林间深谷（U 形）：长 L，宽 Wd，深 D，两边沿各有一道土坎 lip；dunes 大沙丘：半径 R，波长 lam，高 A；bowl 陷落墓坑：半径 R，深 D
 Content.FEAT_PLAN = {
-  1: [{ type: 'slope', name: '林间长坡', H: 16, L: 62, T: 6, Lb: 22, Wc: 6, Ws: 16, kick: 1.8 }, { type: 'pipe', name: 'U 形谷', L: 62, Wd: 20, D: 5.5, lip: 1.3 }],
+  1: [{ type: 'slope', name: '林间长坡', H: 16, L: 62, T: 6, Lb: 22, Wc: 6, Ws: 16, kick: 1.8 }, { type: 'pipe', name: '林间深谷', L: 62, Wd: 20, D: 5.5, lip: 1.3 }],
   2: [{ type: 'dunes', name: '大沙丘', R: 36, A: 5.5, lam: 22 }, { type: 'slope', name: '沙坡跳台', H: 17, L: 66, T: 6, Lb: 22, Wc: 7, Ws: 16, kick: 2.0 }],
   3: [{ type: 'bowl', name: '陷落墓坑', R: 15, D: 6, lip: 1.2 }, { type: 'slope', name: '坟丘长坡', H: 15, L: 58, T: 6, Lb: 20, Wc: 6, Ws: 15, kick: 1.6 }]
 };
@@ -333,7 +333,7 @@ Content.beam = function (o, color, h, r) {
   return m;
 };
 
-// ---------------- 秘宝箱：免费；能觉醒超武就觉醒，不然从三件稀有以上的物品里选一件 ----------------
+// ---------------- 秘宝箱：免费；能觉醒超武就觉醒，不然从三件稀有以上的宝物里选一件 ----------------
 Interact.KINDS.ctChest = {
   radius: 2.6,
   model: function (o) {
@@ -366,12 +366,12 @@ Content.openSecretChest = function (o) {
   Game.openModal(function () {
     var ids = [], tries = 0;
     while (ids.length < 3 && tries++ < 40) { var id = Items.roll(2); if (ids.indexOf(id) < 0) ids.push(id); }
-    UI.choiceModal('moai', '秘宝箱 · 稀有以上三选一', ids.map(function (id) { return { itemId: id, rarity: ITEMS[id].rarity }; }));
+    UI.choiceModal('pick', '秘宝箱 · 稀有以上三选一', ids.map(function (id) { return { itemId: id, rarity: ITEMS[id].rarity }; }));
   });
 };
 
 // ---------------- 隐秘高台：站上台顶就算找到 ----------------
-// ---------------- 裂墙密室：被爆炸（火药桶、爆炸武器、爆炸桶怪）炸开 ----------------
+// ---------------- 裂墙密室：被爆炸（火药桶、爆炸武器、火药桶精）炸开 ----------------
 Interact.KINDS.ctCrack = {
   noPrompt: true,
   model: function (o) {
@@ -417,7 +417,9 @@ Interact.KINDS.ctBrazier = {
     g.add(MX.mesh(MX.geo('ct_brazier' + st, function () { return Content.brazierParts(st); })));
     g.add(MX.mesh(Content.geo('pips' + o.n, function () { return Content.pipParts(o.n); }), 'glow'));
     o.flame = MX.mesh(MX.geo('flame', MX.flameParts), 'glow');
-    o.flame.position.y = 0.95; o.flame.scale.setScalar(0.75); o.flame.visible = false;
+    // 火苗坐在盆里：盆口 1.64，炭面 1.6；火苗底（1.55 + 0.04）藏在盆沿下面，不从柱子周围露出来；
+    // 横向放宽一点（盆口半径 0.62），不像一根细蜡烛
+    o.flame.position.y = 1.55; o.flame.scale.set(0.95, 0.8, 0.95); o.flame.visible = false;
     g.add(o.flame);
     return g;
   },
@@ -428,8 +430,8 @@ Interact.KINDS.ctBrazier = {
   update: function (o, dt, d2) {
     if (!o.lit || d2 > 3600) return;
     var t = Game.time * 11 + o.n;
-    o.flame.scale.set(0.75 * (1 + Math.sin(t * 0.7) * 0.06), 0.75 * (1 + Math.sin(t) * 0.14), 0.75);
-    if (Math.random() < dt * 5) MX.part(o.x + rand(-0.2, 0.2), o.y + 2.2, o.z + rand(-0.2, 0.2), rand(-0.3, 0.3), rand(1.5, 2.5), rand(-0.3, 0.3), rand(0.6, 1.1), 0.08, 0.03, pick([0xffd27a, 0xff9a3a]), 0.3);
+    o.flame.scale.set(0.95 * (1 + Math.sin(t * 0.7) * 0.06), 0.8 * (1 + Math.sin(t) * 0.14), 0.95);
+    if (Math.random() < dt * 5) MX.part(o.x + rand(-0.2, 0.2), o.y + 2.5, o.z + rand(-0.2, 0.2), rand(-0.3, 0.3), rand(1.5, 2.5), rand(-0.3, 0.3), rand(0.6, 1.1), 0.08, 0.03, pick([0xffd27a, 0xff9a3a]), 0.3);
   },
   mapIcon: null
 };
@@ -710,13 +712,13 @@ Content.startEvent = function (type) {
   Content.emit('event', { type: type, name: def.name, phase: 'start', stage: Game.stage, x: ev.x, z: ev.z });
   return ev;
 };
-// result：success 成功 / timeout 时间到 / cancel 被 Boss 战、虫潮打断 / fail
+// result：success 成功 / timeout 时间到 / cancel 被 Boss 战、午夜钟声打断 / fail
 Content.endEvent = function (result) {
   var ev = Content.ev;
   if (!ev) return;
   Content.ev = null;
   if (ev.def.end) ev.def.end(ev, result);
-  // 被 Boss 战、虫潮、下一个事件打断：这次事件的公告不再出来（不会排在虫潮、Boss 后面再冒出一条已经没有了的事件）
+  // 被 Boss 战、午夜钟声、下一个事件打断：这次事件的公告不再出来（不会排在午夜钟声、Boss 后面再冒出一条已经没有了的事件）
   if (result === 'cancel' && ev.annKey && typeof Kit !== 'undefined' && Kit.annDrop) Kit.annDrop(ev.annKey);
   if (ev.mk) Content.removeMarker(ev.mk);
   Content.mmRing = null;
@@ -778,7 +780,7 @@ Content.EVENTS = {
       if (r !== 'cancel') UI.toast('金袋哥布林钻进地洞跑掉了……', Kit.color('goldL'));
     }
   },
-  // 旅行商人：在附近停 50 秒，只卖一件史诗 / 传说物品
+  // 旅行商人：在附近停 50 秒，只卖一件史诗 / 传说宝物
   merchant: {
     name: '旅行商人', title: '旅行商人', sub: '限时卖一件史诗或传说', role: 'gold', icon: 'coin', dur: 50,
     start: function (ev) {
@@ -877,15 +879,15 @@ Interact.KINDS.ctMerchant = {
     o.gem.material = o.gem.material.clone();
     o.gem.material.color = c;
   },
-  label: function (o) { return '旅行商人：' + ITEMS[o.item].name + ' · ' + RARITY[ITEMS[o.item].rarity].name + ' · ' + o.price + ' 金币'; },
+  label: function (o) { return '旅行商人：' + ITEMS[o.item].name + ' · ' + RARITY[ITEMS[o.item].rarity].name + ' · ' + Kit.num(o.price) + ' 金币'; },
   canUse: function (o) { return P.gold >= o.price; },
-  denied: function (o) { return '金币不够：这件要 ' + o.price + ' 金币'; },
+  denied: function (o) { return '金币不够：这件要 ' + Kit.num(o.price) + ' 金币'; },
   use: function (o) {
     Game.openModal(function () {
       UI.shopRef = o;
       var it = ITEMS[o.item];
       UI.choiceModal('ctTrade', '旅行商人 · 只此一件', [
-        { itemId: o.item, rarity: it.rarity, foot: o.price + ' 金币', buy: true },
+        { itemId: o.item, rarity: it.rarity, foot: Kit.num(o.price) + ' 金币', buy: true },
         { title: '不买了', icon: '走', color: 0x5a6a7a, rarity: 0, lines: ['商人还会在这里待一会儿'], foot: '离开' }
       ]);
     });
@@ -902,7 +904,7 @@ UI.modeHandlers.ctTrade = function (opt) {
   o.sold = true;
   Interact.consume(o);
   MX.smoke(o.x, o.y + 1, o.z, 12, 0x9a9488, 0.8, 0.5);
-  UI.toast('获得 ' + ITEMS[o.item].name, RARITY[ITEMS[o.item].rarity].color);
+  UI.toast('获得 ' + ITEMS[o.item].name, '#ffd84a');   // 提示用金色（奖励），稀有度颜色只在边框上（UI_STYLE §2.4）
 };
 Interact.KINDS.ctMimic = {
   radius: 2.4,

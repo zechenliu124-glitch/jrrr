@@ -354,7 +354,7 @@ TEX.tuftCanvas = function () {
   return TEX.paint(N, N, function (x, y) { var v = px[y * N + x]; return v < 0 ? [90, 110, 60, 0] : [v, v, v, 255]; });
 };
 
-// 以前的 PS1 顶点抖动已经去掉（Megabonk 的模型不抖），保留接口
+// 以前的 PS1 顶点抖动已经去掉（参考的低多边形画风不抖），保留接口
 TEX.ps1 = function (mat) { return mat; };
 TEX.setSnap = function () {};
 
@@ -406,7 +406,7 @@ TEX.makeSky = function (scene) {
   TEX.cloudSpin = 0;
 };
 
-// 按关卡配色重建天空（tint/amt：最终虫潮时整体染红）
+// 按关卡配色重建天空（tint/amt：午夜钟声时往深靛蓝偏）
 TEX.applySky = function (pal, tint, amt) {
   var tc = tint != null ? new THREE.Color(tint) : null;
   var col = function (hex) { var c = new THREE.Color(hex); if (tc) c.lerp(tc, amt); return c; };

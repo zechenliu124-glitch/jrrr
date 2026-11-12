@@ -176,13 +176,6 @@
     S.fm(t, 880 * k, 1.41, 2, 0.4, 0.25);
     S.tone(t, 'sine', 120, 0.2, 0.6, { f1: 55, sw: 0.15 });
   });
-  D('aegis', { gap: 0.2, grp: 'ply', vol: 0.435, pri: 1, wet: 0.3 }, function (t, k, o) {
-    S.fm(t, 523 * k, 2.7, 4, 0.7, 0.6);
-    S.fm(t + 0.01, 1047 * k, 1.41, 2, 0.5, 0.25);
-    S.tone(t, 'sine', 110, 0.4, 0.8, { f1: 40, sw: 0.3 });
-    S.nz(t, 0.35, 0.4, { type: 'bp', f: 600, q: 0.7, f2: 3000, fsw: 0.3 });
-    if (o.evo) S.fm(t + 0.05, 1568, 3.5, 1.5, 1, 0.25);
-  });
   D('death', { gap: 1, grp: 'big', vol: 0.513, pri: 2, wet: 0.45 }, function (t) {
     S.tone(t, 'sine', 80, 1.2, 1, { f1: 30, sw: 0.9 });
     S.nz(t, 0.9, 0.6, { type: 'lp', f: 1500, q: 0.6, f2: 120, fsw: 0.8, kind: 'brown' });
@@ -197,180 +190,214 @@
     S.tone(t + 0.19, 'triangle', 100, 0.14, 0.25 * w + 0.08, { f1: 62, sw: 0.1, a: 0.008, lp: 600 });
     S.nz(t, 0.05, 0.12 * w, { type: 'lp', f: 400 });
   });
-  D('timestop', { gap: 1, grp: 'big', vol: 0.4, pri: 2, wet: 0.5 }, function (t) {
-    // 倒放的镲 + 钟表滴答 + 低沉的嗡
-    var s = S.noise(t, t + 1.2), fl = S.filt(t, 'highpass', 3000, 0.6), g = S.gain(0);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.6, t + 0.8); g.gain.linearRampToValueAtTime(0.0001, t + 0.85);
-    s.connect(fl); fl.connect(g); g.connect(S.out()); S.until(t + 1.2);
-    for (var i = 0; i < 4; i++) S.click(t + 0.85 + i * 0.25, 0.7, i % 2 ? 2400 : 3400);
-    S.tone(t + 0.8, 'sine', 65, 1.6, 0.6, { a: 0.1 });
-    S.fm(t + 0.85, 784, 3.5, 2, 1.6, 0.35);
-  });
 
   // ---------------- 武器（每把武器的参数见 SFX.WEAPON） ----------------
-  // 超武：每次出手多一层金色的闪光音
-  var evoLayer = function (t, k) {
-    S.fm(t + 0.02, 1760 * k, 3.5, 1.2, 0.35, 0.13);
-    S.tone(t + 0.03, 'sine', 2637 * k, 0.2, 0.07);
+  // 超武：每次出手多一层金色的闪光音（g 音量倍数：配方本身音量大的给小一点）
+  var evoLayer = function (t, k, g) {
+    g = g || 1;
+    S.fm(t + 0.02, 1760 * k, 3.5, 1.2, 0.35, 0.13 * g);
+    S.tone(t + 0.03, 'sine', 2637 * k, 0.2, 0.07 * g);
   };
-  // 挥砍：带通噪声扫过去 + 低频“呼”；o.ring 金属“铮”，o.dark 低沉，o.wave 剑气
-  D('w_swing', { gap: 0.06, grp: 'wpn', vol: 0.3, jit: 1.2 }, function (t, k, o) {
+  // 挥砍：带通噪声扫过去 + 低频“呼”；o.ring 金属“铮”，o.dark 低沉，o.clang 锻锤的“当”
+  D('w_swing', { gap: 0.06, grp: 'wpn', vol: 0.245, jit: 1.2 }, function (t, k, o) {
     var len = o.len || 0.2, lo = o.lo || 500, hi = o.hi || 2600;
     S.nz(t, len, 0.9, { type: 'bp', f: lo * k, q: 1.5, f2: hi * k, fsw: len * 0.45, a: len * 0.3, kind: 'pink' });
     S.tone(t, 'sine', 150 * k, len, 0.3, { f1: 70, sw: len, a: len * 0.3 });
     if (o.ring) S.fm(t + len * 0.25, 2200 * k, 2.76, 1.2, 0.4, 0.11 * o.ring);
     if (o.dark) S.tone(t, 'sawtooth', 82 * k, len * 1.2, 0.18, { lp: 500, a: len * 0.3 });
-    if (o.wave) S.tone(t + 0.04, 'sine', 700 * k, 0.25, 0.12, { f1: 1500 * k, sw: 0.2 });
+    if (o.clang) S.fm(t + len * 0.6, 620 * k, 1.41, 2.5, 0.35, 0.22);
     if (o.evo) evoLayer(t, k);
   });
-  // 火球：呼的一声 + 噼啪
-  D('w_fire', { gap: 0.08, grp: 'wpn', vol: 0.574, jit: 1 }, function (t, k, o) {
-    S.nz(t, 0.32, 0.9, { type: 'lp', f: 300 * k, q: 1, f2: 2000 * k, fsw: 0.12, a: 0.03, kind: 'pink' });
-    S.tone(t, 'sine', 210 * k, 0.2, 0.3, { f1: 120 * k, sw: 0.18 });
-    S.nz(t + 0.05 + Math.random() * 0.2, 0.015, 0.3, { type: 'hp', f: 3500 });
-    S.nz(t + 0.12 + Math.random() * 0.15, 0.015, 0.25, { type: 'hp', f: 3800 });
-    if (o.evo) evoLayer(t, k);
-  });
-  // 弩：拨弦“嘣”+ 木头“嗒”；连弩一次几发
-  D('w_bolt', { gap: 0.09, grp: 'wpn', vol: 0.231, jit: 1 }, function (t, k, o) {
-    var n = Math.min(4, o.n || 1);
-    for (var i = 0; i < n; i++) {
-      var tt = t + i * 0.07, kk = k * rnd(0.97, 1.03);
-      S.tone(tt, 'triangle', 330 * kk, 0.07, 0.7, { f1: 240 * kk, sw: 0.06, lp: 2600 });
-      S.click(tt, 0.4, 2000);
-      S.nz(tt, 0.05, 0.25, { type: 'hp', f: 4500 });
+  // 飞刀扇面：o.light 只有两声高的“唰唰”（没有低频）
+  D('w_shotgun', { gap: 0.1, grp: 'wpn', vol: 0.556, jit: 0.8 }, function (t, k, o) {
+    if (o.light) {
+      S.nz(t, 0.06, 0.6, { type: 'hp', f: 3500 * k, q: 0.8, a: 0.006 });
+      S.nz(t + 0.05, 0.06, 0.5, { type: 'hp', f: 4200 * k, q: 0.8, a: 0.006 });
+    } else {
+      [0.94, 1, 1.07, 1.13].forEach(function (m) { S.tone(t, 'triangle', 300 * k * m, 0.09, 0.4, { f1: 210 * k * m, sw: 0.08, lp: 2200 }); });
+      S.nz(t, 0.09, 0.7, { type: 'bp', f: 1600, q: 0.8 });
+      S.tone(t, 'sine', 120, 0.12, 0.5, { f1: 60, sw: 0.1 });
     }
     if (o.evo) evoLayer(t, k);
   });
-  D('w_shotgun', { gap: 0.1, grp: 'wpn', vol: 0.556, jit: 0.8 }, function (t, k, o) {
-    [0.94, 1, 1.07, 1.13].forEach(function (m) { S.tone(t, 'triangle', 300 * k * m, 0.09, 0.4, { f1: 210 * k * m, sw: 0.08, lp: 2200 }); });
-    S.nz(t, 0.09, 0.7, { type: 'bp', f: 1600, q: 0.8 });
-    S.tone(t, 'sine', 120, 0.12, 0.5, { f1: 60, sw: 0.1 });
-    if (o.evo) evoLayer(t, k);
-  });
-  // 长弓：弓弦 + 箭飞出去的风声
-  D('w_bow', { gap: 0.08, grp: 'wpn', vol: 0.505, jit: 0.8 }, function (t, k, o) {
-    var os = S.osc(t, 'sawtooth', 196 * k, t + 0.24), fl = S.filt(t, 'lowpass', 3200, 2, 380, 0.16), g = S.env(t, 0.55, 0.002, 0.22);
-    os.connect(fl); fl.connect(g); g.connect(S.out());
-    S.tone(t, 'sine', 392 * k, 0.12, 0.25);
-    S.nz(t + 0.02, 0.14, 0.3, { type: 'hp', f: 3500, a: 0.04 });
-    if (o.evo) evoLayer(t, k);
-  });
-  // 重弩：沉的“咚”+ 清脆的“啪”+ 一点金属回响
+  // 沉的“咚”+ 清脆的“啪”+ 一点金属回响（标枪扎地）
   D('w_heavy', { gap: 0.12, grp: 'wpn', vol: 0.367, jit: 0.6, wet: 0.12 }, function (t, k, o) {
     S.tone(t, 'sine', 140 * k, 0.26, 0.9, { f1: 44, sw: 0.2 });
     S.nz(t, 0.08, 0.7, { type: 'hp', f: 2400, q: 0.7 });
     S.fm(t + 0.01, 880 * k, 1.41, 1.6, 0.3, 0.12);
     if (o.evo) { evoLayer(t, k); S.nz(t + 0.03, 0.4, 0.25, { type: 'lp', f: 1200, kind: 'brown' }); }
   });
-  // 扔出去的东西：o.kind clack 骨头 / whirr 旋转 / rise 回旋镖
+  // 扔出去的东西：o.kind clack 木头“嗒嗒” / whirr 旋转 / rise 往上扬 / flap 扑翅膀 / boop 球 / sling 皮筋 / whistle 呼啸 / clang 锅“铛”
+  // o.heavy 加一声闷的（投石），o.cry 鹰叫，o.wood 木头低一点（棋子）
+  // [带通起点, 终点, q, 颤动 Hz, 音量]
+  var TH = { whirr: [900, 1100, 1.6, 16, 0.56], rise: [700, 1800, 1.6, 16, 0.65], flap: [1200, 0, 1, 14, 0.72] };
   D('w_throw', { gap: 0.08, grp: 'wpn', vol: 0.7, jit: 1.5 }, function (t, k, o) {
-    var kind = o.kind || 'whirr';
+    var kind = o.kind || 'whirr', len;
     if (kind === 'clack') {
-      S.nz(t, 0.03, 0.8, { type: 'bp', f: 1250 * k, q: 4 });
-      S.nz(t + 0.04, 0.03, 0.6, { type: 'bp', f: 1900 * k, q: 4 });
-      S.nz(t, 0.16, 0.3, { type: 'bp', f: 700, q: 1, f2: 1800, fsw: 0.14 });
+      // 木头棋子的「嗒」以前太轻（最响 50 毫秒 0.015），抬到 0.04 上下
+      var kw = o.wood ? 0.7 : 1, ka = o.heavy ? 0.85 : o.wood ? 1.9 : 1;
+      S.nz(t, 0.03, 0.8 * ka, { type: 'bp', f: 1250 * k * kw, q: 4 });
+      S.nz(t + 0.04, 0.03, 0.6 * ka, { type: 'bp', f: 1900 * k * kw, q: 4 });
+      S.nz(t, 0.16, 0.3 * ka, { type: 'bp', f: 700 * kw, q: 1, f2: 1800 * kw, fsw: 0.14 });
+    } else if (kind === 'boop') {
+      S.tone(t, 'sine', 520 * k, 0.08, 0.34, { f1: 300 * k, sw: 0.08 });
+    } else if (kind === 'sling') {
+      S.tone(t, 'triangle', 180 * k, 0.08, 0.34, { f1: 90 * k, sw: 0.08 });
+      S.nz(t, 0.02, 0.26, { type: 'hp', f: 3200, q: 0.7 });
+    } else if (kind === 'whistle') {
+      S.tone(t, 'sine', 900 * k, 0.5, 0.06, { f1: 2600 * k, sw: 0.5, a: 0.03 });
+      S.tone(t, 'sine', 120 * k, 0.08, 0.12, { f1: 60, sw: 0.07 });
+    } else if (kind === 'clang') {
+      S.fm(t, 880 * k, 2.76, 2, 0.25, 0.35);
     } else {
-      var len = o.len || 0.3, s = S.noise(t, t + len + 0.03), fl = S.filt(t, 'bandpass', (kind === 'rise' ? 700 : 900) * k, 1.6, kind === 'rise' ? 1800 * k : 1100 * k, len);
-      var am = S.gain(0.5), lfo = S.osc(t, 'sine', o.rate || 16, t + len + 0.03), lg = S.gain(0.5);
+      var th = TH[kind] || TH.whirr;
+      len = o.len || 0.3;
+      var s = S.noise(t, t + len + 0.03, kind === 'flap' ? 'pink' : null), fl = S.filt(t, 'bandpass', th[0] * k, th[2], th[1] ? th[1] * k : 0, len);
+      var am = S.gain(0.5), lfo = S.osc(t, 'sine', o.rate || th[3], t + len + 0.03), lg = S.gain(0.5);
       lfo.connect(lg); lg.connect(am.gain);
-      var g = S.env(t, 0.8, len * 0.3, len);
+      var g = S.env(t, th[4], len * 0.3, len);
       s.connect(fl); fl.connect(am); am.connect(g); g.connect(S.out());
     }
+    if (o.heavy) S.tone(t, 'sine', 110 * k, 0.18, 0.09, { f1: 60, sw: 0.15 });
+    if (o.cry) S.tone(t + 0.2, 'sine', 2200 * k, 0.12, 0.07, { f1: 1600 * k, sw: 0.12, vib: 30, vd: 40 });
     if (o.evo) evoLayer(t, k);
   });
-  // 骰子：几下木头“嗒嗒”
-  D('w_dice', { gap: 0.08, grp: 'wpn', vol: 0.362, jit: 1 }, function (t, k, o) {
-    var tt = t;
-    for (var i = 0; i < 3; i++) {
-      var a = 0.9 - i * 0.2;
-      S.nz(tt, 0.035, a, { type: 'bp', f: rnd(1500, 2400) * k, q: 1.6 });
-      S.tone(tt, 'triangle', rnd(650, 1000) * k, 0.035, a * 0.5, { lp: 4000 });
-      tt += rnd(0.04, 0.075);
-    }
-    if (o.evo) evoLayer(t, k);
-  });
+  // 短促的“咻”；o.buzz 蜜蜂的“嗡”（代替高频的嘶声）
   D('w_dagger', { gap: 0.06, grp: 'wpn', vol: 0.706, jit: 1.5 }, function (t, k, o) {
-    S.nz(t, 0.07, 0.7, { type: 'hp', f: 3000 * k, q: 0.8, a: 0.008 });
+    if (o.buzz) {
+      var os = S.osc(t, 'sawtooth', 180 * k, t + 0.21), fl = S.filt(t, 'bandpass', 900, 1.2);
+      var am = S.gain(0.5), lfo = S.osc(t, 'sine', 30, t + 0.21), lg = S.gain(0.5);
+      lfo.connect(lg); lg.connect(am.gain);
+      var g = S.env(t, 0.15, 0.02, 0.18, 0.06);
+      os.connect(fl); fl.connect(am); am.connect(g); g.connect(S.out());
+    } else S.nz(t, 0.07, 0.7, { type: 'hp', f: 3000 * k, q: 0.8, a: 0.008 });
     S.tone(t, 'sine', 1500 * k, 0.06, 0.25, { f1: 2600 * k, sw: 0.05 });
     if (o.evo) evoLayer(t, k);
   });
-  // 魔法飞弹 / 血球：o.hi 更高更亮
-  D('w_orb', { gap: 0.08, grp: 'wpn', vol: 0.321, jit: 1, wet: 0.15 }, function (t, k, o) {
-    var f = (o.hi ? 520 : 300) * k;
-    S.tone(t, 'sine', f, 0.2, 0.7, { f1: f * 2, sw: 0.16, vib: 18, vd: 60 });
-    S.tone(t, 'triangle', f * 1.5, 0.12, 0.2, { f1: f * 3, sw: 0.1 });
-    S.nz(t, 0.12, 0.25, { type: o.hi ? 'hp' : 'lp', f: o.hi ? 4000 : 800 });
-    if (o.evo) evoLayer(t, k);
-  });
-  // 雷霆：嗡的电流 + 噼啪
+  // 雷霆：嗡的电流 + 噼啪；o.fall 星星从天上掉下来的“咻——”（没有电流声），o.drum 加一声鼓
   D('w_zap', { gap: 0.08, grp: 'wpn', vol: 0.823, jit: 1, wet: 0.1 }, function (t, k, o) {
-    var car = S.osc(t, 'sawtooth', 900 * k, t + 0.22, { f1: 130 * k, sw: 0.18 }), mod = S.osc(t, 'square', 63, t + 0.22), mg = S.gain(500);
-    mod.connect(mg); mg.connect(car.frequency);
-    var fl = S.filt(t, 'bandpass', 1800, 0.7), g = S.env(t, 0.55, 0.003, 0.2);
-    car.connect(fl); fl.connect(g); g.connect(S.out());
-    S.nz(t + Math.random() * 0.06, 0.02, 0.5, { type: 'hp', f: 4000 });
-    S.nz(t + 0.07 + Math.random() * 0.08, 0.02, 0.45, { type: 'hp', f: 4400 });
-    if (o.evo) evoLayer(t, k);
+    if (o.fall) {
+      S.tone(t, 'sine', 2400 * k, 0.35, 0.053, { f1: 600 * k, sw: 0.35, a: 0.02, hold: 0.12 });
+      S.nz(t, 0.3, 0.05, { type: 'hp', f: 5000, a: 0.05 });
+    } else {
+      var car = S.osc(t, 'sawtooth', 900 * k, t + 0.22, { f1: 130 * k, sw: 0.18 }), mod = S.osc(t, 'square', 63, t + 0.22), mg = S.gain(500);
+      mod.connect(mg); mg.connect(car.frequency);
+      var ca = o.drum ? 0.5 : 1, fl = S.filt(t, 'bandpass', 1800, 0.7), g = S.env(t, 0.55 * ca, 0.003, 0.2);
+      car.connect(fl); fl.connect(g); g.connect(S.out());
+      S.nz(t + Math.random() * 0.06, 0.02, 0.5 * ca, { type: 'hp', f: 4000 });
+      S.nz(t + 0.07 + Math.random() * 0.08, 0.02, 0.45 * ca, { type: 'hp', f: 4400 });
+    }
+    if (o.drum) S.tone(t, 'sine', 90 * k, 0.25, 0.08, { f1: 60, sw: 0.2 });
+    if (o.evo) evoLayer(t, k, 0.4);
   });
-  D('w_wind', { gap: 0.15, grp: 'wpn', vol: 0.467, jit: 1 }, function (t, k, o) {
-    S.nz(t, 0.6, 0.9, { type: 'bp', f: 450 * k, q: 1.2, f2: 1100 * k, fsw: 0.45, a: 0.18, kind: 'pink' });
-    if (o.evo) evoLayer(t, k);
-  });
-  // 黑洞：往下沉的“呜——”
-  D('w_hole', { gap: 0.2, grp: 'wpn', vol: 0.155, jit: 0.8, wet: 0.2 }, function (t, k, o) {
-    S.tone(t, 'sine', 380 * k, 0.7, 0.8, { f1: 50, sw: 0.6, a: 0.02 });
-    S.tone(t, 'triangle', 190 * k, 0.6, 0.25, { f1: 40, sw: 0.5, vib: 7, vd: 40 });
-    S.nz(t, 0.6, 0.35, { type: 'lp', f: 2500, q: 1, f2: 150, fsw: 0.55, kind: 'pink' });
-    if (o.evo) evoLayer(t, k);
-  });
-  // 毒瓶：扔出去 + 0.25 秒后玻璃碎掉 + 冒泡
+  // 扔出去 + 0.25 秒后落地：默认玻璃碎掉 + 冒泡；o.splat 颜料桶“啪嗒”+ 几滴
   D('w_bottle', { gap: 0.1, grp: 'wpn', vol: 0.223, jit: 1 }, function (t, k, o) {
     S.nz(t, 0.1, 0.3, { type: 'bp', f: 1200, q: 1, f2: 2400, fsw: 0.1 });
-    var b = t + 0.25;
-    S.nz(b, 0.12, 0.8, { type: 'bp', f: 5200, q: 1.2 });
-    for (var i = 0; i < 4; i++) S.tone(b + Math.random() * 0.06, 'sine', rnd(2600, 5200), 0.07, 0.25);
-    for (i = 0; i < 3; i++) S.tone(b + 0.08 + i * 0.07, 'sine', rnd(400, 700) * k, 0.06, 0.3, { f1: rnd(800, 1100), sw: 0.05 });
+    var b = t + 0.25, i;
+    if (o.splat) {
+      S.nz(b, 0.12, 0.55, { type: 'lp', f: 600, q: 0.7, kind: 'brown' });
+      S.tone(b, 'sine', 160 * k, 0.08, 0.3, { f1: 80, sw: 0.07 });
+      for (i = 0; i < 3; i++) S.tone(b + 0.1 + i * 0.07 + Math.random() * 0.02, 'sine', rnd(900, 1400) * k, 0.04, 0.3, { f1: rnd(1500, 2000), sw: 0.03 });
+    } else {
+      S.nz(b, 0.12, 0.8, { type: 'bp', f: 5200, q: 1.2 });
+      for (i = 0; i < 4; i++) S.tone(b + Math.random() * 0.06, 'sine', rnd(2600, 5200), 0.07, 0.25);
+      for (i = 0; i < 3; i++) S.tone(b + 0.08 + i * 0.07, 'sine', rnd(400, 700) * k, 0.06, 0.3, { f1: rnd(800, 1100), sw: 0.05 });
+    }
     if (o.evo) evoLayer(b, k);
   });
+  // 放下去 / 炸开的闷响；o.puff 墓烛的“呼”，o.set 铁夹放下的两声金属，o.snap 铁夹合上的“咔嚓”（这三个代替高频的嘶声）
   D('w_mine', { gap: 0.12, grp: 'wpn', vol: 0.4, jit: 1 }, function (t, k, o) {
-    S.tone(t, 'sine', 170 * k, 0.12, 0.7, { f1: 90, sw: 0.1 });
+    S.tone(t, 'sine', 170 * k, 0.12, o.set || o.snap ? 0.4 : 0.7, { f1: 90, sw: 0.1 });
     S.nz(t, 0.06, 0.5, { type: 'lp', f: 900 });
-    S.nz(t + 0.06, 0.28, 0.18, { type: 'hp', f: 5500, a: 0.02 });
+    if (o.puff) S.nz(t + 0.03, 0.25, 0.35, { type: 'lp', f: 800, q: 0.7, a: 0.04, kind: 'brown' });
+    else if (o.set) { S.nz(t + 0.05, 0.015, 0.5, { type: 'bp', f: 3000, q: 6 }); S.nz(t + 0.12, 0.015, 0.45, { type: 'bp', f: 3000, q: 6 }); }
+    else if (o.snap) { S.click(t, 0.6, 2800); S.click(t + 0.02, 0.6, 2600); S.fm(t + 0.02, 1100 * k, 1.41, 2, 0.12, 0.3); }
+    else S.nz(t + 0.06, 0.28, 0.18, { type: 'hp', f: 5500, a: 0.02 });
     if (o.evo) evoLayer(t, k);
   });
-  // 锁链：一串金属“叮铃”
-  D('w_chain', { gap: 0.2, grp: 'wpn', vol: 0.219, jit: 1 }, function (t, k, o) {
-    var tt = t;
-    for (var i = 0; i < 6; i++) { S.fm(tt, rnd(1300, 2100) * k, 1.41, 1.5, 0.09, 0.4); tt += rnd(0.025, 0.05); }
-    S.nz(t, 0.18, 0.3, { type: 'bp', f: 1500, q: 1, f2: 3000, fsw: 0.15 });
-    if (o.evo) evoLayer(t, k);
-  });
-  // 龙息：喷火的轰鸣（o.dur 秒）
-  D('w_flame', { gap: 0.3, grp: 'wpn', vol: 0.155, jit: 0.5 }, function (t, k, o) {
-    var dur = Math.min(2.5, o.dur || 1);
-    S.nz(t, dur, 0.9, { type: 'lp', f: 900 * k, q: 0.7, a: 0.08, hold: dur * 0.6, kind: 'brown' });
-    S.nz(t, dur, 0.3, { type: 'bp', f: 1800, q: 0.8, a: 0.08, hold: dur * 0.5, kind: 'pink' });
-    for (var i = 0; i < 6; i++) S.nz(t + Math.random() * dur, 0.015, 0.25, { type: 'hp', f: 3500 });
-    if (o.evo) evoLayer(t, k);
-  });
-  D('w_trail', { gap: 0.7, grp: 'wpn', vol: 0.375, jit: 1 }, function (t, k) {
+  // 足迹：沙沙一下；o.leaf 荆棘的叶子响（25 Hz 颤动的带通噪声）
+  D('w_trail', { gap: 0.7, grp: 'wpn', vol: 0.375, jit: 1 }, function (t, k, o) {
+    if (o.leaf) {
+      var s = S.noise(t, t + 0.28, 'pink'), fl = S.filt(t, 'bandpass', 2500 * k, 1.2);
+      var am = S.gain(0.5), lfo = S.osc(t, 'sine', 25, t + 0.28), lg = S.gain(0.5);
+      lfo.connect(lg); lg.connect(am.gain);
+      var g = S.env(t, 0.6, 0.04, 0.25, 0.05);
+      s.connect(fl); fl.connect(am); am.connect(g); g.connect(S.out());
+      return;
+    }
     S.nz(t, 0.2, 0.6, { type: 'bp', f: 1100 * k, q: 0.8, a: 0.03, kind: 'pink' });
     S.nz(t + 0.05, 0.015, 0.4, { type: 'hp', f: 3500 });
   });
-  // 圣光光环 / 冰霜：每次跳伤轻轻“嗡”一下
+  // 光环（圣咏）：每次跳伤轻轻“嗡”一下；o.choir 加一点合唱
   D('w_aura', { gap: 0.5, grp: 'wpn', vol: 0.07, jit: 0.3, wet: 0.2 }, function (t, k, o) {
-    S.tone(t, 'sine', 220 * k, 0.4, 0.6, { a: 0.05 });
-    S.tone(t, 'sine', 330 * k, 0.35, 0.35, { a: 0.05 });
+    S.tone(t, 'sine', 220 * k, 0.4, o.choir ? 0.45 : 0.6, { a: 0.05 });
+    S.tone(t, 'sine', 330 * k, 0.35, o.choir ? 0.25 : 0.35, { a: 0.05 });
+    if (o.choir) I.choir(t, 523 * k, 0.3, 0.12, { a: 0.1, rel: 0.3 });
     if (o.evo) S.tone(t, 'sine', 880 * k, 0.4, 0.15, { a: 0.05 });
   });
+  // 冰：几声高的“叮”；o.short 冰锥只有一声短的
   D('w_frost', { gap: 0.8, grp: 'wpn', vol: 0.16, jit: 0.5, wet: 0.25 }, function (t, k, o) {
-    for (var i = 0; i < 3; i++) S.fm(t + i * 0.05, rnd(2200, 3600) * k, 3.5, 1, 0.25, 0.3);
-    S.nz(t, 0.12, 0.3, { type: 'hp', f: 6000 });
+    if (o.short) S.fm(t, 3200 * k, 3.5, 1, 0.12, 1.4);
+    else {
+      for (var i = 0; i < 3; i++) S.fm(t + i * 0.05, rnd(2200, 3600) * k, 3.5, 1, 0.25, 0.3);
+      S.nz(t, 0.12, 0.3, { type: 'hp', f: 6000 });
+    }
     if (o.evo) evoLayer(t, k);
   });
-  D('w_orbit', { gap: 0.9, grp: 'wpn', vol: 0.48, jit: 1 }, function (t, k) {
-    S.nz(t, 0.3, 0.8, { type: 'bp', f: 380 * k, q: 1.4, f2: 900 * k, fsw: 0.15, a: 0.1, kind: 'pink' });
+  // 环绕武器转一圈：“呼”；o.snare 锡兵的小军鼓，o.wind 风筝的风声
+  D('w_orbit', { gap: 0.9, grp: 'wpn', vol: 0.48, jit: 1 }, function (t, k, o) {
+    S.nz(t, 0.3, o.snare ? 0.4 : o.wind ? 0.42 : 0.8, { type: 'bp', f: 380 * k, q: 1.4, f2: 900 * k, fsw: 0.15, a: 0.1, kind: 'pink' });
+    if (o.snare) for (var i = 0; i < 3; i++) I.snare(t + i * 0.07, 0, 0, 0.1);
+    if (o.wind) S.nz(t, 0.5, 0.08, { type: 'lp', f: 700, q: 0.7, a: 0.15, kind: 'pink' });
+  });
+
+  // ---------------- 第 4 块的新配方 ----------------
+  // 铜钟：一声敲击 + FM 钟声 + 低的嗡；后面几圈（emit 'ring'）用 o.soft（轻一点、高一点，见 SFX.EMIT）
+  D('w_bell', { gap: 0.25, grp: 'wpn', vol: 0.082, jit: 0.4, wet: 0.3 }, function (t, k, o) {
+    S.nz(t, 0.02, 0.5, { type: 'bp', f: 2400 });
+    I.bell(t, 392 * k, 0.9, 0.7, { ratio: 2.76, idx: 2.6, dec: 1.2 });
+    S.tone(t, 'sine', 196 * k, 1.0, 0.25);
+    S.tone(t, 'sine', 588 * k, 0.6, 0.12);
+    if (o.evo) evoLayer(t, k, 0.5);
+  });
+  // 钓竿：甩出去的“嗖”+ 收线的咔咔声；o.land 鱼上岸：“啪”的水声 + 几滴水
+  D('w_reel', { gap: 0.3, grp: 'wpn', vol: 1.2, jit: 1 }, function (t, k, o) {
+    if (o.land) {
+      S.nz(t, 0.18, 0.32, { type: 'lp', f: 1400, kind: 'brown' });
+      S.tone(t, 'sine', 180 * k, 0.12, 0.2, { f1: 90, sw: 0.1 });
+      for (var j = 0; j < 4; j++) S.tone(t + 0.05 + j * 0.05 + Math.random() * 0.02, 'sine', rnd(900, 1600), 0.05, 0.08, { f1: rnd(1700, 2200), sw: 0.04 });
+    } else {
+      S.nz(t, 0.16, 2.3, { type: 'bp', f: 900 * k, f2: 2600 * k, fsw: 0.14, kind: 'pink' });
+      for (var i = 0; i < 5; i++) S.nz(t + 0.12 + i * 0.045, 0.012, 0.6, { type: 'bp', f: 3200, q: 6 });
+    }
+    if (o.evo) evoLayer(t, k, 0.15);
+  });
+  // 熊吼：两条带颤音的锯齿波往下压 + 喘气的噪声
+  D('w_roar', { gap: 0.5, grp: 'wpn', vol: 0.31, jit: 0.8, wet: 0.1 }, function (t, k, o) {
+    S.tone(t, 'sawtooth', 95 * k, 0.42, 0.6, { f1: 70 * k, sw: 0.38, lp: 700, vib: 22, vd: 9 });
+    S.tone(t, 'sawtooth', 142 * k, 0.36, 0.25, { lp: 900, vib: 19, vd: 7 });
+    S.nz(t, 0.38, 0.45, { type: 'bp', f: 600, q: 0.9, f2: 350, fsw: 0.34, kind: 'pink' });
+    if (o.evo) evoLayer(t, k, 0.6);
+  });
+  // 提灯光束：暖的嗡声 + 一点气声，o.dur 秒（= 光束亮着的时间，最长 2.5 秒）；长度不固定，不进缓存
+  // （嗡声先保持 0.65 × dur 再衰减，听得到的长度 ≈ 光束亮着的时间）
+  D('w_beam', { gap: 0.3, grp: 'wpn', vol: 0.073, jit: 0.3, wet: 0.2 }, function (t, k, o) {
+    var dur = Math.min(2.5, o.dur || 1.6);
+    S.tone(t, 'sine', 330 * k, dur, 0.5, { a: 0.08, hold: dur * 0.65, vib: 5, vd: 6 });
+    S.tone(t, 'triangle', 495 * k, dur, 0.18, { a: 0.1, hold: dur * 0.65, lp: 2400 });
+    S.nz(t, dur, 0.12, { type: 'bp', f: 2000, q: 0.8, a: 0.1, hold: dur * 0.6, kind: 'pink' });
+    if (o.evo) evoLayer(t, k);
+  });
+  // 鞭炮：扔出去，0.25 秒后噼里啪啦九响
+  D('w_crackle', { gap: 0.3, grp: 'wpn', vol: 0.33, jit: 1 }, function (t, k, o) {
+    S.nz(t, 0.08, 0.3, { type: 'bp', f: 1200 });
+    var tt = t + 0.25;
+    for (var i = 0; i < 9; i++) {
+      S.nz(tt, 0.018, rnd(0.5, 0.9), { type: 'bp', f: rnd(1800, 3600) * k, q: 1.2 });
+      S.tone(tt, 'sine', rnd(150, 240) * k, 0.03, 0.3, { f1: 80, sw: 0.03 });
+      tt += rnd(0.03, 0.11);
+    }
+    if (o.evo) evoLayer(t, k);
   });
 
   // ---------------- 战斗 ----------------
@@ -384,12 +411,6 @@
     S.nz(t, 0.05, 0.6, { type: 'hp', f: 2600, q: 0.7 });
     S.tone(t, 'square', 1700 * k, 0.07, 0.3, { f1: 1150 * k, sw: 0.06, lp: 5000 });
     S.tone(t, 'sine', 160 * k, 0.09, 0.55, { f1: 70, sw: 0.08 });
-  });
-  // 超大暴击 / BONK：重锤 + 金属回响
-  D('crit2', { gap: 0.12, grp: 'hit', vol: 0.434, pri: 1, jit: 1, wet: 0.15 }, function (t, k) {
-    S.tone(t, 'sine', 140 * k, 0.25, 0.9, { f1: 45, sw: 0.18 });
-    S.nz(t, 0.08, 0.8, { type: 'bp', f: 2000, q: 0.8 });
-    S.fm(t, 740 * k, 1.41, 3, 0.45, 0.35);
   });
   // 打死：o.s 体型 0.6~2（小怪清脆，大怪低沉）
   D('kill', { gap: 0.03, grp: 'kill', vol: 0.715, jit: 2 }, function (t, k, o) {
@@ -505,15 +526,20 @@
     I.brass(t + 0.84, 98, 1.1, 0.4, { br: 3.5, a: 0.12, rel: 0.5 });
     I.brass(t + 0.84, 147, 1.1, 0.3, { br: 3.5, a: 0.12, rel: 0.5 });
   });
-  // 最终虫潮：两声警报号角 + 鼓 + 往上冲的噪声
-  D('swarm', { gap: 3, grp: 'big', vol: 0.459, pri: 2, wet: 0.35 }, function (t) {
-    for (var i = 0; i < 2; i++) {
-      var tt = t + i * 0.7;
-      I.brass(tt, 220, 0.55, 0.45, { br: 6, a: 0.03 }); I.brass(tt, 233, 0.55, 0.3, { br: 6, a: 0.03 });
-      I.taiko(tt, 0, 0, 0.9);
+  // 午夜钟声：古城的大钟敲十二下（压进 3 秒，越敲越急），最后一下低八度、余音长，垫一声大鼓
+  D('swarm', { gap: 3, grp: 'big', vol: 0.39, pri: 2, wet: 0.45 }, function (t) {
+    var at = 0;
+    for (var i = 0; i < 12; i++) {
+      if (i < 11) {
+        S.fm(t + at, 147, 1.41, 2.6, 0.7, 0.42 + i * 0.02, { idx1: 0.3 });
+        S.tone(t + at, 'sine', 297, 0.35, 0.08);
+        at += 0.27 - i * 0.008;
+      } else {
+        S.fm(t + at, 147, 1.41, 3.2, 3.2, 0.75, { idx1: 0.3 });
+        S.tone(t + at, 'sine', 73.5, 2.4, 0.5, { a: 0.01 });
+        I.taiko(t + at, 0, 0, 0.9);
+      }
     }
-    I.riser(t, 0, 1.4, 1);
-    I.crash(t + 1.4, 0, 0, 0.8);
   });
   D('portal_open', { gap: 1, grp: 'big', vol: 0.315, pri: 1, wet: 0.5 }, function (t, k) {
     [392, 494, 587, 784, 988].forEach(function (f, i) { S.fm(t + i * 0.07, f * k, 3.5, 1.2, 1, 0.35); });
@@ -552,48 +578,15 @@
     if (r >= 3) S.fm(t + n * 0.06, 1047 * k, 3.5, 1.6, 1.4, 0.3);
     if (r >= 4) { I.choir(t + 0.1, 523, 1.2, 0.18, { a: 0.2, rel: 0.6 }); I.choir(t + 0.1, 659, 1.2, 0.14, { a: 0.2, rel: 0.6 }); I.choir(t + 0.1, 784, 1.2, 0.14, { a: 0.2, rel: 0.6 }); }
   });
-  // 神龛充能：一格一格往上走（o.pitch 给音高）
+  // 站圈充能：一格一格往上走（o.pitch 给音高）
   D('charge_tick', { gap: 0.12, grp: 'use', vol: 0.271, wet: 0.3 }, function (t, k) {
     S.tone(t, 'sine', 523 * k, 0.16, 0.7, { a: 0.01 });
     S.tone(t, 'triangle', 1047 * k, 0.08, 0.2);
-  });
-  D('shrine_done', { gap: 0.5, grp: 'use', vol: 0.323, pri: 1, wet: 0.45 }, function (t, k, o) {
-    var gold = o.golden;
-    [523, 659, 784, 988, 1175].forEach(function (f, i) { S.fm(t + i * 0.05, f * k * (gold ? 1.12 : 1), 3.5, 1.2, 1.2, 0.3); });
-    S.nz(t, 1, 0.12, { type: 'hp', f: 6000, a: 0.3 });
   });
   D('pot', { gap: 0.06, grp: 'use', vol: 0.933, jit: 2 }, function (t, k) {
     S.nz(t, 0.1, 0.8, { type: 'bp', f: 900 * k, q: 1.2 });
     for (var i = 0; i < 3; i++) S.nz(t + 0.02 + Math.random() * 0.09, 0.02, 0.4, { type: 'bp', f: rnd(1800, 3200), q: 3 });
     S.tone(t, 'sine', 160 * k, 0.08, 0.4, { f1: 90, sw: 0.07 });
-  });
-  D('moai', { gap: 0.5, grp: 'use', vol: 0.423, pri: 1, wet: 0.45 }, function (t) {
-    S.nz(t, 0.7, 0.7, { type: 'lp', f: 220, q: 1, a: 0.2, kind: 'brown' });
-    [262, 330, 392].forEach(function (f) { I.choir(t + 0.2, f, 1.1, 0.2, { a: 0.3, rel: 0.6 }); });
-  });
-  D('microwave', { gap: 0.5, grp: 'use', vol: 0.182, pri: 1 }, function (t) {
-    S.tone(t, 'sawtooth', 120, 0.5, 0.12, { lp: 500, hold: 0.3 });
-    S.fm(t + 0.45, 1760, 2, 1, 0.9, 0.5);
-  });
-  D('challenge', { gap: 1, grp: 'use', vol: 0.279, pri: 1, wet: 0.35 }, function (t) {
-    I.brass(t, 147, 0.9, 0.4, { br: 4, a: 0.08, rel: 0.4 }); I.brass(t, 156, 0.9, 0.3, { br: 4, a: 0.08, rel: 0.4 });
-    I.taiko(t, 0, 0, 0.8); I.taiko(t + 0.45, 0, 0, 0.7);
-  });
-  D('greed', { gap: 0.5, grp: 'use', vol: 0.353, pri: 1, wet: 0.2 }, function (t) {
-    for (var i = 0; i < 8; i++) {
-      var tt = t + i * 0.045 + Math.random() * 0.02;
-      S.tone(tt, 'square', 1976 * rnd(0.95, 1.06), 0.04, 0.3, { lp: 6000 });
-      S.tone(tt + 0.03, 'square', 2637 * rnd(0.95, 1.06), 0.07, 0.25, { lp: 7000 });
-    }
-    S.tone(t + 0.1, 'sawtooth', 73, 0.8, 0.25, { lp: 300, a: 0.2 });
-  });
-  D('succ', { gap: 0.5, grp: 'use', vol: 0.298, pri: 1, wet: 0.3 }, function (t) {
-    S.nz(t, 0.8, 0.8, { type: 'bp', f: 3500, q: 1.4, f2: 250, fsw: 0.75, a: 0.6, kind: 'pink' });
-    S.tone(t, 'sine', 1400, 0.8, 0.3, { f1: 180, sw: 0.75, a: 0.6 });
-  });
-  D('curse', { gap: 0.5, grp: 'use', vol: 0.321, pri: 1, wet: 0.45 }, function (t) {
-    [98, 104, 139].forEach(function (f) { S.tone(t, 'sawtooth', f, 1.1, 0.22, { lp: 600, a: 0.15, vib: 5, vd: 25 }); });
-    S.nz(t, 1, 0.15, { type: 'bp', f: 2500, q: 2, f2: 900, fsw: 1, a: 0.3 });
   });
   // 铁砧：o.n 下“铛”
   D('anvil', { gap: 0.2, grp: 'use', vol: 0.312, pri: 1, wet: 0.25 }, function (t, k, o) {
@@ -681,21 +674,6 @@
   D('ready', { gap: 2, grp: 'use', vol: 0.294, pri: 1, wet: 0.4 }, function (t) {
     [1047, 1319, 1568, 2093].forEach(function (f, i) { S.fm(t + i * 0.05, f, 3.5, 1, 0.7, 0.3); });
   });
-  // 胸甲猛男「秀肌肉」：铜管重音 + 一圈冲击的风声
-  D('flex', { gap: 2, grp: 'ply', vol: 0.216, pri: 1, wet: 0.25 }, function (t) {
-    [262, 330, 392].forEach(function (f) { I.brass(t, f, 0.35, 0.4, { br: 6, a: 0.015, rel: 0.2 }); });
-    S.nz(t, 0.4, 0.5, { type: 'bp', f: 500, q: 1, f2: 2200, fsw: 0.3, a: 0.04, kind: 'pink' });
-    I.taiko(t, 0, 0, 0.6);
-  });
-  // 闪电骑士放电：一串噼啪 + 电流
-  D('discharge', { gap: 0.8, grp: 'ply', vol: 0.566, pri: 1, wet: 0.15 }, function (t, k) {
-    var car = S.osc(t, 'sawtooth', 1400 * k, t + 0.35, { f1: 160 * k, sw: 0.3 }), mod = S.osc(t, 'square', 71, t + 0.35), mg = S.gain(700);
-    mod.connect(mg); mg.connect(car.frequency);
-    var fl = S.filt(t, 'bandpass', 2200, 0.7), g = S.env(t, 0.6, 0.004, 0.32);
-    car.connect(fl); fl.connect(g); g.connect(S.out());
-    for (var i = 0; i < 3; i++) S.nz(t + i * 0.06 + Math.random() * 0.04, 0.03, 0.6, { type: 'hp', f: 4200 });
-  });
-
   // 狼嚎（内容扩展的新敌人用）：往上滑再往下落的锯齿 + 宽颤音
   D('howl', { gap: 1.5, grp: 'enemy', vol: 0.393, pri: 1, wet: 0.4 }, function (t, k) {
     var os = S.osc(t, 'sawtooth', 330 * k, t + 1.3), fl = S.filt(t, 'bandpass', 900, 2.5), g = S.env(t, 0.6, 0.25, 1.25, 0.4);
@@ -1160,11 +1138,11 @@
     stone: { f: 380, q: 1, am: 21, amd: 0.3, kind: 'brown' },
     coin: { f: 3300, q: 1.5, am: 23, amd: 0.45, kind: 'white' }
   };
-  // 骑士 → 坐骑的摩擦声
+  // 骑士 → 坐骑的摩擦声（跟着坐骑的材料：皮马鞍、肚皮软，铜锣、坩埚是金属，棺材、调色盘、云梯是木头）
   SFX.RIDE_SOUND = {
-    oofie: 'metal', fox: 'coin', calcium: 'wheels', chad: 'metal', ogre: 'wood', clank: 'wheels', athena: 'metal',
-    robin: 'air', monke: 'soft', tony: 'hover', bush: 'soft', spaceman: 'magic', bandit: 'soft', ninja: 'soft',
-    vlad: 'liquid', noelle: 'ice', amog: 'stone', dicehead: 'soft', chadwell: 'magic', birdo: 'air', roberto: 'wood'
+    squire: 'soft', bellringer: 'metal', gravekeeper: 'wood', cook: 'soft', courier: 'air', jester: 'soft', tinsoldier: 'wheels',
+    astrologer: 'hover', falconer: 'air', nun: 'magic', smith: 'metal', bear: 'wood', bannerman: 'metal', gardener: 'soft',
+    painter: 'wood', magician: 'soft', beekeeper: 'liquid', catknight: 'wood', fisher: 'ice', lampknight: 'soft', engineer: 'wood'
   };
   D('scrape', { grp: 'loop', vol: 0.3, loop: true }, function (t, k, o) {
     var pr = SFX.SCRAPE[o.kind] || SFX.SCRAPE.soft, end = t + 3600;
@@ -1192,7 +1170,6 @@
   CS('hit', { key: size3, base: sizeBase, len: 0.12 });
   CS('kill', { key: size3, base: sizeBase, len: 0.26 });
   CS('crit', { len: 0.12 });
-  CS('crit2', { len: 0.5, n: 2 });
   CS('xp', { len: 0.08 });
   CS('coin', { len: 0.18 });
   CS('zap_hit', { len: 0.08 });
@@ -1210,48 +1187,51 @@
   CS('hover', { len: 0.04 });
   // 武器：每把武器（普通 / 超武）一份
   var wkey = function (o) { return (o.key || '') + (o.evo ? '*' : ''); };
-  [['w_swing', 0.55], ['w_fire', 0.45], ['w_bolt', 0.4], ['w_shotgun', 0.45], ['w_bow', 0.45], ['w_heavy', 0.5], ['w_throw', 0.45], ['w_dice', 0.45], ['w_dagger', 0.45],
-    ['w_orb', 0.45], ['w_zap', 0.45], ['w_wind', 0.65], ['w_hole', 0.75], ['w_bottle', 0.5], ['w_mine', 0.45], ['w_chain', 0.45], ['w_trail', 0.25], ['w_aura', 0.45], ['w_frost', 0.45], ['w_orbit', 0.35]
+  [['w_swing', 0.55], ['w_shotgun', 0.45], ['w_heavy', 0.5], ['w_throw', 0.6], ['w_dagger', 0.45], ['w_zap', 0.45], ['w_bottle', 0.5], ['w_mine', 0.45],
+    ['w_trail', 0.3], ['w_aura', 0.45], ['w_frost', 0.45], ['w_orbit', 0.55], ['w_reel', 0.5], ['w_roar', 0.7], ['w_crackle', 1.2]
   ].forEach(function (w) { CS(w[0], { key: wkey, len: w[1] }); });
+  CS('w_bell', { key: wkey, len: 1.4, n: 2 });   // w_beam 长度跟着光束走，现场合成
   // 解锁后先合成这些（一进游戏就会用到）
   SFX.PREWARM = [['hit', { s: 1 }], ['hit', { s: 0.8 }], ['kill', { s: 1 }], ['kill', { s: 0.8 }], ['xp'], ['coin'], ['crit'], ['boom', { r: 3 }], ['jump'], ['land', { w: 0.5 }], ['click'], ['tick'], ['enemy_shot'], ['slide']];
 
   // ---------------- 每把武器用哪个声音 ----------------
   // [配方, 参数]；新武器可以往这里加，没登记的按武器类型（SFX.WEAPON_TYPE）
+  // 第 4 块：每把武器按自己的玩法配声音（计划 §4.2）；武器出手以外的事件声音见 audio_hooks.js 的 SFX.EMIT
   SFX.WEAPON = {
-    sword: ['w_swing', { len: 0.24, lo: 380, hi: 2200, ring: 0.5 }],
-    katana: ['w_swing', { len: 0.12, lo: 1500, hi: 5200, ring: 1 }],
-    corrupted: ['w_swing', { len: 0.22, lo: 300, hi: 1600, dark: 1 }],
-    herosword: ['w_swing', { len: 0.2, lo: 600, hi: 3000, ring: 0.6, wave: 1 }],
-    scythe: ['w_swing', { len: 0.32, lo: 250, hi: 1400 }],
-    dexe: ['w_swing', { len: 0.26, lo: 300, hi: 1800, ring: 0.8 }],
-    firestaff: ['w_fire', {}],
-    revolver: ['w_bolt', { n: 4 }],
-    shotgun: ['w_shotgun', {}],
-    bow: ['w_bow', {}],
-    sniper: ['w_heavy', {}],
-    bone: ['w_throw', { kind: 'clack' }],
-    axe: ['w_throw', { kind: 'whirr', len: 0.32, rate: 15 }],
-    banana: ['w_throw', { kind: 'rise', len: 0.36, rate: 19 }],
-    dice: ['w_dice', {}],
-    dagger: ['w_dagger', {}],
-    bloodmagic: ['w_orb', {}],
-    rocket: ['w_orb', { hi: 1 }],
-    lightning: ['w_zap', {}],
-    tornado: ['w_wind', {}],
-    blackhole: ['w_hole', {}],
-    poison: ['w_bottle', {}],
-    mines: ['w_mine', {}],
-    noodle: ['w_chain', {}],
-    dragon: ['w_flame', {}],
-    flamewalker: ['w_trail', {}],
-    aura: ['w_aura', {}],
-    frost: ['w_frost', {}],
-    chunkers: ['w_orbit', {}]
+    knightsword: ['w_swing', { len: 0.22, lo: 300, hi: 1800, ring: 0.5 }],
+    lance: ['w_swing', { len: 0.18, lo: 700, hi: 3000, ring: 0.6 }],
+    forgehammer: ['w_swing', { len: 0.3, lo: 200, hi: 1200, clang: 1 }],
+    falcon: ['w_throw', { kind: 'rise', len: 0.36, rate: 19, cry: 1 }],
+    paintbucket: ['w_bottle', { splat: 1 }],
+    claws: ['w_swing', { len: 0.1, lo: 1800, hi: 5600 }],
+    beehive: ['w_dagger', { buzz: 1 }],
+    astrolabe: ['w_zap', { fall: 1 }],
+    trickknives: ['w_shotgun', { light: 1 }],
+    pigeons: ['w_throw', { kind: 'flap' }],
+    trebuchet: ['w_throw', { kind: 'clack', heavy: 1 }],
+    hymn: ['w_aura', { choir: 1 }],
+    toyguard: ['w_orbit', { snare: 1 }],
+    roar: ['w_roar', {}],
+    lanternbeam: ['w_beam', {}],
+    gravecandle: ['w_mine', { puff: 1 }],
+    thornvine: ['w_trail', { leaf: 1 }],
+    fryingpan: ['w_throw', { kind: 'whirr', len: 0.32, rate: 15 }],
+    rod: ['w_reel', {}],
+    bronzebell: ['w_bell', {}],
+    juggle: ['w_throw', { kind: 'boop' }],
+    kite: ['w_orbit', { wind: 1 }],
+    javelin: ['w_throw', { kind: 'rise', len: 0.2 }],
+    chessknight: ['w_throw', { kind: 'clack', wood: 1 }],
+    beartrap: ['w_mine', { set: 1 }],
+    thunderdrum: ['w_zap', { drum: 1 }],
+    firecracker: ['w_crackle', {}],
+    icicle: ['w_frost', { short: 1 }],
+    slingshot: ['w_throw', { kind: 'sling' }],
+    skyrocket: ['w_throw', { kind: 'whistle' }]
   };
   SFX.WEAPON_TYPE = {
-    melee: 'sword', shot: 'bow', bounce: 'bone', boomerang: 'banana', shotgun: 'shotgun', chain: 'lightning', axe: 'axe',
-    tornado: 'tornado', mine: 'mines', puddle: 'poison', blackhole: 'blackhole', aura: 'aura', orbit: 'chunkers', trail: 'flamewalker', tether: 'noodle', flame: 'dragon'
+    melee: 'knightsword', shot: 'javelin', bounce: 'juggle', boomerang: 'falcon', shotgun: 'trickknives', chain: 'pigeons', axe: 'fryingpan',
+    mine: 'gravecandle', puddle: 'paintbucket', aura: 'hymn', orbit: 'toyguard', trail: 'thornvine', tether: 'rod', flame: 'lanternbeam', ring: 'bronzebell'
   };
   // 每把武器的参数对象只建一次（出手时不新建对象）；超武一份、普通一份
   var WC = {};
@@ -1259,10 +1239,82 @@
     var key = w.id + (w.evo ? '*' : '');
     var c = WC[key];
     if (c) return c;
-    var m = SFX.WEAPON[w.id] || SFX.WEAPON[SFX.WEAPON_TYPE[w.def && w.def.type] || ''] || SFX.WEAPON.sword;
+    var m = SFX.WEAPON[w.id] || SFX.WEAPON[SFX.WEAPON_TYPE[w.def && w.def.type] || ''] || SFX.WEAPON.knightsword;
     var o = { key: 'w:' + w.id, evo: !!w.evo, vol: w.evo ? 1.15 : 1 };
     for (var k in m[1]) o[k] = m[1][k];
     c = WC[key] = { name: m[0], o: o };
     return c;
   };
+
+  // ---------------- 第 5 块：骑士被动的两个新声音（audio_hooks.js 的 SFX.PASSIVE） ----------------
+  // 猫叫：锯齿波往上滑再往下落，过两个跟着走的共振峰（700 → 1100 → 600 赫兹）
+  D('p_meow', { gap: 0.2, grp: 'misc', vol: 0.32, wet: 0.2 }, function (t, k) {
+    var end = t + 0.36, os = S.osc(t, 'sawtooth', 520 * k, end), g = S.env(t, 0.9, 0.04, 0.35, 0.08);
+    os.frequency.setValueAtTime(520 * k, t); os.frequency.linearRampToValueAtTime(760 * k, t + 0.12); os.frequency.exponentialRampToValueAtTime(430 * k, t + 0.34);
+    var f1 = S.filt(t, 'bandpass', 700, 4), f2 = S.filt(t, 'bandpass', 1400, 5), g2 = S.gain(0.5);
+    f1.frequency.linearRampToValueAtTime(1100, t + 0.14); f1.frequency.exponentialRampToValueAtTime(600, t + 0.34);
+    f2.frequency.linearRampToValueAtTime(2200, t + 0.14); f2.frequency.exponentialRampToValueAtTime(1200, t + 0.34);
+    os.connect(f1); os.connect(f2); f1.connect(g); f2.connect(g2); g2.connect(g); g.connect(S.out());
+  });
+  // 小丑的喇叭：方波 330 赫兹，每秒抖 7 下
+  D('p_honk', { gap: 0.2, grp: 'misc', vol: 0.22, wet: 0.15 }, function (t, k) {
+    S.tone(t, 'square', 330 * k, 0.25, 0.7, { vib: 7, vd: 80, vdl: 0.01, lp: 1800, a: 0.01 });
+    S.tone(t, 'square', 165 * k, 0.22, 0.25, { vib: 7, vd: 80, vdl: 0.01, lp: 900, a: 0.01 });
+  });
+  CS('p_meow', { len: 0.4 });
+  CS('p_honk', { len: 0.3 });
+  // 熊骑士发怒（r1 修）：低沉的喉音往上冲（锯齿 70 → 125 赫兹，粗糙的快抖）+ 喘气 + 一声往上走的亮音（变强了）
+  // 不用狼嚎（那是敌人的警告声），也不用熊吼（熊骑士自己的武器声）
+  D('p_growl', { gap: 0.2, grp: 'misc', vol: 0.3, wet: 0.2 }, function (t, k) {
+    S.tone(t, 'sawtooth', 70 * k, 0.5, 0.6, { f1: 125 * k, sw: 0.35, lp: 650, vib: 14, vd: 10, vdl: 0.01, a: 0.04 });
+    S.nz(t, 0.42, 0.3, { type: 'bp', f: 380, q: 1.1, f2: 720, fsw: 0.35, kind: 'pink', a: 0.04 });
+    S.tone(t + 0.22, 'triangle', 330 * k, 0.3, 0.22, { f1: 660 * k, sw: 0.24, a: 0.02 });
+  });
+  CS('p_growl', { len: 0.6 });
+  // 渔夫钓上一条鱼（收尾）：水里「啵」一声（正弦 900 → 260 赫兹）+ 一小下溅水 + 两下往上走的木质「嗒嗒」（进了鱼篓）
+  // 不再借拾取金币的声音
+  D('p_catch', { gap: 0.15, grp: 'misc', vol: 0.3, wet: 0.2 }, function (t, k) {
+    S.tone(t, 'sine', 900 * k, 0.11, 0.8, { f1: 260 * k, sw: 0.09, a: 0.003 });
+    S.nz(t + 0.01, 0.08, 0.3, { type: 'bp', f: 2600, q: 1.3, f2: 1300, fsw: 0.08 });
+    S.tone(t + 0.12, 'triangle', 660 * k, 0.06, 0.32, { lp: 3000 });
+    S.tone(t + 0.18, 'triangle', 880 * k, 0.08, 0.28, { lp: 3500 });
+  });
+  CS('p_catch', { len: 0.32 });
+  // 占星骑士换星座（收尾）：五个往上走的 FM 铃音 + 一点高频沙沙（和原来借的神龛声一样；神龛声第 7 块删了）
+  D('p_star', { gap: 0.5, grp: 'misc', vol: 0.323, wet: 0.45 }, function (t, k) {
+    [523, 659, 784, 988, 1175].forEach(function (f, i) { S.fm(t + i * 0.05, f * k, 3.5, 1.2, 1.2, 0.3); });
+    S.nz(t, 1, 0.12, { type: 'hp', f: 6000, a: 0.3 });
+  });
+  // ---------- 第 6 块：宝物的四个新声音（别的宝物借现有的配方，SFX.PASSIVE 的 r_ 行） ----------
+  // 铜号角：两个铜管音往上走（锯齿 392 → 523 赫兹，低通 1400，带一点颤音）+ 低八度垫底；不是敌人的号声
+  D('r_bugle', { gap: 0.3, grp: 'misc', vol: 0.17, wet: 0.3 }, function (t, k) {
+    S.tone(t, 'sawtooth', 392 * k, 0.17, 0.5, { lp: 1400, a: 0.02, vib: 6, vd: 12, vdl: 0.04 });
+    S.tone(t + 0.15, 'sawtooth', 523 * k, 0.3, 0.62, { lp: 1400, a: 0.02, hold: 0.1, vib: 6, vd: 16, vdl: 0.06 });
+    S.tone(t + 0.15, 'square', 261.6 * k, 0.28, 0.12, { lp: 800, a: 0.02, hold: 0.08 });
+  });
+  CS('r_bugle', { len: 0.5 });
+  // 龙吼战鼓：三下低沉的鼓（70 / 70 / 55 赫兹往下滑）+ 每下一声皮面的噪声拍；混响大一点。不是 Boss 的 war_drums
+  D('r_drum', { gap: 0.5, grp: 'misc', vol: 0.2, wet: 0.4 }, function (t, k) {
+    [[0, 70, 0.75], [0.17, 70, 0.75], [0.38, 55, 0.95]].forEach(function (h) {
+      S.tone(t + h[0], 'sine', h[1] * 1.9 * k, 0.32, h[2], { f1: h[1] * k, sw: 0.08, a: 0.002 });
+      S.nz(t + h[0], 0.07, 0.32, { type: 'bp', f: 900, q: 0.8, f2: 300, fsw: 0.06, kind: 'pink' });
+    });
+  });
+  CS('r_drum', { len: 0.8 });
+  // 猎犬扑咬：两声短促的「汪汪」（方波 420 → 300 赫兹，带通 900）+ 一点气声；不是狼嚎
+  D('r_bark', { gap: 0.25, grp: 'misc', vol: 0.28, wet: 0.15 }, function (t, k) {
+    [0, 0.12].forEach(function (d, i) {
+      S.tone(t + d, 'square', 420 * k * (i ? 0.94 : 1), 0.08, 0.6, { f1: 300 * k, sw: 0.07, bp: 900, q: 1.4, a: 0.004 });
+      S.nz(t + d, 0.05, 0.18, { type: 'bp', f: 1400, q: 1.2 });
+    });
+  });
+  CS('r_bark', { len: 0.25 });
+  // 渡鸦出发：两声沙哑的「嘎」（锯齿 620 → 480 赫兹 + 快速的粗糙颤音 + 带通噪声）；不是敌人的尖叫
+  D('r_caw', { gap: 0.3, grp: 'misc', vol: 0.24, wet: 0.2 }, function (t, k) {
+    [0, 0.17].forEach(function (d) {
+      S.tone(t + d, 'sawtooth', 620 * k, 0.14, 0.5, { f1: 480 * k, sw: 0.12, bp: 1300, q: 2, vib: 38, vd: 60, vdl: 0.005, a: 0.008 });
+      S.nz(t + d, 0.13, 0.3, { type: 'bp', f: 1800, q: 2.5, f2: 1200, fsw: 0.12 });
+    });
+  });
+  CS('r_caw', { len: 0.38 });
 })();

@@ -163,6 +163,8 @@ W.generate = function (scene, seed, pal) {
   W.boxes = []; W.ramps = []; W.circles = [];
   W.grid = new Map();
   W.spots = [];
+  W.bellTower = null;   // 沉钟古城倒了一半的钟楼（W.buildCity 填）
+  W.visExtra = { boxes: [], circles: [] };   // 第 3 关只有外观、没有碰撞体的东西的占地（W.cityDetail 填；弩车、军旗、急件躲开它们）
   W.initMats();
   if (W.group) {
     scene.remove(W.group);
@@ -176,6 +178,7 @@ W.generate = function (scene, seed, pal) {
   W.buildTowers(rng, pal);
   W.buildRuins(rng, pal);
   W.buildProps(rng, pal);
+  if (pal.cityWalls || pal.bellTower) W.buildCity(pal, seed);
   W.flushBatches();
   W.buildTufts(pal);
 };
@@ -264,6 +267,16 @@ W.boxUV = function (w, h, d, scale) {
       var i = f * 4 + k;
       uv.setXY(i, uv.getX(i) * dims[f][0] * scale, uv.getY(i) * dims[f][1] * scale);
     }
+  }
+  return g;
+};
+
+// 圆柱 / 圆锥的贴图坐标按实际尺寸缩放：前 nSide 个顶点是侧面（u × su、v × sv），后面的底面按 sc 缩放
+W.scaleUV = function (g, nSide, su, sv, sc) {
+  var uv = g.attributes.uv;
+  for (var i = 0; i < uv.count; i++) {
+    if (i < nSide) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv);
+    else uv.setXY(i, uv.getX(i) * sc, uv.getY(i) * sc);
   }
   return g;
 };
@@ -485,6 +498,332 @@ W.buildRuins = function (rng, pal) {
   }
 };
 
+// ---------------- 沉钟古城：塌掉的城墙、倒了一半的钟楼 ----------------
+// 第 8 块的占位（第 10 块换真模型）：只用石砖批次和 W.addBox，不加新贴图、新网格。
+// 用自己的随机数，不动布局流 rng；W.addBox / 常春藤读的外观随机数 W.vrng 也临时换成自己的一条，
+// 所以第 1、2 关一模一样，第 3 关原来的东西一个不变，只在最后多出这些
+W.buildCity = function (pal, seed) {
+  var rng = mulberry32((seed ^ 0x3c6ef372) >>> 0), vr0 = W.vrng;
+  W.vrng = mulberry32((seed ^ 0x27d4eb2d) >>> 0);
+  W.cityParts = { walls: [], tower: null };
+  try {
+    if (pal.bellTower) W.buildBellTower(rng, pal);
+    if (pal.cityWalls) W.buildCityWalls(rng, pal);
+  } finally { W.vrng = vr0; }
+  var tw = W.cityParts.tower;
+  W.cityDetail(pal, seed);
+  if (tw) W.fallenTopTops(tw);
+};
+
+// 倒下的塔顶（5×7×5 的壳子 + 远端的攒尖屋顶，斜着躺，画出来 3~5 米高）下面原来只垫了一块 2.2 米的碰撞体，人能站进壳子里。
+// 按画出来的轮廓每半米加一块看不见的碰撞体（从塔身 3 米到屋顶尖 12 米；顶比轮廓低 5 厘米，相邻两块差不到 0.2 米，走得上去；
+// 宽：壳子 ±2.5 米，屋顶按攒尖往里收）。放在整座城建完以后：不用随机数，前面的布局、外观、常春藤都不变
+W.fallenTopTops = function (T) {
+  var M = T.fm, v = new THREE.Vector3(), sx = T.sx, sz = T.sz;
+  // 倾倒的那个平面里的轮廓（倒的方向上离塔心多远 d、多高 y）：壳子侧面的矩形 + 屋顶的三角
+  var pt = function (u, w) {   // u：平面里垂直于壳子长度的那根轴（壳子 ±2.5），w：沿壳子长度（±3.5，屋顶尖 −5.9）
+    if (sx) v.set(u, w, 0); else v.set(0, w, u);
+    v.applyMatrix4(M);
+    return [sx ? (v.x - T.x) * sx : (v.z - T.z) * sz, v.y];
+  };
+  var polys = [[pt(2.5, 3.5), pt(-2.5, 3.5), pt(-2.5, -3.5), pt(2.5, -3.5)], [pt(2.55, -3.5), pt(0, -5.9), pt(-2.55, -3.5)]];
+  var topAt = function (d) {
+    var h = -1e9;
+    polys.forEach(function (P) {
+      for (var i = 0; i < P.length; i++) {
+        var a = P[i], b = P[(i + 1) % P.length], lo = Math.min(a[0], b[0]), hi = Math.max(a[0], b[0]);
+        if (d < lo || d > hi || hi - lo < 1e-6) continue;
+        h = Math.max(h, a[1] + (b[1] - a[1]) * (d - a[0]) / (b[0] - a[0]));
+      }
+    });
+    return h;
+  };
+  var r0 = polys[1][0][0], r1 = polys[1][1][0];   // 屋顶从哪儿开始收、尖在哪儿
+  T.tops = [];
+  for (var d = 3; d < r1; d += 0.5) {
+    var top = topAt(d + 0.25) - 0.05;
+    if (!(top > T.ground + 0.6)) continue;
+    var hw = d <= r0 ? 2.5 : 2.55 * Math.max(0.15, (r1 - d) / (r1 - r0));
+    var x0, x1, z0, z1;
+    if (sx) { x0 = T.x + Math.min(d * sx, (d + 0.5) * sx); x1 = T.x + Math.max(d * sx, (d + 0.5) * sx); z0 = T.z - hw; z1 = T.z + hw; }
+    else { z0 = T.z + Math.min(d * sz, (d + 0.5) * sz); z1 = T.z + Math.max(d * sz, (d + 0.5) * sz); x0 = T.x - hw; x1 = T.x + hw; }
+    var o = { kind: 'box', x0: x0, x1: x1, z0: z0, z1: z1, top: top, bottom: T.ground - 1, floating: false, hidden: true };
+    W.boxes.push(o);
+    W.addCollider(o, x0, x1, z0, z1);
+    T.tops.push(o);
+  }
+};
+
+// 一座倒了一半的钟楼（百年沉钟的出场点，Boss 传送门在它旁边，见 interact.js）：离出生点 55~110 米，
+// 6×6 的残塔 10 米高 + 倒在一边的塔顶（只是外观，下面垫一块矮的碰撞体）+ 几块碎石
+W.buildBellTower = function (rng, pal) {
+  for (var t = 0; t < 160; t++) {
+    var a = rng() * TAU, d = 55 + rng() * 55, x = Math.cos(a) * d, z = Math.sin(a) * d, dir = Math.floor(rng() * 4);
+    if (!W.freeSpot(x, z, t < 100 ? 16 : 11)) continue;
+    var ground = W.terrainH(x, z), top = ground + 10;
+    var o = W.addBox(x - 3, x + 3, z - 3, z + 3, top, pal.stone, { trim: pal.stoneTrim });
+    W.towerDetail(o);
+    // 倒下的塔顶：朝 dir（+x −x +z −z）那边倒，塔尖靠着残塔
+    var sx = [1, -1, 0, 0][dir], sz = [0, 0, 1, -1][dir], fx = x + sx * 6.5, fz = z + sz * 6.5;
+    var m = sx ? W.mat4(fx, ground + 1.6, fz, 0, 0, 1.25 * sx) : W.mat4(fx, ground + 1.6, fz, -1.25 * sz, 0, 0);
+    W.pushGeo(W.batch.brick, W.boxUV(5, 7, 5, 0.42), m, pal.stone2, 0.7);
+    W.cityParts.tower = { o: o, x: x, z: z, ground: ground, top: top, sx: sx, sz: sz, fm: m.clone() };
+    if (sx) W.addBox(Math.min(x + sx * 4, x + sx * 10), Math.max(x + sx * 4, x + sx * 10), z - 2.5, z + 2.5, ground + 2.2, pal.stone2);
+    else W.addBox(x - 2.5, x + 2.5, Math.min(z + sz * 4, z + sz * 10), Math.max(z + sz * 4, z + sz * 10), ground + 2.2, pal.stone2);
+    // 碎石：落在另外三面，都不到 1 米高，可以踩上去
+    for (var k = 0; k < 4; k++) {
+      var ra = rng() * TAU, rr = 4.6 + rng() * 2.4, rx = x + Math.cos(ra) * rr, rz = z + Math.sin(ra) * rr, s = 0.5 + rng() * 0.5;
+      if ((rx - x) * sx > 3 || (rz - z) * sz > 3) { rx = x - (rx - x); rz = z - (rz - z); }
+      W.addBox(rx - s, rx + s, rz - s, rz + s, W.terrainH(rx, rz) + 0.45 + rng() * 0.5, pal.stone2, { trim: pal.stoneTrim });
+    }
+    W.bellTower = { x: x, z: z, y: top, g: ground, sx: sx, sz: sz };   // g 地面、(sx, sz) 塔顶倒下的方向（首领出场的镜头要躲开）
+    return;
+  }
+};
+
+// 几段塌掉的城墙：6 段，每段 2~4 截、1.6 米厚、3~5 米长、2.2~4.5 米高，截与截之间断开 1.5~3 米；可以跳上去、爬上去
+W.buildCityWalls = function (rng, pal) {
+  var runs = 0;
+  for (var t = 0; t < 120 && runs < 6; t++) {
+    var x = (rng() * 2 - 1) * (W.S - 35), z = (rng() * 2 - 1) * (W.S - 35);
+    if (!W.freeSpot(x, z, 12)) continue;
+    var along = rng() < 0.5, n = 2 + Math.floor(rng() * 3), segs = [], total = 0, i;
+    for (i = 0; i < n; i++) {
+      var len = 3 + rng() * 2, gap = i < n - 1 ? 1.5 + rng() * 1.5 : 0;
+      segs.push({ len: len, gap: gap, h: 2.2 + rng() * 2.3 });
+      total += len + gap;
+    }
+    var u = -total / 2, placed = 0, th = 1.6;
+    for (i = 0; i < n; i++) {
+      var sg = segs[i], c = u + sg.len / 2, cx = along ? x + c : x, cz = along ? z : z + c;
+      u += sg.len + sg.gap;
+      if (!W.freeSpot(cx, cz, sg.len / 2 + 1.5)) continue;
+      var top = W.terrainH(cx, cz) + sg.h, o;
+      if (along) o = W.addBox(cx - sg.len / 2, cx + sg.len / 2, cz - th / 2, cz + th / 2, top, pal.stone2, { trim: pal.stoneTrim });
+      else o = W.addBox(cx - th / 2, cx + th / 2, cz - sg.len / 2, cz + sg.len / 2, top, pal.stone2, { trim: pal.stoneTrim });
+      W.ivyOnBox(o.x0 - 0.15, o.x1 + 0.15, o.z0 - 0.15, o.z1 + 0.15, o.top - 0.05, o.bottom + 0.8, 1 + Math.floor(W.vrng() * 2), 2.2);
+      W.cityParts.walls.push({ o: o, along: along, gap0: i > 0 ? segs[i - 1].gap : 0, gap1: sg.gap });
+      placed++;
+    }
+    if (placed) runs++;
+  }
+};
+
+// ---------------- 第 10 块：城墙和钟楼的细节（只是外观） ----------------
+// 垛口、塌掉的台阶状断头、墙脚的勒脚石、箭窗、碎石；钟楼的壁柱、腰线、檐下的托石、断掉的钟亭拱、断了的钟梁和垂下的断链、
+// 倒在地上的钟亭（四角攒尖的屋顶、拱形窗洞、裂缝）和一地碎瓦。全都并进已有的石砖 / 木头批次（不加绘制次数），
+// 不加碰撞体；用第三条随机数（不动布局流 rng 和 W.vrng），建的时候 Resume.noise 打开（three.js 的 uuid 不占建关卡的种子随机数，
+// 所以宝箱、神龛这些的位置和以前一样）
+W.cityDetail = function (pal, seed) {
+  var cp = W.cityParts;
+  if (!cp || (!cp.tower && !cp.walls.length)) return;
+  var Rq = typeof Resume !== 'undefined' ? Resume : null;
+  if (Rq) Rq.noise = (Rq.noise || 0) + 1;
+  try {
+    var v3 = mulberry32((seed ^ 0x165667b1) >>> 0);
+    cp.walls.forEach(function (w) { W.wallDetail(w, pal, v3); });
+    if (cp.tower) W.towerRuin(cp.tower, pal, v3);
+  } finally { if (Rq) Rq.noise--; }
+  W.cityParts = null;
+};
+
+// 一块石头：中心 (x,y,z)、大小 (w,h,d)、绕 y 转 ry（再绕 x / z 歪一点），颜色抖一点
+W.stone = function (x, y, z, w, h, d, color, v3, ry, rx, rz, dark) {
+  var c = new THREE.Color(color).multiplyScalar(0.88 + v3() * 0.18);
+  W.pushGeo(W.batch.brick, W.boxUV(w, h, d, 0.42), W.mat4(x, y, z, rx || 0, ry || 0, rz || 0, 'YXZ'), c, dark);
+};
+
+// 一截城墙：沿 along 方向的长度 L、厚度 th；坐标都换成 (沿墙 u, 横向 t) 来写
+W.wallDetail = function (w, pal, v3) {
+  var o = w.o, along = w.along;
+  var cx = (o.x0 + o.x1) / 2, cz = (o.z0 + o.z1) / 2, L = along ? o.x1 - o.x0 : o.z1 - o.z0, th = along ? o.z1 - o.z0 : o.x1 - o.x0;
+  var base = o.bottom + 1, h = o.top - base, st = pal.stone2, trim = pal.stoneTrim, slit = 0x14161c;
+  var put = function (u, y, t, lu, ly, lt, col, ry, rx, rz, dark) {
+    if (along) W.stone(cx + u, y, cz + t, lu, ly, lt, col, v3, ry, rx, rz, dark);
+    else W.stone(cx + t, y, cz + u, lt, ly, lu, col, v3, ry, rz, rx, dark);
+  };
+  // 勒脚：墙脚一圈深色的大石
+  put(0, base + 0.02, 0, L + 0.24, 0.66, th + 0.24, trim, 0, 0, 0, 0.75);
+  // 垛口（高的那几截才有，两边各一排）；矮的那几截顶上是塌下来的乱石
+  var intact = h >= 3.0;
+  if (intact) {
+    var n = Math.max(2, Math.floor((L - 1.0) / 1.1)), pitch = (L - 1.0) / n;
+    for (var i = 0; i < n; i++) {
+      var u = -L / 2 + 0.5 + pitch * (i + 0.5);
+      [-1, 1].forEach(function (sd, k) {
+        var mh = 0.55, end = (i === 0 && w.gap0 > 0 && k === 0) || (i === n - 1 && w.gap1 > 0 && k === 1);
+        if (end || v3() < 0.12) mh = 0.28 + v3() * 0.12;          // 断了半截的垛
+        put(u, o.top + mh / 2, sd * (th / 2 + 0.15 - 0.22), 0.6, mh, 0.44, st, (v3() - 0.5) * 0.06);
+      });
+    }
+  } else {
+    for (i = 0; i < 2; i++) put((v3() - 0.5) * L * 0.6, o.top + 0.14, (v3() - 0.5) * th * 0.5, 0.5 + v3() * 0.4, 0.3, 0.45 + v3() * 0.3, st, v3() * 1.2, 0, (v3() - 0.5) * 0.3);
+  }
+  // 塌掉的断头：两头各两级往下退的台阶（伸进缺口里，越往外越矮）
+  [[-1, w.gap0], [1, w.gap1]].forEach(function (e) {
+    var sd = e[0], gap = e[1], p1 = gap ? Math.min(0.3, gap * 0.16) : 0.4, p2 = gap ? Math.min(0.55, gap * 0.3) : 0.85;
+    var hA = h * (0.55 + v3() * 0.15), hB = h * (0.22 + v3() * 0.1), ue = sd * L / 2;
+    put(ue + sd * p1 / 2, base + hA / 2, (v3() - 0.5) * 0.1, p1 + 0.02, hA, th * 0.86, st, 0, 0, 0, 0.66);
+    put(ue + sd * p2 / 2, base + hB / 2, (v3() - 0.5) * 0.1, p2 + 0.02, hB, th * 0.72, st, 0, 0, 0, 0.66);
+    // 断口顶上歪着的一块
+    put(ue + sd * p1 * 0.4, base + hA + 0.12, 0, 0.42, 0.3, th * 0.5, st, v3() * 0.4, 0, sd * 0.35);
+    // 墙脚碎石（不到 0.4 米高，靠墙两侧，缺口中间留出路）
+    for (var k = 0; k < 2; k++) {
+      var ru = ue + sd * (0.25 + v3() * (gap ? gap * 0.35 : 1.4)), rt = (k ? 1 : -1) * (th / 2 + 0.2 + v3() * 0.6), rs = 0.28 + v3() * 0.22;
+      put(ru, W.terrainH(along ? cx + ru : cx + rt, along ? cz + rt : cz + ru) + rs * 0.25, rt, rs * 1.3, rs * 0.7, rs, v3() < 0.5 ? st : trim, v3() * 3, (v3() - 0.5) * 0.6, (v3() - 0.5) * 0.6);
+      if (W.visExtra) W.visExtra.circles.push({ x: along ? cx + ru : cx + rt, z: along ? cz + rt : cz + ru, r: rs * 0.82 });   // 半对角线
+    }
+  });
+  // 勒脚、压顶、垛口比碰撞盒宽 0.12~0.15 米；两头塌掉的台阶伸出去 p2（缺口里最多 0.55 米，整段的两头 0.85 米）
+  if (W.visExtra) {
+    var e0 = Math.max(0.15, (w.gap0 ? Math.min(0.55, w.gap0 * 0.3) : 0.85) + 0.02), e1 = Math.max(0.15, (w.gap1 ? Math.min(0.55, w.gap1 * 0.3) : 0.85) + 0.02);
+    W.visExtra.boxes.push(along ? { x0: o.x0 - e0, x1: o.x1 + e1, z0: o.z0 - 0.15, z1: o.z1 + 0.15, top: o.top + 0.6, bottom: o.bottom }
+      : { x0: o.x0 - 0.15, x1: o.x1 + 0.15, z0: o.z0 - e0, z1: o.z1 + e1, top: o.top + 0.6, bottom: o.bottom });
+  }
+  // 箭窗：两个长面各 1~2 个
+  if (h >= 2.6) [-1, 1].forEach(function (sd) {
+    var m = 1 + (v3() < 0.45 ? 1 : 0);
+    for (var k = 0; k < m; k++) {
+      var u = m === 1 ? (v3() - 0.5) * L * 0.3 : (k ? 1 : -1) * L * 0.22;
+      put(u, base + h * 0.58, sd * (th / 2 + 0.02), 0.26, 0.85, 0.06, slit);
+      put(u, base + h * 0.58 - 0.5, sd * (th / 2 + 0.04), 0.5, 0.12, 0.1, trim);
+    }
+  });
+};
+
+// 钟楼：残塔上的东西 + 倒在地上的钟亭
+W.towerRuin = function (T, pal, v3) {
+  var x = T.x, z = T.z, g = T.ground, top = T.top, base = T.o.bottom + 1, st = pal.stone, st2 = pal.stone2, trim = pal.stoneTrim, slit = 0x14161c;
+  var iron = 0x2a2a30, wood = pal.wood || 0x6a4a2a, roof = 0x6a4a3a, i, k;
+  var S = function (px, py, pz, w, h, d, col, ry, rx, rz, dark) { W.stone(px, py, pz, w, h, d, col, v3, ry, rx, rz, dark); };
+  var Wd = function (px, py, pz, w, h, d, col, ry, rx, rz) {
+    var c = new THREE.Color(col).multiplyScalar(0.9 + v3() * 0.15);
+    W.pushGeo(W.batch.wood, W.boxUV(w, h, d, 0.5), W.mat4(px, py, pz, rx || 0, ry || 0, rz || 0, 'YXZ'), c);
+  };
+  var H = top - base;
+  // 四角的壁柱（一直到顶）和勒脚
+  for (i = 0; i < 4; i++) {
+    var qx = i & 1 ? 1 : -1, qz = i & 2 ? 1 : -1;
+    S(x + qx * 2.95, base + (H + 1.2) / 2 - 0.6, z + qz * 2.95, 0.72, H + 1.2, 0.72, trim, 0, 0, 0, 0.7);
+  }
+  S(x, base + 0.1, z, 6.5, 0.8, 6.5, trim, 0, 0, 0, 0.8);
+  // 两道腰线
+  [0.36, 0.7].forEach(function (f) { S(x, base + H * f, z, 6.3, 0.28, 6.3, trim); });
+  // 檐下一排托石（每面 5 个）
+  for (i = 0; i < 4; i++) {
+    var fx = [1, -1, 0, 0][i], fz = [0, 0, 1, -1][i];
+    for (k = 0; k < 5; k++) {
+      var a = -2.0 + k * 1.0;
+      S(x + (fx ? fx * 3.12 : a), top - 0.62, z + (fz ? fz * 3.12 : a), fx ? 0.3 : 0.34, 0.36, fz ? 0.3 : 0.34, trim);
+    }
+  }
+  // 塔身上一道大裂缝（深色折线）
+  var cf = T.sx ? -T.sx : 0, cg = T.sz ? -T.sz : 0;   // 背向倒塌方向的那一面
+  if (!cf && !cg) cf = 1;
+  var cy0 = base + H * 0.45;
+  for (i = 0; i < 4; i++) {
+    var off = (i % 2 ? 0.25 : -0.25) + (v3() - 0.5) * 0.2, yy = cy0 + i * 1.05;
+    if (cf) S(x + cf * 3.02, yy, z + off, 0.05, 1.2, 0.1, slit, 0, (i % 2 ? 0.4 : -0.4));
+    else S(x + off, yy, z + cg * 3.02, 0.1, 1.2, 0.05, slit, 0, 0, (i % 2 ? 0.4 : -0.4));
+  }
+  // 断掉的钟亭：四个角上的残墩（锯齿形的顶）
+  var ph = [];
+  for (i = 0; i < 4; i++) {
+    qx = i & 1 ? 1 : -1; qz = i & 2 ? 1 : -1;
+    var hh = 1.5 + v3() * 1.0; ph.push(hh);
+    S(x + qx * 2.35, top + hh / 2, z + qz * 2.35, 1.3, hh, 1.3, st, 0, 0, 0, 0.85);
+    S(x + qx * (2.35 + (v3() - 0.5) * 0.5), top + hh + 0.22, z + qz * (2.35 + (v3() - 0.5) * 0.5), 0.6, 0.44, 0.6, st, v3(), (v3() - 0.5) * 0.4, (v3() - 0.5) * 0.4);
+  }
+  // 两面的拱：从残墩上起拱，中间断开（一边三块拱石、一边两块）
+  [0, 1].forEach(function (side) {
+    var ax = side ? 0 : 1, az = side ? 1 : 0, sgn = side ? -1 : 1;   // 拱在 +x 面或 −z 面上
+    var spring = top + 1.25, R = 1.6;
+    for (k = 0; k < 5; k++) {
+      var left = k < 3, an = left ? (k + 0.5) * 0.3 : Math.PI - (k - 3 + 0.5) * 0.3;
+      var u = Math.cos(an) * R * (left ? -1 : -1), yy = spring + Math.sin(an) * R;
+      var rot = left ? -(Math.PI / 2 - an) : (an - Math.PI / 2);
+      if (ax) S(x + sgn * 2.35, yy, z + u, 0.9, 0.36, 0.55, st, 0, -rot);
+      else S(x + u, yy, z + sgn * 2.35, 0.55, 0.36, 0.9, st, 0, 0, rot);
+    }
+  });
+  // 断了的钟梁（木头）：一头搭在残墩上、另一头断了往下垂；断口上几根木刺；断口垂下一段断链
+  // （架在 +z 那一面的两个残墩之间：那一面没有拱）
+  var bz = z + 2.35, b0 = [x - 2.35, top + ph[2] - 0.25, bz], blen = 3.0, tilt = -0.28;
+  var bcx = b0[0] + Math.cos(tilt) * blen / 2, bcy = b0[1] + Math.sin(tilt) * blen / 2;
+  Wd(bcx, bcy, bz, blen, 0.42, 0.42, wood, 0, 0, tilt);
+  var ex = b0[0] + Math.cos(tilt) * blen, ey = b0[1] + Math.sin(tilt) * blen;
+  for (k = 0; k < 3; k++) Wd(ex + 0.12, ey + (k - 1) * 0.12, bz + (k - 1) * 0.1, 0.38, 0.07, 0.07, wood, (k - 1) * 0.4, 0, tilt + (k - 1) * 0.3);
+  Wd(x + 2.35 - 0.6, top + ph[3] - 0.25, bz, 1.4, 0.42, 0.42, wood, 0, 0, 0.12);   // 对面剩下的一截
+  for (k = 0; k < 6; k++) S(ex - 0.15, ey - 0.3 - k * 0.2, bz, k % 2 ? 0.05 : 0.14, 0.22, k % 2 ? 0.14 : 0.05, iron);
+  S(ex - 0.15, ey - 1.55, bz + 0.05, 0.16, 0.16, 0.05, iron, 0.3, 0, 0.8);   // 断开的最后一节
+  // 倒在地上的钟亭：原来的那块 5×7×5 的塔顶就是它的四方壳子；壳子的四面开拱形窗洞、两道裂缝，
+  // 远的那头是四角攒尖的屋顶（扎进地里一点），周围一地碎瓦
+  var M = T.fm, tm = new THREE.Matrix4(), tmp = new THREE.Matrix4();
+  // 占地：塔身连壁柱、勒脚（半边 3.31 米）和顶上的残墩；倒下的壳子 8 个角 + 屋顶 4 个角和尖顶按 M 摆好以后的范围（只有靠塔那一截下面有碰撞体）
+  if (W.visExtra) {
+    W.visExtra.boxes.push({ x0: x - 3.35, x1: x + 3.35, z0: z - 3.35, z1: z + 3.35, top: top + 3.2, bottom: T.o.bottom });
+    var fb = { x0: 1e9, x1: -1e9, z0: 1e9, z1: -1e9, top: -1e9, bottom: T.o.bottom }, pv = new THREE.Vector3(), q;
+    var corner = function (lx, ly, lz) {
+      pv.set(lx, ly, lz).applyMatrix4(M);
+      fb.x0 = Math.min(fb.x0, pv.x); fb.x1 = Math.max(fb.x1, pv.x); fb.z0 = Math.min(fb.z0, pv.z); fb.z1 = Math.max(fb.z1, pv.z); fb.top = Math.max(fb.top, pv.y);
+    };
+    for (q = 0; q < 8; q++) corner(q & 1 ? 2.5 : -2.5, q & 2 ? 3.5 : -3.5, q & 4 ? 2.5 : -2.5);   // 壳子
+    for (q = 0; q < 4; q++) corner(q & 1 ? 2.55 : -2.55, -3.5, q & 2 ? 2.55 : -2.55);            // 屋顶底下的四个角
+    corner(0, -5.9, 0);                                                                           // 尖顶
+    W.visExtra.boxes.push(fb);
+  }
+  var put = function (list, geo, lx, ly, lz, rx, ry, rz, col, dark) {
+    tmp.copy(W.mat4(lx, ly, lz, rx || 0, ry || 0, rz || 0, 'YXZ'));
+    tm.multiplyMatrices(M, tmp);
+    W.pushGeo(list, geo, tm, new THREE.Color(col).multiplyScalar(0.9 + v3() * 0.14), dark);
+  };
+  for (i = 0; i < 4; i++) {
+    var nx = [1, -1, 0, 0][i], nz = [0, 0, 1, -1][i], ry = nx ? Math.PI / 2 : 0;
+    var px = nx * 2.53, pz = nz * 2.53;
+    // （钟亭倒下以后它的“上”是壳子的 −y：拱顶朝 −y）
+    put(W.batch.brick, W.boxUV(1.5, 1.6, 0.06, 0.42), px, -1.3, pz, 0, ry, 0, slit);
+    var arch = W.scaleUV(new THREE.CylinderGeometry(0.75, 0.75, 0.06, 7, 1, false, -Math.PI / 2, Math.PI), 16, 0.99, 0.025, 0.63);
+    put(W.batch.brick, arch, px, -2.1, pz, Math.PI / 2, ry, 0, slit);
+    put(W.batch.brick, W.boxUV(1.9, 0.22, 0.12, 0.42), px, -0.42, pz, 0, ry, 0, trim);
+  }
+  for (i = 0; i < 3; i++) put(W.batch.brick, W.boxUV(0.06, 1.3, 0.1, 0.42), 2.54, 0.3 + i * 1.0, -1.2 + (i % 2) * 0.3, 0, 0, (i % 2 ? 0.45 : -0.45), slit);
+  put(W.batch.brick, W.boxUV(5.5, 0.4, 5.5, 0.42), 0, -3.3, 0, 0, 0, 0, trim);   // 底下的檐口
+  // 四角攒尖顶：每个坡面宽 5.1 米、斜高 3.5 米，按木板批次的 0.5 缩放贴图（不然一块木板拉满整面）
+  var rg = W.scaleUV(new THREE.ConeGeometry(3.6, 2.4, 4, 1), 10, 4 * 5.09 * 0.5, 3.5 * 0.5, 3.6);
+  put(W.batch.wood, rg, 0, -3.5 - 1.2, 0, Math.PI, Math.PI / 4, 0, roof);
+  put(W.batch.wood, new THREE.ConeGeometry(0.12, 0.9, 4), 0, -5.9 - 0.4, 0, Math.PI, 0, 0, iron);   // 尖顶的铁杆
+  for (k = 0; k < 14; k++) {
+    var ta = v3() * TAU, tr = 2.5 + v3() * 5.5, tx = x + T.sx * 9 + Math.cos(ta) * tr, tz = z + T.sz * 9 + Math.sin(ta) * tr;
+    if (Math.abs(tx - x) < 3.4 && Math.abs(tz - z) < 3.4) continue;
+    var c = new THREE.Color(roof).multiplyScalar(0.8 + v3() * 0.35);
+    W.pushGeo(W.batch.wood, W.boxUV(0.5, 0.06, 0.72, 0.5), W.mat4(tx, W.terrainH(tx, tz) + 0.05, tz, (v3() - 0.5) * 0.3, v3() * TAU, (v3() - 0.5) * 0.3, 'YXZ'), c);
+  }
+};
+
+// 模型真实占地（不进物理）：几何体（去重的顶点，缓存在 geo.userData）按矩阵 m 摆好以后，离 (cx, cz) 最远的水平距离；
+// 只算离底 maxH 米以内的点（树：vis 只看树干和低处的枝叶，can 看到 4.3 米的树冠）。石头的模型可以比碰撞圈大到 1.5 倍，弩车 / 军旗 / 信要躲开的是这个
+W.visR = function (geo, m, cx, cz, y0, maxH) {
+  var v = geo.userData.vtx;
+  if (!v) {
+    var pos = geo.attributes.position, seen = {}, L = [];
+    for (var i = 0; i < pos.count; i++) {
+      var x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), k = Math.round(x * 50) + ',' + Math.round(y * 50) + ',' + Math.round(z * 50);
+      if (!seen[k]) { seen[k] = 1; L.push(x, y, z); }
+    }
+    v = geo.userData.vtx = new Float32Array(L);
+  }
+  var e = m.elements, r2 = 0;
+  for (var j = 0; j < v.length; j += 3) {
+    var px = e[0] * v[j] + e[4] * v[j + 1] + e[8] * v[j + 2] + e[12];
+    var py = e[1] * v[j] + e[5] * v[j + 1] + e[9] * v[j + 2] + e[13];
+    var pz = e[2] * v[j] + e[6] * v[j + 1] + e[10] * v[j + 2] + e[14];
+    if (py - y0 > maxH) continue;
+    var dx = px - cx, dz = pz - cz;
+    if (dx * dx + dz * dz > r2) r2 = dx * dx + dz * dz;
+  }
+  return Math.sqrt(r2);
+};
+
 // ---------------- 树木岩石（实例化，每种一次绘制） ----------------
 W.buildProps = function (rng, pal) {
   var vr = W.vrng;
@@ -520,7 +859,7 @@ W.buildProps = function (rng, pal) {
     // 每棵树颜色略有不同
     var b = 0.86 + vr() * 0.24;
     treeMeshes[k].setColorAt(idx, tint.setRGB(b * (0.96 + vr() * 0.08), b, b * (0.92 + vr() * 0.1)));
-    var c = { kind: 'circle', x: x, z: z, r: 0.6 * sc, top: y + 20 };
+    var c = { kind: 'circle', x: x, z: z, r: 0.6 * sc, top: y + 20, vis: W.visR(treeGeos[k], m, x, z, y, 1.6), can: W.visR(treeGeos[k], m, x, z, y, 4.3) };   // can：离地 4.3 米以内（树冠下沿，4 米高的军旗要躲开）
     W.circles.push(c);
     W.addCollider(c, x - 1, x + 1, z - 1, z + 1);
     placed++;
@@ -542,7 +881,7 @@ W.buildProps = function (rng, pal) {
     rockMeshes[k].setColorAt(ri, tint.setRGB(b, b, b));
     W.darkenGround(x, z, 1.7 * sc, 0.3);
     var top = y + sc * 0.9;
-    var cr = { kind: 'circle', x: x, z: z, r: 1.1 * sc, top: top };
+    var cr = { kind: 'circle', x: x, z: z, r: 1.1 * sc, top: top, vis: W.visR(rockGeos[k], m, x, z, y, 99) };
     W.circles.push(cr);
     W.addCollider(cr, x - 2 * sc, x + 2 * sc, z - 2 * sc, z + 2 * sc);
   }

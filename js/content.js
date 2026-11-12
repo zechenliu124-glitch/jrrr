@@ -100,8 +100,8 @@ Content.gfxInit = function () {
       ['cone', [0.25, 1.1, 4], [-0.3, 0.55, -0.15], 0x7a5a32, [0.2, 0, 0.35], null, 'bark'], ['dodec', [0.24], [0.2, 1.45, 0.18], 0x4a8a2c, null, [1, 0.6, 1], 'leaf']], 80),
     sand: mk([['cone', [0.5, 2.2, 5], [0, 1.1, 0], 0xd9b46a, null, null, 'sand'], ['cone', [0.3, 1.2, 4], [0.32, 0.6, 0], 0xc29a52, [0, 0, -0.35], null, 'sand'],
       ['cone', [0.28, 1.0, 4], [-0.28, 0.5, 0.1], 0xe0c080, [0.2, 0, 0.35], null, 'sand']], 60),
-    bone: mk([['cyl', [0.13, 0.13, 2.0, 6], [0, 1.0, 0], 0xe8dcc0, null, null, 'bone'], ['dodec', [0.22], [0.11, 0, 0], 0xe8dcc0, null, null, 'bone'], ['dodec', [0.22], [-0.11, 0, 0], 0xe8dcc0, null, null, 'bone'],
-      ['dodec', [0.22], [0.11, 2.0, 0], 0xe8dcc0, null, null, 'bone'], ['dodec', [0.22], [-0.11, 2.0, 0], 0xe8dcc0, null, null, 'bone']], 40),
+    // 百年沉钟「骨雨」天上掉的东西：一块弯的碎钟片（带铜绿边）+ 一片陶瓦，一共约 2 米高（零件在 models_bosses.js）
+    bone: mk(typeof Bosses !== 'undefined' && Bosses.SHARD ? Bosses.SHARD : [['box', [0.5, 1.45, 0.09], [0, 0.72, 0], 0x8a5a2a, null, null, 'metal'], ['box', [0.46, 0.06, 0.8], [0.08, 1.72, 0.08], 0xa85a3a, [1.05, 0.25, 0.3], null, 'brick']], 40),
     hand: mk([['box', [0.16, 1.0, 0.16], [0, 0.5, 0], 0xd8ccb0, null, null, 'bone'], ['box', [0.34, 0.24, 0.14], [0, 1.1, 0], 0xd8ccb0, null, null, 'bone'],
       ['cone', [0.04, 0.34, 3], [-0.12, 1.36, 0.02], 0xd8ccb0, [0.25, 0, 0.15], null, 'bone'], ['cone', [0.04, 0.38, 3], [-0.04, 1.4, 0.02], 0xd8ccb0, [0.25, 0, 0.05], null, 'bone'],
       ['cone', [0.04, 0.38, 3], [0.04, 1.4, 0.02], 0xd8ccb0, [0.25, 0, -0.05], null, 'bone'], ['cone', [0.04, 0.34, 3], [0.12, 1.36, 0.02], 0xd8ccb0, [0.25, 0, -0.15], null, 'bone'],
@@ -117,11 +117,11 @@ Content.gfxInit = function () {
   // 冲击波光墙：每帧贴着地形重算一圈顶点（先建 4 道，不够用时再加，最多 WAVE_MAX 道）
   Content.wavePool = [];
   for (var i = 0; i < 4; i++) Content.makeWave();
-  // 扫射光束（骷髅老爹）：一道长方条，警告时细而暗，开火时粗而亮（先建 2 道，不够用时再加）
+  // 扫射光束（现在没有首领用）：一道长方条，警告时细而暗，开火时粗而亮（先建 2 道，不够用时再加）
   Content.beamPool = [];
   for (i = 0; i < 2; i++) Content.makeBeam();
 };
-// 池子满了就再建一个（Boss 诅咒叫出两只 Boss、Boss 战里叫来好几只小 Boss 时）；建好的一直留着下一关用
+// 池子满了就再建一个（一次来两只关卡首领、首领战里叫来好几只小 Boss 时）；建好的一直留着下一关用
 Content.WAVE_MAX = 12; Content.BEAM_MAX = 6;
 Content.makeWave = function () {
   if (Content.wavePool.length >= Content.WAVE_MAX) return null;
@@ -391,7 +391,7 @@ Content.updateZones = function (dt) {
   else { Content.slowK = 1; Content.slowName = ''; Content.slowLeft = 0; }
 };
 
-// ---------------- 追踪落点（胡狼法老的烈日）：先跟着玩家走，锁定变红，然后光柱落下 ----------------
+// ---------------- 追踪落点（沙漏王的烈日）：先跟着玩家走，锁定变红，然后光柱落下 ----------------
 Content.mark = function (x, z, track, lock, r, dmg) {
   Content.gfxInit();
   var m = { x: x, z: z, y: W.groundAt(x, z, P.pos.y + 1.5), t: 0, track: track, lock: lock, r: r, dmg: dmg };
@@ -439,7 +439,7 @@ Content.sunPillar = function (x, y, z, r) {
   }, mat);
 };
 
-// ---------------- 合拢的骨手圈（大骨头鲍勃第二阶段）：一圈骨手从地里伸出来往里收，留一个缺口 ----------------
+// ---------------- 合拢的骨手圈（百年沉钟第二阶段）：一圈骨手从地里伸出来往里收，留一个缺口 ----------------
 Content.handRing = function (x, z, r0, r1, n, gap, gapN, delay, dur, dmg) {
   Content.gfxInit();
   var R = { x: x, z: z, y: W.groundAt(x, z, P.pos.y + 1.5), r0: r0, r1: r1, n: n, gap: gap, gapN: gapN, delay: delay, dur: dur, t: 0, dmg: dmg, cd: 0 };
@@ -524,11 +524,8 @@ Content.drawMinimap = function () {
     var x = R - (o.x - px) * k, y = R - (o.z - pz) * k, dx = x - R, dy = y - R, d = Math.sqrt(dx * dx + dy * dy);
     if (d <= RI - 4) { UI.mmIcon(c, x, y, m.color, m.shape, m.size); continue; }
     if (!m.arrow) continue;
-    var ax = R + dx / d * (RI - 9), ay = R + dy / d * (RI - 9);
-    c.save(); c.translate(ax, ay); c.rotate(Math.atan2(dy, dx));
-    c.fillStyle = m.color; c.strokeStyle = '#000'; c.lineWidth = 1.5;
-    c.beginPath(); c.moveTo(6, 0); c.lineTo(-4, -5); c.lineTo(-4, 5); c.closePath(); c.fill(); c.stroke();
-    c.restore();
+    // 细长的三角（UI.mmArrow），尖朝外、离白圈 2 像素
+    UI.mmArrow(c, R + dx / d * (RI - 10), R + dy / d * (RI - 10), Math.atan2(dy, dx), m.arrowColor || m.color);   // arrowColor：箭头另用一种颜色（望远镜）
   }
 };
 
@@ -862,6 +859,8 @@ CB.shield = function (e, dt, nx, nz, d, spd, frozen) {
   return false;
 };
 ENEMIES.lizard.look = function (e, L) { if (e.faceA !== undefined) L.face = e.faceA; };
+// 蜥人督军（小 Boss）也举着盾：朝向由 Content.updateBigs 维持（bossAI 不走 CB.shield）
+ENEMIES.lizardlord.look = ENEMIES.lizard.look;
 Content.blockFx = function (e) {
   if (Content.time - (e.blkT || -9) < 0.12) return;
   e.blkT = Content.time;
@@ -870,7 +869,7 @@ Content.blockFx = function (e) {
   FX.burst(x, y, z, 3, 0xffd27a, 4, 0.14);
   if (Content.time - (Content.blkTextT || -9) > 0.7 && Content.near(e.x, e.z, 30)) { Content.blkTextT = Content.time; FX.text(x, y + 0.6, z, '格挡', '#ffd27a', 0.9); }
   Content.sfx('shieldBlock', x, y, z, e);
-  Content.hint('shield', '盾卫挡住正面：绕到侧面打', '#ffd27a');
+  Content.hint('shield', '盾牌挡住正面：绕到侧面打', '#ffd27a');
 };
 
 // ---------------- 诅咒墓碑：从地里升起来，每 6.5 秒在旁边召唤两只亡灵（地上先亮绿圈）；不打碎会一直召唤 ----------------
@@ -1026,7 +1025,7 @@ Content.lead = function (t, lim, out) {
 };
 Content._ld = [0, 0];
 
-// ---- 树皮老大 ----
+// ---- 千年橡王 ----
 // 盘根错节：玩家脚下 5×5 的棋盘格，两批树根先后冒出来（先亮的那批先冒）
 CA.rootgrid = {
   start: function (e) { e.st = 0.55; e.ak = 0; FX.ring(e.x, e.y, e.z, 5, 0x9a7a3a, 0.5); Content.atk(e, 'rootgrid'); },
@@ -1084,7 +1083,7 @@ CA.leafstorm = {
   }
 };
 
-// ---- 胡狼法老 ----
+// ---- 沙漏王 ----
 // 烈日审判：几个金色光圈追着玩家跑，停下变红，0.55 秒后光柱落下
 CA.sunbeam = {
   start: function (e) { e.st = 0.4; e.ak = 0; Content.atk(e, 'sunbeam'); },
@@ -1138,7 +1137,7 @@ CA.quicksand = {
   }
 };
 
-// ---- 大骨头鲍勃 ----
+// ---- 百年沉钟 ----
 // 骨雨：一大把骨头从天上落下，每根落点先亮红圈
 CA.bonerain = {
   start: function (e) { e.st = 0.5; e.ak = 0; e.at = 0; e.bn = 0; Content.atk(e, 'bonerain'); },
@@ -1188,7 +1187,7 @@ CA.gravehands = {
 };
 
 // ---- 小 Boss ----
-// 石头魔像·投石：抓起三块大石头扔过来
+// 投石（现在没有首领用）：抓起三块大石头扔过来
 CA.boulder = {
   start: function (e) { e.st = 0.7; e.ak = 0; Content.atk(e, 'boulder'); },
   update: function (e, dt, nx, nz) {
@@ -1206,7 +1205,7 @@ CA.boulder = {
     Content.done(e, 2.5, 3.5);
   }
 };
-// 猪头大王·泰山压顶：蹲下，跳起来砸向玩家的位置（落点先亮），落地一圈冲击波
+// 泰山压顶（绿衣巨骑的跃马重击、守墓黑犬的扑咬）：蹲下，跳起来砸向玩家的位置（落点先亮），落地一圈冲击波
 CA.bellyflop = {
   start: function (e) {
     e.st = 0.55; e.ak = 0; var t = Content.lead(0.3, 3, Content._ld); e.tx = t[0]; e.tz = t[1]; e.ty = W.groundAt(e.tx, e.tz, P.pos.y + 1); Content.atk(e, 'bellyflop');
@@ -1234,7 +1233,7 @@ CA.bellyflop = {
     } else if (e.st <= 0) Content.done(e, 2.4, 3.4);
   }
 };
-// 沙魔像·裂地冲击：三条沙刺扇形冲向玩家
+// 裂地冲击（沙漏王、沙虫女王）：三条沙刺扇形冲向玩家
 CA.quakeline = {
   start: function (e) { e.st = 0.6; e.ak = 0; Content.atk(e, 'quakeline'); },
   update: function (e, dt, nx, nz) {
@@ -1252,7 +1251,7 @@ CA.quakeline = {
     Content.done(e, 2.4, 3.4);
   }
 };
-// 毒蝎女王·毒液喷射：五团毒液落地，留下一片片毒水
+// 毒液喷射（毒伞菇王：zone 'spore' 落地变孢子云）：五团毒液落地，留下一片片毒水（def.zone 换地面效果，默认毒水）
 CA.acidrain = {
   start: function (e) { e.st = 0.55; e.ak = 0; Content.atk(e, 'acidrain'); },
   update: function (e) {
@@ -1260,17 +1259,19 @@ CA.acidrain = {
     if (e.st > 0) return;
     if (e.ak === 0) {
       e.ak = 1; e.st = 1.6;
-      var t = Content.lead(0.4, 4, Content._ld);
+      var t = Content.lead(0.4, 4, Content._ld), zk = e.def.zone || 'poison', sp = zk === 'spore';
       for (var i = 0; i < 5; i++) {
         var a = Math.random() * TAU, r = i ? rand(2.5, 6.5) : 0;
-        Content.lob('acid', e.x, e.y + 2.2 * e.scale, e.z, t[0] + Math.cos(a) * r, t[1] + Math.sin(a) * r, 1.0 + i * 0.08, { r: 2.0, dmg: e.dmg, H: 5, boom: 0x8aff4a, trail: 0x7dff4a, glow: Content.C.green, tele: 0xff4a2a, zone: ['poison', 2.4, 4.5, { dps: e.dmg * 0.35 }] });
+        Content.lob('acid', e.x, e.y + 2.2 * e.scale, e.z, t[0] + Math.cos(a) * r, t[1] + Math.sin(a) * r, 1.0 + i * 0.08, { r: 2.0, dmg: e.dmg, H: 5,
+          boom: sp ? 0x5affc0 : 0x8aff4a, trail: sp ? 0x7affd8 : 0x7dff4a, glow: sp ? Content.C.teal : Content.C.green, tele: 0xff4a2a,
+          zone: [zk, 2.4, 4.5, { dps: e.dmg * (sp ? 0.2 : 0.35) }] });
       }
       return;
     }
     Content.done(e, 2.6, 3.6);
   }
 };
-// 幽灵猪王·穿墙突袭：消失，在玩家身后亮起鬼影，然后现身冲过来
+// 幽魂冠军·穿墙突袭：消失，在玩家身后亮起鬼影，然后现身冲过来
 CA.phasedash = {
   start: function (e) { e.st = 0.35; e.ak = 0; Content.atk(e, 'phasedash'); },
   update: function (e, dt) {
@@ -1303,8 +1304,9 @@ CA.phasedash = {
     if (e.st <= 0) Content.done(e, 2.4, 3.4);
   }
 };
-ENEMIES.ghostham.look = function (e, L) { if (e.state === 'phasedash' && e.ak === 1) L.hide = true; };
-// 骷髅老爹·王杖扫射：先亮一道细红线，然后紫色光束横扫 120°（跳起来躲）
+// 瞬移的第一段藏起来；模型自己的 look（披风冒烟，models_bosses.js）接着跑
+var ghostLook0 = ENEMIES.ghostchamp.look; ENEMIES.ghostchamp.look = function (e, L, dt) { if (ghostLook0) ghostLook0(e, L, dt); if (e.state === 'phasedash' && e.ak === 1) L.hide = true; };
+// 扫射光束（现在没有首领用）：先亮一道细红线，然后紫色光束横扫 120°（跳起来躲）
 CA.sweepbeam = {
   start: function (e, nx, nz) {
     e.st = 0.75; e.ak = 0; e.at = 0;
@@ -1402,23 +1404,14 @@ Content.shot = function (x, y, z, vx, vy, vz, dmg) {
   s.push({ x: x, y: y, z: z, vx: vx, vy: vy, vz: vz, dmg: dmg, life: 6 });
 };
 
-// 新招式加进各个 Boss 的招式表（第一阶段就有两招；第三招在第二阶段才出现）
-ENEMIES.ent.attacks = ['spikes', 'orbs', 'slam', 'rootgrid', 'seedbomb'];
-ENEMIES.pharaoh.attacks = ['lasers', 'orbs', 'charge', 'sunbeam', 'sandwall'];
-ENEMIES.bigbob.attacks = ['slam', 'summon', 'orbs', 'lasers', 'bonerain', 'necrowave'];
-ENEMIES.golemboss.attacks = ['slam', 'charge', 'boulder'];
-ENEMIES.chunkham.attacks = ['charge', 'slam', 'bellyflop'];
-ENEMIES.sandgolem.attacks = ['slam', 'volley', 'quakeline'];
-ENEMIES.scorpboss.attacks = ['charge', 'volley', 'acidrain'];
-ENEMIES.ghostham.attacks = ['volley', 'charge', 'phasedash'];
-ENEMIES.skelking.attacks = ['summon', 'slam', 'sweepbeam'];
+// 各首领 / 小 Boss 的招式表在 data_enemies*.js 的行里
 
 // ---------------- 关卡 Boss 第二阶段（血量降到一半）：变色、变大一点、冒火星，招式换一套、出招更快 ----------------
-// 公告是红色的燕尾横幅：小标签「第二阶段」+ title（「Boss + 状态」，8 个字以内）+ sub（只写新招式）
+// 公告是红色的燕尾横幅：小标签「第二阶段」+ title（「Boss + 状态」）+ sub（第二阶段的变化和新招式）
 Content.PHASE2 = {
-  ent: { attacks: ['rootgrid', 'seedbomb', 'leafstorm', 'spikes', 'leafstorm', 'slam'], tint: [1.6, 0.66, 0.42], ember: 0xff8a2a, title: '树皮老大被激怒了', sub: '新招式：落叶旋风' },
-  pharaoh: { attacks: ['sunbeam', 'sandwall', 'quicksand', 'lasers', 'sunbeam', 'orbs'], tint: [1.4, 1.18, 0.6], ember: 0xffd27a, title: '胡狼法老召来了烈日', sub: '新招式：流沙漩涡' },
-  bigbob: { attacks: ['bonerain', 'necrowave', 'gravehands', 'summon', 'lasers', 'necrowave'], tint: [1.12, 0.78, 1.55], ember: 0xc070ff, title: '大骨头鲍勃不笑了', sub: '新招式：墓手合围' }
+  oakking: { attacks: ['rootgrid', 'seedbomb', 'leafstorm', 'summon', 'leafstorm', 'slam'], tint: [1.6, 0.66, 0.42], ember: 0xff8a2a, title: '千年橡王发怒了！', sub: '树冠烧成了秋天的颜色 · 新招式：落叶旋风' },
+  hourglass: { attacks: ['sunbeam', 'sandwall', 'quicksand', 'quakeline', 'sunbeam', 'orbs'], tint: [1.4, 1.18, 0.6], ember: 0xffd27a, title: '沙漏王倒过来了！', sub: '沙子开始倒着流 · 新招式：流沙漩涡 · 沙墙推两排' },
+  sunkenbell: { attacks: ['bonerain', 'necrowave', 'gravehands', 'summon', 'necrowave', 'slam'], tint: [1.1, 0.92, 0.9], ember: 0xc070ff, title: '沉钟自己响了！', sub: '钟声一圈比一圈响 · 新招式：墓手合围' }
 };
 Content.bossPhase2 = function (e) {
   e.phase2 = true;
@@ -1441,6 +1434,12 @@ Content.updateBigs = function (dt) {
     var e = L[i];
     if (!e.alive) { Content.dropBeam(e); L.splice(i, 1); continue; }
     if (e.beam && e.state !== 'sweepbeam') Content.dropBeam(e);
+    // 举盾的小 Boss（蜥人督军）：盾牌慢慢转向玩家，冲锋时朝冲锋方向（Weapons.hit 按 faceA 挡正面的飞弹）
+    if (e.def.shield) {
+      var want = e.state === 'charge' && e.st <= 0 ? Math.atan2(e.dx, e.dz) : Math.atan2(P.pos.x - e.x, P.pos.z - e.z);
+      if (e.faceA === undefined) e.faceA = want;
+      e.faceA += clamp(Content.angDiff(want, e.faceA), -1.6 * dt, 1.6 * dt);
+    }
     if (!e.phase2) continue;
     // 第二阶段：追击时冷却走得快一点，身上一直冒火星
     if (e.state === 'chase') e.st -= dt * 0.3;

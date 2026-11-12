@@ -1,12 +1,12 @@
 'use strict';
 // ============================================================
 //  游戏主循环与状态机
-//  每关倒计时（默认 15:00，可在菜单里选 10 / 15 / 20 分钟）→ 找到 Boss 传送门并召唤 Boss
-//  → 打死后出现传送门进入下一关；倒计时归零进入最终虫潮
+//  每关倒计时（默认 15:00，可在菜单里选 10 / 15 / 20 分钟）→ 找到烽火台、点燃它引出首领
+//  → 打死后出现传送门进入下一关；倒计时归零敲响午夜钟声（加时）
 // ============================================================
 var Game = {
-  state: 'menu', time: 0, totalTime: 0, realTime: 0, stage: 1, stageDef: null, charId: 'fox',
-  levelQueue: 0, modalQueue: [], timers: [], shakeAmt: 0, bossAlive: false, enemySpeedMult: 1, challenges: [], bossCurses: 0
+  state: 'menu', time: 0, totalTime: 0, realTime: 0, stage: 1, stageDef: null, charId: 'squire',
+  levelQueue: 0, modalQueue: [], timers: [], shakeAmt: 0, bossAlive: false, enemySpeedMult: 1, challenges: []
 };
 
 Game.init = function () {
@@ -59,8 +59,9 @@ Game.resize = function () {
   Game.camera.updateProjectionMatrix();
 };
 
-// 按关卡配色设置天空、雾和灯光；tint/amt：最终虫潮时整体往红色偏
-Game.applyAtmosphere = function (pal, tint, amt) {
+// 按关卡配色设置天空、雾和灯光；tint/amt：午夜钟声时整体往深靛蓝偏（Director.MIDNIGHT_SKY）；light：灯光亮度倍数（不写 = 1）
+Game.applyAtmosphere = function (pal, tint, amt, light) {
+  var lk = light != null ? light : 1;
   var tc = tint != null ? new THREE.Color(tint) : null;
   var col = function (hex, k) { var c = new THREE.Color(hex); if (tc) c.lerp(tc, amt * (k == null ? 1 : k)); return c; };
   Game.renderer.setClearColor(col(pal.fog));
@@ -70,9 +71,9 @@ Game.applyAtmosphere = function (pal, tint, amt) {
   // 灯光只染一半，角色和怪物仍然看得清
   Game.hemi.color.copy(col(pal.skyLight, 0.5));
   Game.hemi.groundColor.copy(col(pal.groundLight, 0.5));
-  Game.hemi.intensity = pal.hemiInt != null ? pal.hemiInt : 1;
+  Game.hemi.intensity = (pal.hemiInt != null ? pal.hemiInt : 1) * lk;
   Game.sun.color.copy(col(pal.sun != null ? pal.sun : 0xffffff, 0.5));
-  Game.sun.intensity = pal.sunInt != null ? pal.sunInt : 0.8;
+  Game.sun.intensity = (pal.sunInt != null ? pal.sunInt : 0.8) * lk;
   var d = pal.sunDir || [0.6, 1, 0.35];
   Game.sun.position.set(d[0], d[1], d[2]);
 };
@@ -89,7 +90,6 @@ Game.start = function (charId) {
   Game.levelQueue = 0;
   Game.modalQueue = [];
   Interact.chestsOpened = 0;
-  Enemies.firstElite = true;
   LevelUp.reset();
   Game.buildStage(false);
   P.reset(charId);
@@ -98,7 +98,7 @@ Game.start = function (charId) {
   UI.show('hud', true);
   UI.closeModal();
   Game.state = 'play';
-  UI.toast('第 1 关 · ' + Game.stageDef.name + '：找到 Boss 传送门！', Kit.color('gold'));
+  UI.toast('第 1 关 · ' + Game.stageDef.name + '：找到烽火台！', Kit.color('gold'));
 };
 
 Game.buildStage = function (menuOnly) {
@@ -108,13 +108,13 @@ Game.buildStage = function (menuOnly) {
   Weapons.clear();
   Pickups.clear();
   Interact.clear();
+  if (typeof Passive !== 'undefined' && Passive.clear) Passive.clear();   // 被动的模型藏起来、列表清空（换关、回菜单）
   FX.clear();
   Shadows.clear();
   Game.timers = [];
   Game.challenges = [];
   Game.time = 0;
   Game.bossAlive = false;
-  Game.bossCurses = 0;
   Game.enemySpeedMult = 1;
   Director.reset();
   var pal = sd.palette;
@@ -168,26 +168,39 @@ Game.toMenu = function () {
   if (ICONS.prewarm) ICONS.prewarm(800);
 };
 
-// ---------------- Boss / 挑战 ----------------
-// 越晚召唤，Boss 血量越高（跟着关卡进度的敌人血量曲线走，曲线已含关卡时长缩放）
+// ---------------- 首领 ----------------
+// 越晚点燃烽火台，首领血量越高（跟着关卡进度的敌人血量曲线走，曲线已含关卡时长缩放）
 Game.bossHpMult = function () { return (Game.stageDef.bossHp || 0.4) * Director.hpMult(); };
 
+// 首领落点不能在钟楼和倒下的塔顶那一片（沉钟古城：烽火台离钟楼 9~14 米，东边 8 米可能正好是塔和塔顶之间的夹缝，
+// 首领卡在废墟里，出场镜头从哪儿都拍不到），也不落在箱子、墙头上
+Game.bossSpotBad = function (x, z) {
+  var bt = W.bellTower;
+  if (bt) {
+    var dx = x - bt.x, dz = z - bt.z;
+    if (Math.abs(dx) < 6 && Math.abs(dz) < 6) return true;
+    if (bt.g != null) { var al = dx * bt.sx + dz * bt.sz, ac = Math.abs(dx * bt.sz - dz * bt.sx); if (al > 0 && al < 13.5 && ac < 5) return true; }
+  }
+  return W.groundAt(x, z, 999) - W.terrainH(x, z) > 0.5;
+};
 Game.summonBoss = function (portal) {
   if (Game.bossAlive) return;
   Game.bossAlive = true;
-  var sd = Game.stageDef;
-  var a = portal || Interact.portal;
-  var n = 1 + Game.bossCurses;
-  Game.bossesLeft = n;
-  for (var i = 0; i < n; i++) {
-    var ang = i / n * TAU;
-    var b = Enemies.spawn(sd.boss, a.x + Math.cos(ang) * 8, a.z + Math.sin(ang) * 8, { hpMult: Game.bossHpMult(), dmgMult: Director.dmgMult(), drop: true });
-    b.state = 'intro'; b.st = 1.5;
-  }
+  var sd = Game.stageDef, a = portal || Interact.portal;
+  Game.bossesLeft = 1;
+  var bx = a.x + 8, bz = a.z;
+  for (var k = 1; k < 8 && Game.bossSpotBad(bx, bz); k++) { bx = a.x + Math.cos(k * Math.PI / 4) * 8; bz = a.z + Math.sin(k * Math.PI / 4) * 8; }
+  if (Game.bossSpotBad(bx, bz)) { bx = a.x + 8; bz = a.z; }
+  var b = Enemies.spawn(sd.boss, bx, bz, { hpMult: Game.bossHpMult(), dmgMult: Director.dmgMult(), drop: true });
+  b.state = 'intro'; b.st = 1.5;
   Game.bossX = a.x; Game.bossZ = a.z;
-  UI.toast(ENEMIES[sd.boss].name + ' 降临！', Kit.color('red'));
+  // 有出场过场时（Feel 设了 muteRe）不出提示：过场的横幅写着首领名，下面一行就是「被烽火引来了！」（feel.js Feel.bossLand）
+  if (!(typeof Feel !== 'undefined' && Feel.muteRe)) UI.toast(ENEMIES[sd.boss].name + ' 被烽火引来了！', Kit.color('red'));
   Game.shake(0.8);
-  Interact.consume(a);
+  // 点燃烽火台（塔身留着，光柱换成火焰）
+  if (Interact.lightBeacon) Interact.lightBeacon(a); else Interact.consume(a);
+  // 拔过决斗旗：首领身边多一位护卫冠军
+  if (typeof Guild !== 'undefined' && Guild.duelArmed) Guild.spawnChampion(a);
   // Boss 战期间定时刷小魔像
   Game.bossAdds = 45;
 };
@@ -202,16 +215,6 @@ Game.onBossKilled = function (e) {
   Game.bossAlive = false;
   Enemies.boss = null;
   Interact.openExit(Game.bossX, Game.bossZ);
-};
-
-Game.startChallenge = function (o) {
-  var n = 3 + Game.stage, list = [];
-  for (var i = 0; i < n; i++) {
-    var a = i / n * TAU;
-    list.push(Enemies.spawn(pick(Director.currentPool().types), o.x + Math.cos(a) * 9, o.z + Math.sin(a) * 9, { elite: true, hpMult: Director.hpMult() * 0.8, dmgMult: Director.dmgMult() * 1.3, drop: true }));
-  }
-  Game.challenges.push({ x: o.x, z: o.z, list: list });
-  UI.toast('挑战开始！击败所有精英', Kit.color('org'));
 };
 
 // ---------------- 弹窗队列 ----------------
@@ -242,7 +245,7 @@ Game.onKey = function (e) {
   }
   if (Game.state === 'play' && e.code === 'KeyE') Interact.use();
   if (Game.state === 'modal' && !$('levelModal').classList.contains('hidden')) {
-    if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') UI.pickOption(parseInt(e.code.slice(5), 10) - 1);
+    if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3' || e.code === 'Digit4') UI.pickOption(parseInt(e.code.slice(5), 10) - 1);
     if (UI.mode === 'level') {
       if (e.code === 'KeyR') UI.action('reroll');
       if (e.code === 'KeyX') UI.action('skip');
@@ -310,8 +313,9 @@ Game.render = function (dt) {
 Game.stageEvents = function (dt) {
   if (!Director.swarm && Director.remaining() <= 0) {
     Director.startSwarm();
-    // 天空、远山、雾都变红
-    Game.applyAtmosphere(Game.stageDef.palette, 0x5a0a0a, 0.35);
+    // 天空、远山、雾都往深靛蓝偏（每关的深浅不同；白天的两关灯光也暗下来）
+    var mi = clamp(Game.stage - 1, 0, Director.MIDNIGHT_AMT.length - 1);
+    Game.applyAtmosphere(Game.stageDef.palette, Director.MIDNIGHT_SKY, Director.MIDNIGHT_AMT[mi], Director.MIDNIGHT_LIGHT[mi]);
   }
   if (Game.bossAlive) {
     Game.bossAdds -= dt;

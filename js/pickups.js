@@ -184,7 +184,7 @@ Pickups.gold = function (x, y, z, v) {
   Pickups.coins.push({ x: x, y: y, z: z, vy: rand(4, 7), vx: rand(-2.5, 2.5), vz: rand(-2.5, 2.5), v: v, pull: false, t: Math.random() * 10 });
 };
 
-// 地上同一种掉落已经有 Pickups.DROP_CAP 个没捡时不再掉新的（无尽虫潮里不去捡的话，爱心会无限增加，每个都是一个网格）
+// 地上同一种掉落已经有 Pickups.DROP_CAP 个没捡时不再掉新的（午夜钟声里不去捡的话，爱心会无限增加，每个都是一个网格）
 Pickups.DROP_CAP = 24;
 Pickups.drop = function (kind, x, y, z) {
   for (var i = 0, same = 0; i < Pickups.drops.length; i++) if (Pickups.drops[i].kind === kind && ++same >= Pickups.DROP_CAP) return;
@@ -234,6 +234,7 @@ Pickups.update = function (dt) {
     g.t += dt;
     if (Pickups.moveOne(g, dt, r2)) {
       P.gainXp(g.v);
+      Relic.onPickup('xp', g.v);   // 第 6 块：每颗水晶（渡鸦羽毛）
       FX.popup('xp', g.v * xg);
       gems[i] = gems[gems.length - 1]; gems.pop();
     }
@@ -308,7 +309,7 @@ Pickups.update = function (dt) {
 
 Pickups.randomPowerup = function () { return pick(['heal', 'heal', 'magnet', 'bomb', 'clock', 'rage']); };
 
-// 吸取一定范围内的经验（吸吸磁铁）
+// 把一定范围内的经验和金币吸过来
 Pickups.magnetNear = function (r) {
   var r2 = r * r;
   Pickups.gems.forEach(function (g) { if (dist2(g.x, g.z, P.pos.x, P.pos.z) < r2) g.pull = true; });
@@ -319,7 +320,7 @@ Pickups.collect = function (kind) {
   FX.flash(P.pos.x, P.pos.y + 1, P.pos.z, 3, Pickups.DROP_GLOW[kind] || 0xffffff, 0.3, 0);
   if (kind === 'clock') { Enemies.list.forEach(function (e) { if (!e.boss) e.frozen = Math.max(e.frozen, 5); }); UI.toast('时间暂停！', Kit.color('gold')); return; }
   if (kind === 'rage') { P.rage = 8; UI.toast('狂暴！伤害翻倍', Kit.color('gold')); return; }
-  if (kind === 'heal') P.heal(P.st.maxHp * 0.3);
+  if (kind === 'heal') { P.heal(P.st.maxHp * 0.3 * Relic.healPickupMult()); Relic.onPickup('heal', 0); }   // 第 6 块：硬面包
   else if (kind === 'magnet') { Pickups.magnetAll(); UI.toast('磁铁！吸取所有经验', Kit.color('cya')); }
   else if (kind === 'bomb') { Enemies.nova(P.pos.x, P.pos.z, 30, 0, 60); Enemies.inRadius(P.pos.x, P.pos.z, 30, function (e) { if (!e.boss) Enemies.damage(e, e.hp + 1, true, 0, 0); }); Game.shake(0.8); UI.toast('炸弹！', Kit.color('gold')); }
 };

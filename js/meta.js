@@ -1,28 +1,34 @@
 'use strict';
 // ============================================================
 //  局外成长（数据表在 data_meta.js）：存档、魔晶、骑士和内容解锁、成就、强化、难度、记录
-//  · 存档：localStorage 'knight_magic_profile'（每次读写都 try/catch；坏了、不能用就用内存里的存档）
-//  · 只包装别的文件的函数，不改它们：Game.start/win/onDeath/toMenu、P.reset、LevelUp.reset/options/shrineOptions、
+//  · 存档：localStorage 'knight_magic_profile_v2'（每次读写都 try/catch；坏了、不能用就用内存里的存档）；
+//    没有 v2 时读一次 v1 的 'knight_magic_profile'，换成新 id（Meta.fromV1）写进 v2；v1 的键从来不改（留给离线打开的旧版本）
+//  · 这一页的数据表和这个 meta.js 不配套（离线缓存在网络出错时给了旧的 data.js / data_meta.js，或者 data.js 没加载）：
+//    这一页冻结（Meta.frozen），存档、设置、存档点什么都不写，下次正常打开再迁移（第 13 块 M1：Meta.tablesOk、Meta.freeze）
+//  · 只包装别的文件的函数，不改它们：Game.start/win/onDeath/toMenu、P.reset、LevelUp.reset/options/blessOptions、
 //    Items.roll/rollOfRarity、Director.hpMult/dmgMult/curve/update、Enemies.kill、Interact.use/breakPot、
-//    UI.buildMenu/showEnd/action/shrineChoice、Evo.evolve、MX.wish/launch/captureBanner/explodeKeg
+//    UI.buildMenu/showEnd/action、Guild.oathDone、Evo.evolve、MX.wish/launch/captureBanner/explodeKeg
 //  · 直接调用（Game.start 任何骑士、Weapons.give、Items.give……）从不拦：锁只影响随机池和菜单
 //  · 难度 I 就是原来的手感；游戏逻辑只在 Game.update 里跑（每帧的统计挂在 Director.update 后面）
 // ============================================================
 var Meta = {
-  KEY: 'knight_magic_profile', SETTINGS_KEY: 'knight_magic_settings',
+  KEY: 'knight_magic_profile_v2', KEY_V1: 'knight_magic_profile', SETTINGS_KEY: 'knight_magic_settings',
+  DATA_VERSION: 2,      // 这个 meta.js 配套的 META_DATA.VERSION（data_meta.js）：升版本时两边一起改，不然每一页都冻结（Meta.tablesOk）
   p: null,              // 存档
   run: null,            // 当前这一局的统计（结算后 settled = true，结算结果在 run.result）
   activeTier: 1,        // 这一局的难度（开局时定下）
   ver: 1,               // 解锁状态的版本号（变了就重算随机池的缓存）
   storageOk: true,      // 能不能存进 localStorage
+  frozen: true,         // 这一页什么都不写；Meta.load 查过数据表配套（Meta.tablesOk）才改成 false
   returning: false,     // 更新前就玩过（有设置存档）
   uiReady: false, layer: null, confirmEl: null, sink: null, lateAch: [], toastQ: [], toastBusy: false, restored: null
 };
 
 // ---------------- 存取（全部 try/catch：隐私模式、禁用存储、存满了都不报错） ----------------
+// 冻结的一页（Meta.frozen）不写也不删：这里兜底，写存档的几个函数自己也先看 Meta.frozen
 Meta.read = function (k) { try { return window.localStorage ? window.localStorage.getItem(k) : null; } catch (e) { return null; } };
-Meta.write = function (k, v) { try { window.localStorage.setItem(k, v); return true; } catch (e) { return false; } };
-Meta.drop = function (k) { try { window.localStorage.removeItem(k); } catch (e) { /* 忽略 */ } };
+Meta.write = function (k, v) { if (Meta.frozen) return false; try { window.localStorage.setItem(k, v); return true; } catch (e) { return false; } };
+Meta.drop = function (k) { if (Meta.frozen) return; try { window.localStorage.removeItem(k); } catch (e) { /* 忽略 */ } };
 Meta.err = function (e) { try { console.error('[meta]', e && e.stack ? e.stack : e); } catch (e2) { /* 忽略 */ } };
 // 给别的文件（音效、打击感）用的事件：window 上的 'knightmeta:achievement' / 'knightmeta:settle' / 'knightmeta:unlock'，detail 里是数据
 Meta.emit = function (name, detail) {
@@ -30,7 +36,7 @@ Meta.emit = function (name, detail) {
 };
 
 // 局内计数（结算时加进生涯总数）和局内最大值（结算时更新生涯最佳）
-Meta.SUMS = ['runs', 'kills', 'elites', 'minis', 'bosses', 'chests', 'shrines', 'pots', 'evos', 'wishes', 'kegs', 'launches', 'succ',
+Meta.SUMS = ['runs', 'kills', 'elites', 'minis', 'bosses', 'chests', 'oaths', 'pots', 'evos', 'wishes', 'kegs', 'launches', 'boulders',
   'interacts', 'lowHpKills', 'frozenKills', 'dotKills', 'goblins', 'ride', 'heal', 'hurt', 'playTime',
   // 新内容（content.js / content_map.js 的回调里数）：秘密地点、抓住金袋哥布林、打倒宝箱怪、熬过血月、一次点亮宝库、跳台 + 滑坡
   'secrets', 'goldgobs', 'mimics', 'bloodmoons', 'vaultClean', 'padRides'];
@@ -42,12 +48,12 @@ Meta.P2N = typeof STAGES !== 'undefined' && STAGES.length ? STAGES.length : 3;
 Meta.SUMSET = {}; Meta.SUMS.forEach(function (k) { Meta.SUMSET[k] = true; });
 Meta.MAXSET = {}; Meta.MAXES.forEach(function (k) { Meta.MAXSET[k] = true; });
 Meta.GOBLINS = {};
-(META_DATA.GOBLINS || ['goblin', 'goblin2', 'goblintank']).forEach(function (id) { Meta.GOBLINS[id] = true; });
+(META_DATA.GOBLINS || ['goblin', 'gobspear', 'drummer', 'goldgob']).forEach(function (id) { Meta.GOBLINS[id] = true; });
 
 Meta.blank = function () {
   return {
-    v: META_DATA.VERSION, mc: 0, mcTotal: 0, tier: 1, casual: false, notice: 0, gift: 0,
-    unlocked: { knight: {}, weapon: {}, tome: {}, item: {}, shrine: {} },
+    v: META_DATA.VERSION, mc: 0, mcTotal: 0, tier: 1, casual: false, notice: 0, gift: 0, changes: 0, note: '',
+    unlocked: { knight: {}, weapon: {}, tome: {}, item: {} },
     ach: {}, up: {}, life: {}, best: {}, wins: [0, 0, 0, 0], chars: {}, wk: {}, bought: {}, refund: {}, pending: null
   };
 };
@@ -69,6 +75,8 @@ Meta.flags = function (src) {
 // 读进来的存档逐项检查，类型不对的用默认值；不认识的字段原样留着（新版本的存档在旧版本里打开也不会丢）
 Meta.sanitize = function (o) {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  // v1 的存档先换成新 id（必须在下面按 CHARACTERS 过滤 chars / pending 之前，不然旧骑士的记录会被丢掉）
+  if (!(Meta.num(o.v, 0) >= 2)) o = Meta.fromV1(o);
   var p = Meta.blank(), k;
   for (k in o) if (!(k in p) && k !== '__proto__' && k !== 'constructor' && k !== 'prototype') p[k] = o[k];
   p.v = Meta.num(o.v, 0);
@@ -78,6 +86,8 @@ Meta.sanitize = function (o) {
   p.casual = o.casual === true;
   p.notice = o.notice ? 1 : 0;
   p.gift = o.gift ? 1 : 0;
+  p.changes = o.changes ? 1 : 0;
+  p.note = typeof o.note === 'string' ? o.note.slice(0, 60) : '';
   if (o.unlocked && typeof o.unlocked === 'object') for (k in p.unlocked) p.unlocked[k] = Meta.flags(o.unlocked[k]);
   p.ach = Meta.nums(o.ach); p.up = Meta.nums(o.up); p.life = Meta.nums(o.life); p.best = Meta.nums(o.best); p.wk = Meta.nums(o.wk);
   p.bought = Meta.flags(o.bought);
@@ -88,7 +98,7 @@ Meta.sanitize = function (o) {
   return Meta.migrate(p);
 };
 
-// 存档版本迁移：v1 是第一个版本；以后改了存档结构就在这里一步步升级
+// 存档版本迁移：v1 → v2 的换键在 Meta.fromV1（sanitize 最开头）；这里只写版本号，以后改了存档结构就在这里一步步升级
 Meta.migrate = function (p) {
   if (!(p.v >= 1)) p.v = 1;
   if (p.v < META_DATA.VERSION) p.v = META_DATA.VERSION;
@@ -108,19 +118,198 @@ Meta.cleanRun = function (o) {
   return r;
 };
 
+// ---------------- v1 → v2：旧 id 换成新 id（原创计划 §17；表来自 migration.json） ----------------
+// banned-words: allow-begin 存档迁移表（旧 id → 新 id）
+Meta.V1 = {
+  knight: {
+    oofie: 'squire', fox: 'bellringer', calcium: 'gravekeeper', chad: 'cook', robin: 'courier', monke: 'jester',
+    clank: 'tinsoldier', tony: 'astrologer', birdo: 'falconer', spaceman: 'nun', amog: 'smith', ogre: 'bear',
+    athena: 'bannerman', bandit: 'gardener', bush: 'painter', dicehead: 'magician', vlad: 'beekeeper', roberto: 'catknight',
+    noelle: 'fisher', ninja: 'lampknight', chadwell: 'engineer'
+  },
+  weapon: {
+    sword: 'knightsword', aegis: 'lance', poison: 'forgehammer', tornado: 'falcon', sniper: 'paintbucket', scythe: 'claws',
+    bloodmagic: 'beehive', dagger: 'astrolabe', dice: 'trickknives', bow: 'pigeons', corrupted: 'trebuchet', blackhole: 'hymn',
+    revolver: 'toyguard', axe: 'roar', katana: 'lanternbeam', bone: 'gravecandle', dexe: 'thornvine', aura: 'fryingpan',
+    frost: 'rod', firestaff: 'bronzebell', banana: 'juggle', chunkers: 'kite', herosword: 'javelin', shotgun: 'chessknight',
+    noodle: 'beartrap', lightning: 'thunderdrum', mines: 'firecracker', flamewalker: 'icicle', dragon: 'slingshot', rocket: 'skyrocket'
+  },
+  tome: {
+    xp: 'owl', golden: 'goldkey', chaos: 'wheel'
+  },
+  item: {
+    borgar: 'hardtack', greencard: 'lockpick', redcard: 'honeyjar', magnet: 'caltrops', plug: 'talisman', bigbonk: 'wardrum',
+    glasses: 'duelglove', dragonfire: 'twinbelt', lamp: 'forgeplan', snek: 'ravenfeather', zawarudo: 'holygrail'
+  },
+  achievement: {
+    k_clank: 'k_tinsoldier', k_tony: 'k_astrologer', k_birdo: 'k_falconer', k_spaceman: 'k_nun', k_amog: 'k_smith', k_ogre: 'k_bear',
+    k_athena: 'k_bannerman', k_bandit: 'k_gardener', k_bush: 'k_painter', k_dicehead: 'k_magician', k_vlad: 'k_beekeeper', k_roberto: 'k_catknight',
+    k_noelle: 'k_fisher', k_ninja: 'k_lampknight', k_chadwell: 'k_engineer', c_shrines: 'c_oaths', c_succ: 'c_boulder', c_tomes: 'c_crests',
+    c_swarm: 'c_midnight'
+  },
+  metric: {
+    shrines: 'oaths', succ: 'boulders'
+  },
+  // unlocked.shrine 的祝福 → 同一个成就的新奖励（unlocked.item）
+  shrine: { quantity: 'ruler' }
+};
+// banned-words: allow-end
+
+// o 是读进来的 v1 存档（JSON.parse 的结果）；返回一个新对象，不改 o。
+// 一对一换键：骑士、成就、武器、纹章、宝物换成新 id，两个旧统计换名（Meta.V1.metric）；表里没有、游戏里也没有的 id 直接丢掉（不报错）。
+// 新 id 不会是旧表的键（migrate-check 的 v2.mixed 查），所以已经是新 id 的再换一遍也不变：sanitize 对 v < 2 的存档调用，
+// Meta.load 对 v1 键里读出来的不管 v 是几都调用（第 13 块 M1）
+Meta.fromV1 = function (o) {
+  var V = Meta.V1, k;
+  var own = function (m, x) { return !!m && Object.prototype.hasOwnProperty.call(m, x); };
+  var isObj = function (v) { return !!v && typeof v === 'object' && !Array.isArray(v); };
+  var inTable = function (t) { return function (id) { return typeof t !== 'undefined' && own(t, id); }; };
+  var achIds = {};
+  (META_DATA.ACHIEVEMENTS || []).forEach(function (a) { achIds[a.id] = true; });
+  var okKnight = inTable(typeof CHARACTERS !== 'undefined' ? CHARACTERS : undefined);
+  var okWeapon = inTable(typeof WEAPONS !== 'undefined' ? WEAPONS : undefined);
+  var okTome = inTable(typeof TOMES !== 'undefined' ? TOMES : undefined);
+  var okItem = inTable(typeof ITEMS !== 'undefined' ? ITEMS : undefined);
+  var okAch = inTable(achIds);
+  var any = function () { return true; };
+  // 换键：表里有就换，换完（或者本来就是）游戏里有的才留下
+  var rekey = function (map, src, ok) {
+    if (!isObj(src)) return src;
+    var out = {};
+    for (var x in src) {
+      if (!own(src, x)) continue;
+      var n = own(map, x) ? map[x] : x;
+      if (typeof n === 'string' && n !== '__proto__' && ok(n)) out[n] = src[x];
+    }
+    return out;
+  };
+  var r = {};
+  for (k in o) if (own(o, k)) r[k] = o[k];
+  var u = isObj(o.unlocked) ? o.unlocked : null;
+  if (u) {
+    var item = rekey(V.item, u.item, okItem);
+    if (isObj(u.shrine)) {
+      if (!isObj(item)) item = {};
+      for (k in V.shrine) if (own(u.shrine, k) && u.shrine[k] && okItem(V.shrine[k])) item[V.shrine[k]] = 1;
+    }
+    r.unlocked = { knight: rekey(V.knight, u.knight, okKnight), weapon: rekey(V.weapon, u.weapon, okWeapon), tome: rekey(V.tome, u.tome, okTome), item: item };
+  }
+  r.bought = rekey(V.knight, o.bought, okKnight);
+  r.chars = rekey(V.knight, o.chars, okKnight);
+  r.ach = rekey(V.achievement, o.ach, okAch);
+  r.refund = rekey(V.achievement, o.refund, okAch);
+  r.wk = rekey(V.weapon, o.wk, okWeapon);
+  r.life = rekey(V.metric, o.life, any);
+  r.best = rekey(V.metric, o.best, any);
+  if (isObj(o.pending)) {
+    var pd = o.pending, ch = own(V.knight, pd.char) ? V.knight[pd.char] : pd.char, np = null;
+    if (typeof ch === 'string' && okKnight(ch)) {
+      np = {};
+      for (k in pd) if (own(pd, k)) np[k] = pd[k];
+      np.char = ch;
+      np.wk = rekey(V.weapon, pd.wk, okWeapon);
+      np.c = rekey(V.metric, pd.c, any);
+      np.x = rekey(V.metric, pd.x, any);
+    }
+    r.pending = np;
+  }
+  r.v = 2;
+  r.changes = 1;   // 下次进菜单弹一次「这次更新改了什么」（第 12 块的页面），看完清零
+  return r;
+};
+
+// ---------------- 第 13 块 M1：这一页的数据表是不是配套的 ----------------
+// 离线缓存（sw.js）给从网络打开的页面拿文件时，单个文件网络出错、超时就用缓存里旧版本的那一份；data.js 也可能根本没加载成功。
+// 这个 meta.js 配上旧的表，迁移会把表里找不到的新 id 全丢掉（解锁的骑士、买过的骑士、武器 / 纹章 / 宝物、骑士记录），
+// 而且马上写进 v2，以后再也不读 v1。所以先查：META_DATA.VERSION 是这个 meta.js 认识的版本，四张表都在，
+// Meta.V1 换过去的每个新 id 都是对应的表自己的键（Meta.V1.shrine 换成的宝物也算），每个新成就 id 都在 META_DATA.ACHIEVEMENTS 里。
+// 旧版本的表里一个新 id 都没有，版本号也是 1。出错就当不配套
+Meta.tablesOk = function () {
+  try {
+    if (typeof META_DATA === 'undefined' || !META_DATA || META_DATA.VERSION !== Meta.DATA_VERSION) return false;
+    var V = Meta.V1, ach = {}, k, x;
+    var own = function (m, id) { return !!m && typeof m === 'object' && Object.prototype.hasOwnProperty.call(m, id); };
+    var T = {
+      knight: typeof CHARACTERS !== 'undefined' ? CHARACTERS : null, weapon: typeof WEAPONS !== 'undefined' ? WEAPONS : null,
+      tome: typeof TOMES !== 'undefined' ? TOMES : null, item: typeof ITEMS !== 'undefined' ? ITEMS : null
+    };
+    for (k in T) {
+      if (!T[k] || typeof T[k] !== 'object') return false;
+      for (x in V[k]) if (!own(T[k], V[k][x])) return false;
+    }
+    for (x in V.shrine) if (!own(T.item, V.shrine[x])) return false;
+    (META_DATA.ACHIEVEMENTS || []).forEach(function (a) { if (a && typeof a.id === 'string') ach[a.id] = 1; });
+    for (x in V.achievement) if (!ach[V.achievement[x]]) return false;
+    return true;
+  } catch (e) { return false; }
+};
+
+// 冻结的一页：内存里放一份空存档，什么都不读、不写，下次正常打开时存档原样都在（v1 还没迁移就再迁移）。
+// · 为什么是空存档：这一页的表是旧的（或者没有），按它读出来的存档就是 M1 丢掉了新 id 的那一份，显示出来也不对；
+//   空存档里没有任何 id，跟哪一版的表都不冲突，0 魔晶也买不了东西（不会有买了、下次打开又没了的事）。
+//   Meta.storageOk = false：「记录」页照常提示「这个浏览器现在不让游戏保存进度……」，和隐私模式一样（存不进去的情况每条存档路径都能处理）。
+//   notice、gift 记成看过：老玩家的说明卡和礼包不弹（送了也存不下来）；changes 是 0：「这次更新改了什么」留给下次正常打开
+// · pending 是空的：没结算的那一局还在存档里，下次正常打开再结算（或者留给「继续上一局」）
+// · 同一页里也可能有旧版本的 resume_boot.js / resume.js、ui.js / pace.js / movement_ui.js，它们不知道 Meta.frozen：
+//   存档点（Resume.write / Resume.drop）和设置（UI.saveSettings）都是用的时候才查这几个函数，在这里换成什么都不做
+Meta.freeze = function () {
+  var p = Meta.blank();
+  p.notice = 1; p.gift = 1;
+  Meta.p = p;
+  Meta.storageOk = false;
+  Meta.ver++;
+  if (typeof Resume !== 'undefined' && Resume) { Resume.write = function () { return false; }; Resume.drop = function () {}; }
+  if (typeof UI !== 'undefined' && UI) UI.saveSettings = function () {};
+};
+
+// 先查数据表（不配套就冻结，什么都不读、不写）。再读 v2；没有（或者坏了）再读一次 v1，换成新 id 以后马上存进 v2。
+// v1 的键和它的 _bad 备份都不写（v1 的键原样留着，本身就是备份；离线打开的旧版本读到的永远是它认识的存档）
 Meta.load = function () {
-  var raw = Meta.read(Meta.KEY), p = null;
+  Meta.frozen = !Meta.tablesOk();
+  if (Meta.frozen) { Meta.freeze(); return; }
+  var raw = Meta.read(Meta.KEY), p = null, migrated = false;
   if (raw) {
     try { p = Meta.sanitize(JSON.parse(raw)); } catch (e) { p = null; }
-    if (!p) Meta.write(Meta.KEY + '_bad', raw);   // 坏掉的存档备份一份，再从头开始
+    if (!p) Meta.write(Meta.KEY + '_bad', raw);   // 坏掉的存档备份一份，再看看有没有 v1
+  }
+  if (!p) {
+    var raw1 = Meta.read(Meta.KEY_V1), o1;
+    if (raw1) {
+      // v1 的键只有旧版本写。旧的 meta.js 配上新的 data_meta.js（离线缓存给了一半旧文件）会把 v: 2 和旧 id 一起写进来，
+      // 所以不管里面的 v 是几都先按 v1 换一遍 id（第 13 块 M1）。已经是新 id 的不变；真的 v1 存档和原来一样（sanitize 看到 v = 2 不再换）
+      try {
+        o1 = JSON.parse(raw1);
+        p = Meta.sanitize(o1 && typeof o1 === 'object' && !Array.isArray(o1) ? Meta.fromV1(o1) : o1);
+      } catch (e) { p = null; }
+      migrated = !!p;
+    }
   }
   Meta.p = p || Meta.blank();
   Meta.storageOk = Meta.write(Meta.KEY + '_test', '1');
   Meta.drop(Meta.KEY + '_test');
   Meta.ver++;
+  if (migrated) Meta.save();
+};
+
+// 设置里记的骑士（knight_magic_settings.char）：旧 id 换成新 id；换不了或者还锁着就用见习骑士。
+// 在 Meta.load 之后（知道解锁了谁）、UI.loadSettings 之前（页面加载完才读设置）调用；只改 char，其他字段和顺序不动，没要改的就不写。
+// 冻结的一页不改（按旧表会把认识的骑士当成不认识的，换成见习骑士）
+Meta.migrateSettings = function () {
+  if (Meta.frozen) return false;
+  var raw = Meta.read(Meta.SETTINGS_KEY), s = null;
+  if (!raw) return false;
+  try { s = JSON.parse(raw); } catch (e) { return false; }
+  if (!s || typeof s !== 'object' || Array.isArray(s) || s.char == null) return false;
+  var own = function (m, x) { return !!m && Object.prototype.hasOwnProperty.call(m, x); };
+  if (typeof CHARACTERS === 'undefined' || (typeof s.char === 'string' && own(CHARACTERS, s.char))) return false;
+  var n = typeof s.char === 'string' && own(Meta.V1.knight, s.char) ? Meta.V1.knight[s.char] : null;
+  if (!n || !own(CHARACTERS, n) || !Meta.isUnlocked('knight', n)) n = 'squire';
+  s.char = n;
+  return Meta.write(Meta.SETTINGS_KEY, JSON.stringify(s));
 };
 
 Meta.save = function () {
+  if (Meta.frozen) return false;   // 冻结的一页不存（Meta.storageOk 一直是 false）
   var s;
   try { s = JSON.stringify(Meta.p); } catch (e) { return false; }
   Meta.storageOk = Meta.write(Meta.KEY, s);
@@ -174,7 +363,7 @@ Meta.lockedIds = function (kind) {
   return l;
 };
 
-// 宝箱 / 商人 / 摩艾的物品池：去掉还锁着的；某个稀有度被锁空了就用完整的（池子永远不会空）
+// 宝箱 / 商人 / 三选一的宝物池：去掉还锁着的；某个稀有度被锁空了就用完整的（池子永远不会空）
 Meta.itemPools = function () {
   if (Meta._ipVer === Meta.ver && Meta._ip) return Meta._ip;
   var full = [[], [], [], [], []], f = [[], [], [], [], []];
@@ -278,12 +467,13 @@ Meta.tick = function (dt) {
   // 受伤（生命 + 护盾变少）和回复（生命变多，最大生命变大带来的不算）；换关回满血那一帧不算
   var hp = P.hp, tot = hp + (P.shield || 0), mx = st.maxHp;
   if (tk.hp >= 0 && tk.stage === Game.stage) {
-    var dm = mx - tk.max;
-    if (tot < tk.tot - 0.01 && dm >= 0) { c.hurt += tk.tot - tot; tk.noHit = 0; }
+    // 护盾比现在的上限多出来的部分（药箱的临时护盾到时间，护盾被压回上限）不算受伤
+    var dm = mx - tk.max, pt = tk.tot - (tk.sh > st.shield ? tk.sh - st.shield : 0);
+    if (tot < pt - 0.01 && dm >= 0) { c.hurt += pt - tot; tk.noHit = 0; }
     var dh = hp - tk.hp - (dm > 0 ? dm : 0);
     if (dh > 0) c.heal += dh;
   }
-  tk.hp = hp; tk.tot = tot; tk.max = mx; tk.stage = Game.stage;
+  tk.hp = hp; tk.tot = tot; tk.sh = P.shield || 0; tk.max = mx; tk.stage = Game.stage;
   tk.noHit += dt;
   if (tk.noHit > x.noHit) x.noHit = tk.noHit;
   // 踩了跳台之后的 15 秒里：在长坡上顺着坡往下滑铲冲到 20 就算一次「坡道飞驰」（别处的平地上靠连跳攒速度不算）
@@ -302,7 +492,7 @@ Meta.tick = function (dt) {
   if (tk.save >= 20) { tk.save = 0; Meta.snapshot(); }
 };
 
-// 每半秒：武器、魔典、物品数量这些要数一遍的
+// 每半秒：武器、纹章、宝物数量这些要数一遍的
 Meta.sample = function (run) {
   var x = run.x, ws = P.weapons, ev = 0, wk = 0, n = 0, i, id;
   for (i = 0; i < ws.length; i++) { if (ws[i].evo) ev++; if (ws[i].kills > wk) wk = ws[i].kills; }
@@ -344,7 +534,7 @@ Meta.onKill = function (e) {
   if (e.elite) c.elites++;
   if (e.mini) c.minis++;
   if (e.boss) c.bosses++;
-  if (e.frozen > 0) c.frozenKills++;
+  if (e.frozen > 0 && !(e.evoStun > 0) && !(e.stunEnd > Game.time)) c.frozenKills++;   // 眩晕、夹住（Evo.stun）不算冻住
   if (e.dot > 0 || e.poisoned > 0) c.dotKills++;
   if (P.alive && P.hp < P.st.maxHp * 0.25) c.lowHpKills++;
   if (e.def && Meta.GOBLINS[e.def.id]) c.goblins++;
@@ -450,7 +640,7 @@ Meta.complete = function (a) {
       if (back > 0) { p.mc += back; p.mcTotal += back; p.refund[a.id] = back; }
     } else Meta.unlock('knight', r.knight);
   }
-  ['weapon', 'tome', 'item', 'shrine'].forEach(function (k) { (r[k] || []).forEach(function (id) { Meta.unlock(k, id); }); });
+  ['weapon', 'tome', 'item'].forEach(function (k) { (r[k] || []).forEach(function (id) { Meta.unlock(k, id); }); });
   Meta.ver++;
   if (Meta.sink) Meta.sink.push(a.id);           // 结算时完成的：写进结算结果
   else if (run) run.newAch.push(a.id);           // 局内完成的：右上角提示，结算时列出来
@@ -460,15 +650,14 @@ Meta.complete = function (a) {
   Meta.emit('achievement', { id: a.id, name: a.name, inRun: !!run, atSettle: !!Meta.sink });
 };
 
-// 奖励的文字：「骑士「食人魔骑士」、武器「流星锤」、100 魔晶」（a 是成就）
+// 奖励的文字：「骑士「熊骑士」、武器「风筝」、100 魔晶」（a 是成就）
 Meta.rewardParts = function (a) {
   var out = [], r = a && a.r, back = a && Meta.p.refund[a.id];
   if (!r) return out;
   if (r.knight && CHARACTERS[r.knight]) out.push({ kind: 'char', id: r.knight, text: '骑士「' + CHARACTERS[r.knight].name + '」' + (back ? '（已买过，返还 ' + back + ' 魔晶）' : '') });
   (r.weapon || []).forEach(function (id) { if (WEAPONS[id]) out.push({ kind: 'weapon', id: id, text: '武器「' + WEAPONS[id].name + '」' }); });
-  (r.tome || []).forEach(function (id) { if (TOMES[id]) out.push({ kind: 'tome', id: id, text: '魔典「' + TOMES[id].name + '」' }); });
-  (r.item || []).forEach(function (id) { if (ITEMS[id]) out.push({ kind: 'item', id: id, text: '物品「' + ITEMS[id].name + '」' }); });
-  (r.shrine || []).forEach(function (id) { out.push({ kind: 'glyph', glyph: '神', color: 0x7ef0ff, text: '神龛祝福「' + (STATS[id] ? STATS[id].name : id) + '」' }); });
+  (r.tome || []).forEach(function (id) { if (TOMES[id]) out.push({ kind: 'tome', id: id, text: '纹章「' + TOMES[id].name + '」' }); });
+  (r.item || []).forEach(function (id) { if (ITEMS[id]) out.push({ kind: 'item', id: id, text: '宝物「' + ITEMS[id].name + '」' }); });
   if (r.mc) out.push({ kind: 'mc', text: r.mc + ' 魔晶' });
   return out;
 };
@@ -497,7 +686,7 @@ Meta.payout = function (run) {
   if (t >= D.zeroTime || run.won) {
     if (run.stage > 1) add('到达第 ' + run.stage + ' 关', (run.stage - 1) * D.stage);
     if (run.won) add('通关', D.win);
-    if (c.bosses) add('关卡 Boss ×' + c.bosses, c.bosses * D.boss);
+    if (c.bosses) add('首领 ×' + c.bosses, c.bosses * D.boss);
     if (c.minis) add('小 Boss ×' + c.minis, c.minis * D.mini);
     add('击杀 ' + Meta.fmt(c.kills), c.kills * (15 / (run.minutes || 15)) / D.killsPer);
     add('等级 ' + run.level, (run.level - 1) * D.level);
@@ -564,7 +753,7 @@ Meta.finish = function (run, how) {
 
 // ---------------- 包装：随机池（只在 progression.js 的几个函数外面套一层） ----------------
 (function () {
-  // 升级三选一：还锁着的武器 / 魔典临时放进放逐名单，选完马上拿掉（玩家自己放逐的不动）
+  // 升级三选一：还锁着的武器 / 纹章临时放进放逐名单，选完马上拿掉（玩家自己放逐的不动）
   var opts = LevelUp.options, added = [];
   LevelUp.options = function () {
     var ban = LevelUp.banned, i, w = Meta.lockedIds('weapon'), t = Meta.lockedIds('tome');
@@ -576,7 +765,7 @@ Meta.finish = function (run, how) {
     try { return opts.apply(this, arguments); }
     finally { for (i = 0; i < added.length; i++) delete ban[added[i]]; added.length = 0; }
   };
-  // 宝箱 / 摩艾 / 商人：抽的时候临时换成过滤过的物品池
+  // 宝箱 / 商人 / 三选一：抽的时候临时换成过滤过的宝物池
   var depth = 0;
   var pooled = function (fn) {
     return function () {
@@ -590,15 +779,13 @@ Meta.finish = function (run, how) {
   };
   Items.roll = pooled(Items.roll);
   Items.rollOfRarity = pooled(Items.rollOfRarity);
-  // 神龛：去掉还锁着的祝福（剩下的不到 3 个就不过滤）
-  var shrine = LevelUp.shrineOptions;
-  LevelUp.shrineOptions = function () {
-    var lk = Meta.lockedIds('shrine');
-    if (!lk.length || typeof SHRINE_STATS === 'undefined') return shrine.apply(this, arguments);
-    var full = SHRINE_STATS, f = full.filter(function (s) { return lk.indexOf(s[0]) < 0; });
-    if (f.length < 3) return shrine.apply(this, arguments);
-    SHRINE_STATS = f;
-    try { return shrine.apply(this, arguments); } finally { SHRINE_STATS = full; }
+  // 誓言 / 决斗旗的纹章祝福：还锁着的纹章同样临时放进放逐名单，抽完马上拿掉
+  var bless = LevelUp.blessOptions;
+  if (typeof bless === 'function') LevelUp.blessOptions = function () {
+    var ban = LevelUp.banned, i, t = Meta.lockedIds('tome'), mine = [];
+    if (ban) for (i = 0; i < t.length; i++) if (!ban[t[i]]) { ban[t[i]] = true; mine.push(t[i]); }
+    try { return bless.apply(this, arguments); }
+    finally { for (i = 0; i < mine.length; i++) delete ban[mine[i]]; }
   };
   // 强化：开局加属性、起始金币；重抽 / 跳过 / 放逐次数
   var reset = P.reset;
@@ -664,7 +851,7 @@ Meta.finish = function (run, how) {
         if (o.kind === 'chest' || o.kind === 'ctChest') { if (o.used) Meta.count('chests'); }
         else if (o.kind !== 'bossportal' && o.kind !== 'exitportal' && o.kind !== 'pot' && o.kind !== 'ctBrazier') {
           Meta.count('interacts');
-          if (o.kind === 'succ') Meta.count('succ');
+          if (o.kind === 'boulder') Meta.count('boulders');
         }
       } catch (e) { Meta.err(e); }
     }
@@ -672,8 +859,11 @@ Meta.finish = function (run, how) {
   };
   var pot = Interact.breakPot;
   Interact.breakPot = function () { var r = pot.apply(this, arguments); Meta.count('pots'); return r; };
-  var shrine = UI.shrineChoice;
-  UI.shrineChoice = function () { var r = shrine.apply(this, arguments); Meta.count('shrines'); Meta.count('interacts'); return r; };
+  // 誓言达成才算一次 oaths（立誓那一下已经在 Interact.use 里算过 interacts）
+  if (typeof Guild !== 'undefined' && typeof Guild.oathDone === 'function') {
+    var od = Guild.oathDone;
+    Guild.oathDone = function () { var r = od.apply(this, arguments); Meta.count('oaths'); return r; };
+  }
   if (typeof Evo !== 'undefined' && typeof Evo.evolve === 'function') {
     var evolve = Evo.evolve;
     Evo.evolve = function () { var r = evolve.apply(this, arguments); if (r) Meta.count('evos'); return r; };
@@ -956,6 +1146,8 @@ Meta.CSS = [
   '.meRec { margin-top: 3px; font-size: var(--fs-m); line-height: 24px; color: var(--goldM); text-shadow: none; }',
   '.meNewTitle { margin: 9px 0 6px; font-size: var(--fs-m); line-height: 24px; color: var(--goldM); text-shadow: none; }',
   '.meNew { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; text-align: left; }',
+  // 窄窗口（375 / 320 的 Split View）一列：两列时「宝物「渡鸦羽毛」」放不下、被切掉（第 13 块）
+  '@media (max-width: 440px) { .meNew { grid-template-columns: minmax(0, 1fr); } }',
   '.meItem { display: flex; align-items: center; gap: 9px; padding: 3px 12px 3px 3px; animation: kmSlipIn 0.15s steps(3, jump-start) backwards; }',
   '.meItem .cardIcon { flex: none; width: 40px; height: 40px; }',
   '.meItemT { font-size: var(--fs-s); line-height: 18px; color: var(--goldL); }',
@@ -1069,8 +1261,24 @@ Meta.menuInject = function () {
   Meta.uiReady = true;
   // 老玩家第一次打开：说明卡 + 礼包
   if (Meta.returning && Meta.p.notice !== 1) Meta.showNotice();
-  if (Meta.restored && Meta.restored.pay.total > 0) Meta.note('上一局没有结束就离开了：已结算 +' + Meta.fmt(Meta.restored.pay.total) + ' 魔晶');
+  Meta.showKeptNote();
   return true;
+};
+// 启动时按退出结算的那一局（第 13 块 O5）：提示先写进存档（Meta.p.note），小签真正弹出来那一刻才清掉。
+// 玩家第一次打开新版本时先弹「这次更新改了什么」，小签排在它后面；这时关掉 App，下次打开还会提示一次（只一次）
+Meta.keepNote = function () {
+  var r = Meta.restored;
+  if (!r || r.noted || !r.pay || !(r.pay.total > 0)) return;
+  r.noted = true;
+  Meta.p.note = '上一局没能接着打，已按退出结算：+' + Meta.fmt(r.pay.total) + ' 魔晶';
+  Meta.save();
+};
+Meta.showKeptNote = function () {
+  Meta.keepNote();
+  var t = Meta.p && Meta.p.note;
+  if (!t || Meta.toastQ.some(function (q) { return q.keep; })) return;
+  Meta.toastQ.push({ text: t, keep: true });
+  Meta.pumpToast();
 };
 Meta.pxSvgI = function (name) { return Meta.px(name).outerHTML; };
 
@@ -1174,7 +1382,7 @@ Meta.priceLabel = function (b, label, price, after) {
   b.classList.add('kmPrice');
   return b;
 };
-// 去掉括号里的举例（「累计击杀 800 个被冻住的敌人（冰霜行者、冰块……）」→「累计击杀 800 个被冻住的敌人」）
+// 去掉括号里的举例（「累计击杀 800 个被冻住的敌人（冰棱、冰晶雪橇的薄冰……）」→「累计击杀 800 个被冻住的敌人」）
 Meta.plain = function (s) { return String(s == null ? '' : s).replace(/（[^）]*）/g, ''); };
 
 Meta.renderDesc = function (sel, locked) {
@@ -1361,7 +1569,7 @@ Meta.iconPump = function () {
   if (Meta.iconQ.length) Meta.iconRaf = (window.requestAnimationFrame || window.setTimeout)(Meta.iconPump);
 };
 
-// 奖励图标：骑士头像 / 武器 / 魔典 / 物品（游戏的 3D 图标），魔晶、奖杯用像素图标（和 3D 图标一样的深色图块）；
+// 奖励图标：骑士头像 / 武器 / 纹章 / 宝物（游戏的 3D 图标），魔晶、奖杯用像素图标（和 3D 图标一样的深色图块）；
 // 成就自己的像素图标（icon: ['px', 名字]，Kit.ICONS）也是这样的深色图块；只有一个字的（icon: ['glyph', 字, 颜色]）是符文砖（Kit.glyphTile）
 Meta.iconTile = function (r, size) {
   var tile = Meta.el('div', 'cardIcon');
@@ -1468,9 +1676,9 @@ Meta.renderRec = function (body) {
     ['总击杀', Meta.fmt(L.kills || 0)],
     ['精英怪', Meta.fmt(L.elites || 0)],
     ['小 Boss', Meta.fmt(L.minis || 0)],
-    ['关卡 Boss', Meta.fmt(L.bosses || 0)],
+    ['首领', Meta.fmt(L.bosses || 0)],
     ['打开宝箱', Meta.fmt(L.chests || 0)],
-    ['充能神龛', Meta.fmt(L.shrines || 0)],
+    ['完成的誓言', Meta.fmt(L.oaths || 0)],
     ['觉醒超武', Meta.fmt(L.evos || 0)],
     ['最高等级', 'Lv ' + (B.level || 1)],
     ['单局最多击杀', Meta.fmt(B.runKills || 0)],
@@ -1541,7 +1749,9 @@ Meta.layerAction = function (act) {
   }
 };
 
+// 冻结的一页（第 13 块 M1）什么都不清：真的存档没读进来，内存里本来就是空的；下次正常打开存档还在
 Meta.wipe = function () {
+  if (Meta.frozen) return;
   Meta.drop(Meta.KEY);
   var keep = Meta.p;
   Meta.p = Meta.blank();
@@ -1550,7 +1760,7 @@ Meta.wipe = function () {
   Meta.ver++;
   Meta.save();
   Meta.closeAll();
-  if (!Meta.isUnlocked('knight', UI.selected)) { UI.selected = 'fox'; try { UI.saveSettings(); } catch (e) { /* 忽略 */ } }
+  if (!Meta.isUnlocked('knight', UI.selected)) { UI.selected = 'squire'; try { UI.saveSettings(); } catch (e) { /* 忽略 */ } }
   UI.buildMenu();
   Meta.note('存档已清除');
 };
@@ -1606,7 +1816,7 @@ Meta.noticeChoice = function (c, silent) {
   if (!silent && c === 'casual') { Meta.p.casual = true; Meta.ver++; }
   Meta.save();
   if (silent) return;
-  if (c !== 'casual' && !Meta.isUnlocked('knight', UI.selected)) { UI.selected = 'fox'; try { UI.saveSettings(); } catch (e) { /* 忽略 */ } }
+  if (c !== 'casual' && !Meta.isUnlocked('knight', UI.selected)) { UI.selected = 'squire'; try { UI.saveSettings(); } catch (e) { /* 忽略 */ } }
   UI.buildMenu();
 };
 
@@ -1710,8 +1920,8 @@ Meta.flushToasts = function () {
 Meta.note = function (text) { Meta.toastQ.push({ text: text }); Meta.pumpToast(); };
 Meta.pumpToast = function () {
   if (Meta.toastBusy || !Meta.toastQ.length || !document.body) return;
-  // 升级、宝箱、商人、暂停弹窗开着：先排着，关了再弹
-  if (typeof Game !== 'undefined' && (Game.state === 'modal' || Game.state === 'pause')) {
+  // 升级、宝箱、商人、暂停弹窗开着，或者正在放首领出场 / 换关的过场（body.fxCine，第 13 块 G2）：先排着，完了再弹
+  if ((typeof Game !== 'undefined' && (Game.state === 'modal' || Game.state === 'pause')) || document.body.classList.contains('fxCine')) {
     if (!Meta.toastWait) Meta.toastWait = setTimeout(function () { Meta.toastWait = 0; Meta.pumpToast(); }, 400);
     return;
   }
@@ -1732,6 +1942,7 @@ Meta.pumpToast = function () {
     d = Kit.slip({ kind: 'note', name: q.text });
   }
   box.appendChild(d);
+  if (q.keep && Meta.p && Meta.p.note === q.text) { Meta.p.note = ''; Meta.save(); }   // 存着的结算提示（Meta.keepNote）：弹出来了，清掉
   Meta.toastBusy = true;
   // 成就提示真正出现的这一刻（音效接在这里，弹窗开着时排队的提示也在出现时才响）
   if (q.a) Meta.emit('toast', { id: q.a.id, more: more });
@@ -1771,6 +1982,7 @@ Meta.pumpToast = function () {
 (function () {
   Meta.returning = !!Meta.read(Meta.SETTINGS_KEY);
   Meta.load();
+  if (Meta.migrateSettings() && Meta.returning) { Meta.p.changes = 1; Meta.save(); }
   // 新玩家（更新前没玩过）：更新说明和老玩家礼包都不需要；记下来，下次打开（那时已经有设置存档了）也不会弹
   if (!Meta.returning && Meta.p.notice !== 1) { Meta.p.notice = 1; Meta.p.gift = 1; Meta.save(); }
   // 上次没结算就关掉的那一局：按“退出”结算
@@ -1778,4 +1990,5 @@ Meta.pumpToast = function () {
   if (Meta.p.pending && !(typeof Resume !== 'undefined' && Resume.holdPending(Meta.p.pending))) {
     try { Meta.restored = Meta.finish(Meta.p.pending, 'quit'); } catch (e) { Meta.err(e); Meta.p.pending = null; Meta.save(); }
   }
+  try { Meta.keepNote(); } catch (e) { Meta.err(e); }
 })();

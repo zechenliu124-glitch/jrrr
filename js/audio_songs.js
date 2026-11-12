@@ -1,6 +1,6 @@
 'use strict';
 // ============================================================
-//  曲子（全部原创）：主菜单、森林、沙漠、墓地、Boss、最终虫潮；插曲：升级、超武觉醒、Boss 倒下、通关、阵亡
+//  曲子（全部原创）：主菜单、迷雾森林、黄沙古道、沉钟古城、Boss、午夜钟声；插曲：升级、超武觉醒、Boss 倒下、通关、阵亡
 //  格式（引擎见 audio.js 的 Player）：
 //   bpm / div（每拍几步：4 = 十六分音符，3 = 三连音）/ steps（每小节几步）/ root（MIDI 根音）/ scale / keys（每轮循环移调）
 //   parts：声部（乐器、音区、音量、声像、lvl = 强度到几级才出来）
@@ -47,9 +47,9 @@
     forms: [['!I', 'A', 'B', 'A', 'C']]
   });
 
-  // ---------------- 第 1 关 森林：轻快的冒险（G 大调，奇数轮移到 A 大调） ----------------
+  // ---------------- 第 1 关 迷雾森林：轻快的冒险（G 大调，奇数轮移到 A 大调） ----------------
   SFX.SONGS.forest = C({
-    id: 'forest', name: '森林', bpm: 136, div: 4, steps: 16, root: 55, scale: 'major', keys: [0, 2], wet: 0.18,
+    id: 'forest', name: '迷雾森林', bpm: 136, div: 4, steps: 16, root: 55, scale: 'major', keys: [0, 2], wet: 0.18,
     parts: {
       bass: { inst: 'bass', lo: 40, vol: 0.126 },
       arp: { inst: 'pluck', lo: 62, vol: 0.24, pan: -0.25, br: 7, dec: 0.5 },
@@ -87,9 +87,9 @@
     forms: [['!I', 'A', 'A', 'B', 'C', 'A', 'B'], ['A', 'B', 'D', 'C', 'A', 'B']]
   });
 
-  // ---------------- 第 2 关 沙漠：异域风（E 弗里几亚属音阶，马克苏姆节奏，乌德琴 + 祖尔纳 + 奈伊笛） ----------------
+  // ---------------- 第 2 关 黄沙古道：异域风（E 弗里几亚属音阶，马克苏姆节奏，乌德琴 + 祖尔纳 + 奈伊笛） ----------------
   SFX.SONGS.desert = C({
-    id: 'desert', name: '沙漠', bpm: 100, div: 4, steps: 16, root: 52, scale: 'phrygdom', keys: [0, 0, -2], wet: 0.26,
+    id: 'desert', name: '黄沙古道', bpm: 100, div: 4, steps: 16, root: 52, scale: 'phrygdom', keys: [0, 0, -2], wet: 0.26,
     parts: {
       drone: { inst: 'drone', lo: 40, vol: 0.062 },
       bass: { inst: 'bass', lo: 40, vol: 0.13, wave: 'triangle', br: 6, sus: 0.7 },
@@ -125,9 +125,9 @@
     forms: [['!I', 'A', 'B', 'A', 'C'], ['A', 'C', 'B', 'D', 'A', 'B']]
   });
 
-  // ---------------- 第 3 关 墓地：阴森的小调，慢一点（D 小调，12/8 三连音律动，钟、管风琴、特雷门琴） ----------------
+  // ---------------- 第 3 关 沉钟古城：阴森的小调，慢一点（D 小调，12/8 三连音律动，钟、管风琴、特雷门琴） ----------------
   SFX.SONGS.graveyard = C({
-    id: 'graveyard', name: '墓地', bpm: 72, div: 3, steps: 12, root: 50, scale: 'minor', wet: 0.42,
+    id: 'graveyard', name: '沉钟古城', bpm: 72, div: 3, steps: 12, root: 50, scale: 'minor', wet: 0.42,
     parts: {
       bass: { inst: 'pizz', lo: 38, vol: 0.53 },
       arp: { inst: 'harpsi', lo: 62, vol: 0.17, pan: -0.25, lvl: 1 },
@@ -199,9 +199,9 @@
     forms: [['!I', 'A', 'B', 'A', 'C', 'B']]
   });
 
-  // ---------------- 最终虫潮：更快、更紧张（A 小调，每轮升半音） ----------------
+  // ---------------- 午夜钟声：更快、更紧张（A 小调，每轮升半音） ----------------
   SFX.SONGS.swarm = C({
-    id: 'swarm', name: '最终虫潮', bpm: 168, div: 4, steps: 16, root: 45, scale: 'minor', keys: [0, 1, 2], wet: 0.12,
+    id: 'swarm', name: '午夜钟声', bpm: 168, div: 4, steps: 16, root: 45, scale: 'minor', keys: [0, 1, 2], wet: 0.12,
     parts: {
       bass: { inst: 'bass', lo: 40, vol: 0.12, br: 11 },
       arp: { inst: 'pluck', lo: 57, vol: 0.25, pan: -0.3, br: 12, dec: 0.25 },

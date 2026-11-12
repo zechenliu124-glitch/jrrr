@@ -270,7 +270,7 @@ Settings.render = function () {
   // 存档：继续上一局（RESUME）在的时候说每关开始时存一次
   var hasResume = typeof Resume !== 'undefined' && Resume && Resume.KEY;
   L.querySelector('.setSaveT').textContent = '进度自动保存在这台设备上';
-  L.querySelector('.setSaveS').textContent = hasResume ? '每关开始时存一次 · 关掉 App 下次可以继续' : '魔晶、成就、记录和设置随时保存';
+  L.querySelector('.setSaveS').textContent = hasResume ? '每关开始时存一次 · 关掉游戏下次可以继续' : '魔晶、成就、记录和设置随时保存';
   Settings.renderSens();
 };
 
@@ -306,12 +306,12 @@ Settings.closePanel = function () {
   if (typeof Shadows !== 'undefined') Settings.base.shadow = [520, 45];
   Settings.applyMotion();
 
-  // 伤害数字关掉：不出数字（暴击的那颗金色 / 红色星光照样有）；闪避、格挡、回血、处决、拾取的字不受影响
+  // 伤害数字关掉：不出数字（暴击的那颗金色星光照样有）；闪避、格挡、回血、处决、拾取的字不受影响
   if (typeof FX !== 'undefined' && FX.damage) {
     var dmg0 = FX.damage;
     FX.damage = function (x, y, z, dmg, crit) {
       if (Settings.v.dmgNums) return dmg0.apply(this, arguments);
-      if (crit) FX.flash(x, y - 0.3, z, (crit === 2 ? 1.6 : 1.1) * 1.3, crit === 2 ? 0xff5030 : 0xffd23a, 0.18, 2);
+      if (crit) FX.flash(x, y - 0.3, z, 1.43, 0xffd23a, 0.18, 2);
     };
   }
   // 中 / 低画质的圆形影子

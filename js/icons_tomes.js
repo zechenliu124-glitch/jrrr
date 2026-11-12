@@ -1,20 +1,7 @@
 'use strict';
-// 魔典图标：每本魔典画成它代表的东西（ICONS.model 定义低多边形模型，ICONS.use 对应到游戏 id）
+// 纹章图标：每枚纹章画成一面骑士盾，盾面是家族的颜色，上面一个剪影（狮子、钥匙、新月……）
 // 零件格式和游戏里的模型完全一样：[类型, 尺寸, 位置, 颜色, 旋转, 缩放, 贴图名, 平面投影]
-
-// 敏捷魔典 = 一只带翅膀的皮靴（翅膀是三根往后上方扫的白羽毛，和火焰行者的靴子区分开）
-ICONS.model('boot', [
-  ['box', [0.5, 0.95, 0.55], [0, 0.78, -0.12], 0x8a5a2e, null, null, 'ch_leather'],
-  ['box', [0.56, 0.14, 0.62], [0, 1.25, -0.12], 0x6a4020, null, null, 'ch_leather'],
-  ['box', [0.5, 0.38, 1.0], [0, 0.2, 0.12], 0x8a5a2e, null, null, 'ch_leather'],
-  ['box', [0.54, 0.1, 1.06], [0, 0.0, 0.12], 0x3a2614, null, null, 'wood'],
-  ['box', [0.12, 0.12, 0.06], [0, 0.62, 0.17], 0xffd84a, null, null, 'gold']
-].concat([[1.0, 0.72, 1.06, 0xffffff], [0.62, 0.6, 0.93, 0xeef3ff], [0.28, 0.48, 0.8, 0xdde6f6]].map(function (f) {
-  // [仰角, 长度, 根部高度, 颜色]：羽毛从靴筒外侧后方长出来
-  return ['box', [0.06, 0.15, f[1]], [0.29, f[2] + Math.sin(f[0]) * f[1] / 2, -0.36 - Math.cos(f[0]) * f[1] / 2], f[3], [f[0], 0, 0], null, 'ch_feather'];
-})), { yaw: 0.9, pitch: 0.3, zoom: 0.9 });
-ICONS.use('tome', 'agi', 'boot');
-
+// ICONS.crestParts(id, opts) 把同一面盾交给别的图标用（家族徽章）
 (function () {
   var PI = Math.PI;
 
@@ -34,32 +21,6 @@ ICONS.use('tome', 'agi', 'boot');
       if (k !== 1) { var s = p[5] || [1, 1, 1]; q[5] = [s[0] * k, s[1] * k, s[2] * k]; }
       return q;
     });
-  }
-  // 沿 +y 建好的零件组，转到指向 dir
-  function aim(parts, dir, pos) {
-    var q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dir[0], dir[1], dir[2]).normalize());
-    var e = new THREE.Euler().setFromQuaternion(q);
-    return xf(parts, [e.x, e.y, e.z], pos);
-  }
-  // 左右镜像
-  function mirror(parts) {
-    return parts.map(function (p) {
-      var q = p.slice(), r = p[4];
-      q[2] = [-p[2][0], p[2][1], p[2][2]];
-      if (r) q[4] = [r[0], -r[1], -r[2]];
-      return q;
-    });
-  }
-  // 有发光零件的图标：发光部分不受光照（和游戏里的火球、灵魂一样），其余照常打光
-  var glowMat = null;
-  function glow(parts, glowParts) {
-    return function () {
-      if (!glowMat) glowMat = new THREE.MeshBasicMaterial({ vertexColors: true, map: TEX.atlas });
-      var g = new THREE.Group();
-      g.add(new THREE.Mesh(MODEL.build(parts, false), MODEL.material()));
-      g.add(new THREE.Mesh(MODEL.build(glowParts, false), glowMat));
-      return g;
-    };
   }
   // 按位置合并法线：挤出来的形状变得圆鼓鼓的
   function smooth(g) {
@@ -135,7 +96,7 @@ ICONS.use('tome', 'agi', 'boot');
       return out.set(Math.cos(a) * R, (t - 0.5) * L, Math.sin(a) * R);
     }, Math.round(turns * 10), s[1], 5);
   };
-  // 三叶结的一段（混沌魔典的彩虹结）：[起点 0~1, 终点 0~1, 大小, 管粗]
+  // 三叶结的一段（彩虹结）：[起点 0~1, 终点 0~1, 大小, 管粗]
   MODEL.extraGeo.tm_knot = function (s) {
     var t0 = s[0], t1 = s[1], R = s[2] || 0.5;
     return tube(function (t, out) {
@@ -144,7 +105,7 @@ ICONS.use('tome', 'agi', 'boot');
     }, 14, s[3] || 0.1, 6);
   };
 
-  // 旋涡的一条臂（吸引魔典）：[圈数, 外半径, 内半径, 下沉深度, 管粗, 起始角]
+  // 旋涡的一条臂：[圈数, 外半径, 内半径, 下沉深度, 管粗, 起始角]
   MODEL.extraGeo.tm_spiral = function (s) {
     return tube(function (t, out) {
       var a = s[5] + t * s[0] * PI * 2, r = s[1] + (s[2] - s[1]) * t;
@@ -152,300 +113,245 @@ ICONS.use('tome', 'agi', 'boot');
     }, Math.round(s[0] * 18), s[4], 6);
   };
 
-  // ---------------- 常用小部件 ----------------
-  // 竖直的六棱水晶，上下带尖（和地上的经验水晶一样）
-  function crystal(h, r, c, top) {
+
+  // ---------------- 纹章：钢边盾 + 家族颜色的盾面 + 一个挤出的剪影 ----------------
+  // 剪影后面垫一层深色的同形状（倒角往外胀一圈），在 36px 下就是一道 1 像素的纹章描边：
+  // 金配棕、棕配红、绿配绿也分得开（图标的描边只描整体外轮廓，里面的边要靠自己）
+  // 剪影的坐标都画在盾面里面：x -0.42~0.42，y -0.48~0.42；正面朝 +z
+  var CREST_FAMILY = { beast: 0xd9433b, bird: 0x4a8ad9, plant: 0x4ab04a, object: 0xb08a5a, sky: 0x8a6ad9 };   // = tables.json crestFamilies
+  var CREST_CAM = { yaw: 0.28, pitch: 0.12, zoom: 1.0 };
+  var INK = 0x14101e, OUT = 0.045;
+  function shield(field, rim, rimTex) {
     return [
-      ['cyl', [r, r, h, 6], [0, 0, 0], c, null, null, 'plain', 1],
-      ['cone', [r, r * 1.6, 6], [0, h / 2 + r * 0.8, 0], top || c, null, null, 'plain', 1],
-      ['cone', [r, r * 1.1, 6], [0, -h / 2 - r * 0.55, 0], c, [PI, 0, 0], null, 'plain', 1]
+      ['tm_shield', [1.30, 1.50, 0.12], [0, 0, -0.07], rim || 0xc8d0da, null, null, rimTex || 'metal'],   // 盾边（大一圈，在后面）
+      ['tm_shield', [1.10, 1.30, 0.12], [0, 0.01, 0], field, null, null, 'cloth']                         // 盾面（不发光，像涂了漆）
     ];
   }
-
-  // ---------------- 伤害：两把交叉的剑 ----------------
-  (function () {
-    // 剑身中点在原点、剑尖朝 +y；剑身中间一道血槽
-    var sword = [
-      ['box', [0.26, 1.5, 0.08], [0, 0, 0], 0xe8eef6, null, null, 'metal'],
-      ['cone', [0.13, 0.34, 4], [0, 0.92, 0], 0xe8eef6, null, [1, 1, 0.3], 'metal'],
-      ['box', [0.07, 1.25, 0.09], [0, -0.05, 0], 0xd0283a, null, null, 'plain'],
-      ['box', [0.8, 0.15, 0.2], [0, -0.82, 0], 0xffc83a, null, null, 'gold'],
-      ['oct', [0.09], [0, -0.82, 0.1], 0xff3a4a, null, null, 'plain'],
-      ['cyl', [0.07, 0.07, 0.38, 6], [0, -1.08, 0], 0x7a2a1a, null, null, 'ch_leather'],
-      ['sphere', [0.12, 6, 4], [0, -1.33, 0], 0xffc83a, null, null, 'gold']
+  // 一个剪影 = 深色描边层 + 上色层；dz 把叠在别的剪影上的那块往前挪一点
+  // 描边层往左下挪一点点：相机从右上方斜着看，上色层在前面会显得往左下偏，挪过去两边的描边才一样粗
+  function charge(pts, col, tex, dz) {
+    dz = dz || 0;
+    return [
+      ['ii_poly', [0.04, pts, OUT], [-0.02, -0.008, 0.13 + dz], INK, null, null, 'plain'],
+      ['ii_poly', [0.08, pts, 0], [0, 0, 0.17 + dz], col, null, null, tex || 'plain']
     ];
-    ICONS.model('tome_dmg', xf(sword, [0, 0, 0.74], [0, 0, 0.06]).concat(xf(sword, [0, 0, -0.74], [0, 0, -0.06])), { yaw: 0.25, pitch: 0.12 });
-  })();
-
-  // ---------------- 冷却：装着蓝色魔法沙的沙漏 ----------------
-  (function () {
-    var sand = 0x3ab8ff, glass = 0xe0f6ff, p = [
-      ['cyl', [0.58, 0.58, 0.15, 8], [0, 0.88, 0], 0x7a4a24, null, null, 'wood'],
-      ['cyl', [0.58, 0.58, 0.15, 8], [0, -0.88, 0], 0x7a4a24, null, null, 'wood'],
-      ['cyl', [0.42, 0.42, 0.08, 8], [0, 0.99, 0], 0xffc83a, null, null, 'gold'],
-      ['cyl', [0.42, 0.42, 0.08, 8], [0, -0.99, 0], 0xffc83a, null, null, 'gold'],
-      // 玻璃（上下两半）和沙子：上面的沙子快漏完了，下面堆起来
-      ['ch_lathe', [10, 0.3, 0.22, 0.42, 0.45, 0.39, 0.66, 0.24, 0.8], [0, 0, 0], glass, null, null, 'plain'],
-      ['ch_lathe', [10, 0.05, 0.0, 0.16, 0.08, 0.3, 0.22], [0, 0, 0], sand, null, null, 'sand'],
-      ['ch_lathe', [10, 0.39, -0.36, 0.3, -0.22, 0.16, -0.08, 0.05, 0.0], [0, 0, 0], glass, null, null, 'plain'],
-      ['ch_lathe', [10, 0.24, -0.8, 0.39, -0.66, 0.42, -0.48, 0.39, -0.36], [0, 0, 0], sand, null, null, 'sand']
+  }
+  // 小方块（眼睛、窗户）贴在剪影前面
+  function dot(x, y, w, h, col, z) { return ['box', [w, h, 0.02], [x, y, z || 0.22], col, null, null, 'plain']; }
+  // 左半边（从正上方的中线开始，顺着左边到正下方的中线）→ 左右对称的整圈
+  function sym(half) {
+    var out = half.slice();
+    for (var i = half.length - 4; i >= 2; i -= 2) out.push(-half[i], half[i + 1]);
+    return out;
+  }
+  // 星形：n 个角，外半径 R，内半径 r，第一个角朝上
+  function starPts(n, R, r, cx, cy) {
+    var out = [];
+    for (var i = 0; i < n * 2; i++) {
+      var a = PI / 2 + i * PI / n, k = i % 2 ? r : R;
+      out.push(cx + Math.cos(a) * k, cy + Math.sin(a) * k);
+    }
+    return out;
+  }
+  // 一圈点：半径随角度变化 f(a)（树冠的圆鼓包）
+  function loopPts(n, rx, ry, cx, cy, f) {
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var a = PI / 2 + i * PI * 2 / n, k = f ? f(a) : 1;
+      out.push(cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k);
+    }
+    return out;
+  }
+  // 沿中心线描一笔：宽度从 w0 渐变到 w1（风的笔画）
+  function strokePts(path, w0, w1) {
+    var L = [], R = [], n = path.length;
+    for (var i = 0; i < n; i++) {
+      var a = path[Math.max(0, i - 1)], b = path[Math.min(n - 1, i + 1)];
+      var dx = b[0] - a[0], dy = b[1] - a[1], l = Math.sqrt(dx * dx + dy * dy) || 1;
+      var t = i / (n - 1), w = (w0 + (w1 - w0) * Math.sin(t * PI * 0.5)) / 2;
+      L.push(path[i][0] - dy / l * w, path[i][1] + dx / l * w);
+      R.unshift(path[i][0] + dy / l * w, path[i][1] - dx / l * w);
+    }
+    return L.concat(R);
+  }
+  // 一笔卷起来的风：从 (x0,y) 横着到 (x1,y)，末端绕一个半径 rc 的圈卷 turn 弧度；up=1 往上卷、-1 往下卷
+  function curl(x0, x1, y, rc, turn, up) {
+    var path = [], dir = x1 > x0 ? 1 : -1, i, n = 5;
+    for (i = 0; i < n; i++) path.push([x0 + (x1 - x0) * i / n, y]);
+    var cx = x1, cy = y + rc * up, a0 = -PI / 2 * up, m = 12;
+    for (i = 0; i <= m; i++) {
+      var a = a0 + dir * up * turn * i / m, k = 1 - 0.25 * i / m;
+      path.push([cx + Math.cos(a) * rc * k, cy + Math.sin(a) * rc * k]);
+    }
+    return path;
+  }
+  // 弯月：大圆 (0,0,R) 减去偏到 (cx,cy) 的小圆 r，两角朝小圆那边
+  function crescentPts(R, cx, cy, r, n) {
+    var d = Math.sqrt(cx * cx + cy * cy), ph = Math.atan2(cy, cx);
+    var al = Math.acos((R * R - r * r + d * d) / (2 * d * R)), out = [], i;
+    for (i = 0; i <= n; i++) { var a = ph + al + (PI * 2 - al * 2) * i / n; out.push(Math.cos(a) * R, Math.sin(a) * R); }
+    // 小圆上从后一个交点绕回前一个交点（经过靠大圆圆心的那边）
+    var p1 = [Math.cos(ph + al) * R - cx, Math.sin(ph + al) * R - cy], p2 = [Math.cos(ph - al) * R - cx, Math.sin(ph - al) * R - cy];
+    var b1 = Math.atan2(p1[1], p1[0]), b2 = Math.atan2(p2[1], p2[0]), db = b1 - b2;
+    while (db > 0) db -= PI * 2;
+    if (Math.abs(Math.cos((b2 + db / 2) - (ph + PI)) - 1) > 1) db += PI * 2;
+    for (i = 1; i < n; i++) { var b = b2 + db * i / n; out.push(cx + Math.cos(b) * r, cy + Math.sin(b) * r); }
+    return out;
+  }
+  // 钥匙（沿 +y：上面是匙环，下面是匙齿朝 side 那边）；描边层是同样的零件放大一圈、放在后面
+  function key(side, z) {
+    var G = 0xf0c03a, s = side, d = z - 0.04;
+    var gold = [
+      ['tm_band', [0.15, 0.08, 0, PI * 2, 0.06], [0, 0.34, z], G, null, null, 'gold'],
+      ['box', [0.075, 0.62, 0.06], [0, -0.12, z], G, null, null, 'gold'],
+      ['box', [0.16, 0.05, 0.06], [0, 0.17, z], G, null, null, 'gold'],
+      ['box', [0.12, 0.06, 0.06], [s * 0.085, -0.4, z], G, null, null, 'gold'],
+      ['box', [0.09, 0.06, 0.06], [s * 0.07, -0.29, z], G, null, null, 'gold']
     ];
-    [0.5 + PI / 2, 0.5 - PI / 2, 0.5 + PI].forEach(function (a) {
-      p.push(['cyl', [0.065, 0.065, 1.62, 5], [Math.sin(a) * 0.49, 0, Math.cos(a) * 0.49], 0x5a3418, null, null, 'wood']);
-    });
-    ICONS.model('tome_cd', p, { yaw: 0.5, pitch: 0.22, tilt: -0.3 });
-  })();
-
-  // ---------------- 数量：扇形散开的三支箭 ----------------
-  (function () {
-    var arw = [
-      ['box', [0.11, 1.5, 0.11], [0, 0, 0], 0xb07a40, null, null, 'wood'],
-      ['cone', [0.22, 0.46, 4], [0, 0.96, 0], 0xe8eef6, null, [1, 1, 0.4], 'metal'],
-      ['ch_tbox', [0.08, 0.4, 0.48, 0.04, 0.04], [0, -0.55, 0], 0xff9a2a, null, null, 'ch_feather'],
-      ['ch_tbox', [0.04, 0.04, 0.48, 0.08, 0.4], [0, -0.55, 0], 0xff8a1a, null, null, 'ch_feather']
+    var ink = [
+      ['tm_band', [0.19, 0.05, 0, PI * 2, 0.04], [0, 0.34, d], INK, null, null, 'plain'],
+      ['box', [0.155, 0.7, 0.04], [0, -0.12, d], INK, null, null, 'plain'],
+      ['box', [0.24, 0.13, 0.04], [0, 0.17, d], INK, null, null, 'plain'],
+      ['box', [0.2, 0.14, 0.04], [s * 0.085, -0.4, d], INK, null, null, 'plain'],
+      ['box', [0.17, 0.14, 0.04], [s * 0.07, -0.29, d], INK, null, null, 'plain']
     ];
-    var a = xf(arw, null, [0, 1.15, 0]), p = [];
-    [0.5, 0, -0.5].forEach(function (r, i) { p = p.concat(xf(a, [0, 0, r], [0, 0, i === 1 ? 0.08 : 0])); });
-    ICONS.model('tome_qty', p, { yaw: 0.3, pitch: 0.2 });
-  })();
+    return ink.concat(gold);
+  }
 
-  // ---------------- 精准：靶心 + 正中的箭 ----------------
-  (function () {
-    var ring = function (r, z, c) { return ['cyl', [r, r, 0.04, 16], [0, 0, z], c, [PI / 2, 0, 0], null, 'plain']; };
-    var p = [
-      ['cyl', [0.86, 0.86, 0.22, 16], [0, 0, -0.1], 0xb07a40, [PI / 2, 0, 0], null, 'wood'],
-      ring(0.8, 0.02, 0xf4f0e6), ring(0.63, 0.04, 0xe0282e), ring(0.46, 0.06, 0xf4f0e6), ring(0.29, 0.08, 0xe0282e), ring(0.13, 0.1, 0xffd23a)
-    ];
-    var stuck = [
-      ['box', [0.09, 0.95, 0.09], [0, 0.47, 0], 0xb07a40, null, null, 'wood'],
-      ['ch_tbox', [0.38, 0.08, 0.38, 0.04, 0.04], [0, 0.76, 0], 0x3a8af0, null, null, 'ch_feather'],
-      ['ch_tbox', [0.04, 0.04, 0.38, 0.38, 0.08], [0, 0.76, 0], 0x2a6ad0, null, null, 'ch_feather']
-    ];
-    // 木头三脚架
-    p.push(['box', [0.11, 1.0, 0.1], [-0.42, -0.72, -0.12], 0x7a4a24, [0.15, 0, -0.35], null, 'wood']);
-    p.push(['box', [0.11, 1.0, 0.1], [0.42, -0.72, -0.12], 0x7a4a24, [0.15, 0, 0.35], null, 'wood']);
-    p.push(['box', [0.1, 1.0, 0.1], [0, -0.6, -0.42], 0x6a3a1c, [-0.5, 0, 0], null, 'wood']);
-    ICONS.model('tome_prec', p.concat(aim(stuck, [0.55, 0.3, 0.75], [0.02, 0.02, 0.1])), { yaw: 0.35, pitch: 0.2 });
-  })();
+  var GOLD_C = 0xf0c03a, SILVER = 0xd8e0f0;
+  var CHARGES = {
+    // 猛兽：立起来的金狮子（朝左，前爪举起，鬃毛鼓起，一条后腿着地，尾巴 S 形翘起）
+    lion: charge([
+      -0.32, 0.36, -0.26, 0.42, -0.18, 0.44, -0.16, 0.52, -0.06, 0.46, 0.02, 0.52, 0.06, 0.42, 0.16, 0.44,
+      0.12, 0.34, 0.20, 0.30, 0.12, 0.24, 0.16, 0.16, 0.08, 0.14, 0.12, 0.04, 0.20, -0.10, 0.26, -0.20,
+      0.26, -0.30, 0.20, -0.40, 0.24, -0.54, 0.02, -0.54, 0.06, -0.48, 0.12, -0.46, 0.12, -0.36, 0.06, -0.30,
+      -0.10, -0.38, -0.30, -0.42, -0.26, -0.34, -0.06, -0.26, 0.0, -0.18,
+      -0.10, -0.12, -0.28, -0.14, -0.42, -0.10, -0.36, -0.07, -0.40, -0.02, -0.20, -0.04, -0.08, -0.02,
+      -0.10, 0.06, -0.30, 0.10, -0.44, 0.16, -0.40, 0.22, -0.26, 0.18, -0.12, 0.16,
+      -0.16, 0.22, -0.22, 0.26, -0.32, 0.26, -0.24, 0.30, -0.34, 0.32
+    ], GOLD_C, 'gold').concat(
+      charge(strokePts([[0.24, -0.24], [0.34, -0.24], [0.42, -0.14], [0.41, -0.02], [0.35, 0.07], [0.35, 0.15], [0.40, 0.21]], 0.07, 0.065), GOLD_C, 'gold', -0.01),
+      charge([0.34, 0.20, 0.43, 0.17, 0.47, 0.28, 0.42, 0.38, 0.35, 0.32], GOLD_C, 'gold', -0.01),
+      [dot(-0.22, 0.36, 0.045, 0.04, INK)]
+    ),
+    // 猛兽：仰头嚎叫的银狼头（长嘴朝左上、张开的上下颚、两只尖耳朵，脖子下面三撮大毛尖；眼睛是一道斜缝）
+    direwolf: charge([
+      -0.45, 0.33, -0.18, 0.39, -0.06, 0.40, 0.04, 0.54, 0.13, 0.38, 0.28, 0.50, 0.29, 0.28, 0.34, 0.10,
+      0.39, -0.12, 0.43, -0.42, 0.28, -0.30, 0.17, -0.47, 0.06, -0.31, -0.07, -0.43, -0.09, -0.18, -0.13, -0.03,
+      -0.27, 0.0, -0.41, 0.03, -0.38, 0.09, -0.15, 0.18, -0.47, 0.22
+    ], 0xd0d8e4, 'metal').concat([
+      ['ii_poly', [0.03, [0.03, 0.41, 0.045, 0.49, 0.085, 0.40], 0], [0, 0, 0.215], 0x8a94a4, null, null, 'plain'],
+      ['ii_poly', [0.03, [0.30, 0.10, 0.36, -0.12, 0.40, -0.40, 0.28, -0.28, 0.17, -0.44, 0.07, -0.29, 0.16, -0.10], 0], [0, 0, 0.215], 0xa8b0bc, null, null, 'metal'],
+      ['box', [0.10, 0.05, 0.02], [-0.08, 0.30, 0.23], INK, [0, 0, 0.3], null, 'plain']
+    ]),
+    // 猛兽：站起来的棕熊（朝左，前掌往前抬，圆耳朵，浅色的嘴）
+    grizzly: charge([
+      -0.39, 0.24, -0.37, 0.31, -0.25, 0.35, -0.19, 0.41, -0.12, 0.45, -0.04, 0.41, 0.05, 0.33, 0.19, 0.27,
+      0.27, 0.08, 0.31, -0.14, 0.27, -0.30, 0.25, -0.47, 0.03, -0.47, 0.08, -0.37, 0.02, -0.28, -0.04, -0.31,
+      -0.06, -0.47, -0.23, -0.47, -0.18, -0.36, -0.15, -0.2, -0.19, -0.04, -0.35, -0.03, -0.41, 0.06, -0.33, 0.12,
+      -0.17, 0.10, -0.21, 0.18, -0.31, 0.18
+    ], 0x6a4022, 'fur').concat([
+      ['ii_poly', [0.04, [-0.39, 0.21, -0.38, 0.30, -0.28, 0.32, -0.25, 0.22], 0], [0, 0, 0.21], 0xc89a6a, null, null, 'plain'],
+      dot(-0.41, 0.29, 0.04, 0.04, INK, 0.24),
+      dot(-0.22, 0.32, 0.04, 0.04, INK, 0.22)
+    ]),
+    // 飞禽：展翅俯冲的金隼（两翼往上扬成 V，头朝下，尾羽散开）
+    hawk: charge(sym([
+      0, 0.35, -0.12, 0.44, -0.07, 0.14, -0.14, 0.23, -0.18, 0.15, -0.24, 0.31, -0.28, 0.22, -0.35, 0.39,
+      -0.45, 0.44, -0.42, 0.30, -0.30, 0.09, -0.18, -0.12, -0.09, -0.19, -0.06, -0.25, -0.10, -0.31, -0.09, -0.40,
+      -0.04, -0.46, 0, -0.52
+    ]), GOLD_C, 'gold'),
+    // 飞禽：侧身站着的渡鸦（朝左，粗嘴，两条腿）；翅膀上一块紫色的光泽
+    raven: charge([
+      -0.43, 0.17, -0.27, 0.31, -0.18, 0.37, -0.06, 0.35, 0.0, 0.25, 0.16, 0.15, 0.30, 0.03, 0.43, -0.14,
+      0.41, -0.23, 0.24, -0.15, 0.12, -0.21, -0.10, -0.19, -0.20, -0.05, -0.24, 0.09, -0.27, 0.13
+    ], 0x2a2438, 'plain').concat(
+      charge([-0.03, -0.17, 0.03, -0.17, 0.03, -0.40, 0.09, -0.47, -0.10, -0.47, -0.03, -0.41], 0x2a2438, 'plain', -0.01),
+      charge([0.09, -0.17, 0.15, -0.17, 0.15, -0.40, 0.21, -0.47, 0.02, -0.47, 0.09, -0.41], 0x2a2438, 'plain', -0.01),
+      [['ii_poly', [0.03, [-0.06, 0.15, 0.16, 0.09, 0.36, -0.07, 0.12, -0.09, -0.08, 0.01], 0], [0, 0, 0.215], 0x5a4a7a, null, null, 'plain'],
+        dot(-0.19, 0.27, 0.05, 0.05, 0xf4f4f4)]
+    ),
+    // 飞禽：正面的白猫头鹰（梨形身子、两撮耳羽、浅灰的脸盘、黄色圆眼睛、橙色小尖嘴，两边是灰色的翅膀边）
+    owl: charge(sym([
+      0, 0.27, -0.11, 0.29, -0.25, 0.45, -0.25, 0.24, -0.28, 0.08, -0.34, -0.08, -0.34, -0.22, -0.27, -0.36, -0.15, -0.45, 0, -0.48
+    ]), 0xf4f4f8, 'cloth').concat([-1, 1].reduce(function (o, s) {
+      return o.concat([
+        ['ii_poly', [0.03, [s * 0.27, 0.06, s * 0.335, -0.08, s * 0.335, -0.22, s * 0.265, -0.355, s * 0.15, -0.44, s * 0.20, -0.24, s * 0.22, -0.06].concat(s < 0 ? [] : []), 0], [0, 0, 0.215], 0xc8ccd8, null, null, 'cloth'],
+        ['cyl', [0.15, 0.15, 0.02, 14], [s * 0.115, 0.11, 0.215], 0xd8dce4, [PI / 2, 0, 0], null, 'plain'],
+        ['cyl', [0.13, 0.13, 0.03, 14], [s * 0.12, 0.11, 0.23], 0xffd040, [PI / 2, 0, 0], null, 'plain'],
+        ['cyl', [0.06, 0.06, 0.03, 10], [s * 0.12, 0.11, 0.25], INK, [PI / 2, 0, 0], null, 'plain']
+      ]);
+    }, []), [
+      ['ii_poly', [0.03, [-0.06, 0.0, 0.06, 0.0, 0, -0.13], 0], [0, 0, 0.26], 0xe89a30, null, null, 'plain']
+    ]),
+    // 花木：三瓣的金百合（中间一瓣高，两边往外卷，中间一道横箍，下面短短的脚）
+    lily: charge(sym([
+      0, 0.45, -0.06, 0.35, -0.11, 0.23, -0.10, 0.12, -0.05, 0.05, -0.14, 0.16, -0.21, 0.27, -0.30, 0.31,
+      -0.38, 0.27, -0.43, 0.17, -0.43, 0.05, -0.37, 0.12, -0.29, 0.12, -0.22, 0.06, -0.21, 0.02, -0.25, 0.02,
+      -0.25, -0.09, -0.10, -0.09, -0.18, -0.19, -0.25, -0.33, -0.12, -0.29, -0.05, -0.21, 0, -0.41
+    ]), 0xf0d060, 'gold'),
+    // 花木：一棵圆冠橡树 + 两颗橡果（树冠比盾面深）
+    oak: charge([-0.07, -0.05, 0.07, -0.05, 0.08, -0.37, 0.18, -0.47, -0.18, -0.47, -0.08, -0.37], 0x6a4022, 'bark', -0.01).concat(
+      charge(loopPts(30, 0.40, 0.30, 0, 0.13, function (a) { return 0.86 + 0.18 * Math.abs(Math.cos(2.5 * (a - PI / 2))); }), 0x2e6a2a, 'leaf'),
+      [-1, 1].reduce(function (o, s) {
+        return o.concat([
+          ['sphere', [0.105, 8, 6], [s * 0.27, -0.32, 0.2], INK, null, [0.95, 1.2, 0.5], 'plain'],
+          ['sphere', [0.085, 8, 6], [s * 0.27, -0.335, 0.22], 0xc08a3a, null, [0.9, 1.15, 0.6], 'plain'],
+          ['sphere', [0.09, 8, 4], [s * 0.27, -0.25, 0.23], 0x6a4022, null, [1, 0.55, 0.6], 'bark']
+        ]);
+      }, [])
+    ),
+    // 花木：一朵向日葵（金黄的花瓣，深棕的花盘，短茎一片叶子）
+    sunflower: charge([-0.03, -0.12, 0.03, -0.12, 0.03, -0.47, -0.03, -0.47], 0x2e6a2a, 'leaf', -0.01).concat(
+      charge([0.02, -0.34, 0.12, -0.24, 0.26, -0.22, 0.20, -0.34, 0.06, -0.40], 0x2e6a2a, 'leaf', -0.01),
+      charge(starPts(12, 0.36, 0.23, 0, 0.09), 0xffc030, 'plain'),
+      [['cyl', [0.17, 0.17, 0.04, 12], [0, 0.09, 0.22], 0x6a4022, [PI / 2, 0, 0], null, 'bark']]
+    ),
+    // 器物：三个垛口的城塔（浅灰的砖，拱门，一道窄窗）
+    tower: charge([
+      -0.30, -0.48, 0.30, -0.48, 0.26, -0.40, 0.24, 0.18, 0.32, 0.20, 0.32, 0.42, 0.20, 0.42, 0.20, 0.32,
+      0.06, 0.32, 0.06, 0.42, -0.06, 0.42, -0.06, 0.32, -0.20, 0.32, -0.20, 0.42, -0.32, 0.42, -0.32, 0.20,
+      -0.24, 0.18, -0.26, -0.40
+    ], 0xc8ced6, 'brick').concat([
+      ['ii_poly', [0.03, [-0.10, -0.48, 0.10, -0.48, 0.10, -0.24, 0.07, -0.17, 0, -0.14, -0.07, -0.17, -0.10, -0.24], 0], [0, 0, 0.215], 0x2a2a38, null, null, 'plain'],
+      dot(0, 0.06, 0.05, 0.15, 0x2a2a38)
+    ]),
+    // 器物：两把交叉的金钥匙
+    goldkey: xf(key(-1, 0.17), [0, 0, 0.75], [0, -0.02, 0]).concat(xf(key(1, 0.22), [0, 0, -0.75], [0, -0.02, 0])),
+    // 器物：八根辐条的车轮（铁箍 + 深色木头；盾面本身就是木色）
+    wheel: [
+      ['tm_band', [0.40, 0.32, 0, PI * 2, 0.06], [0, -0.03, 0.16], 0x3a3e48, null, null, 'metal'],
+      ['tm_band', [0.33, 0.26, 0, PI * 2, 0.05], [0, -0.03, 0.15], 0x5a3820, null, null, 'wood']
+    ].concat([0, 1, 2, 3].map(function (i) {
+      return ['box', [0.055, 0.56, 0.03], [0, -0.03, 0.15], 0x5a3820, [0, 0, i * PI / 4], null, 'wood'];
+    }), [
+      ['cyl', [0.09, 0.09, 0.06, 10], [0, -0.03, 0.18], 0x8a6a40, [PI / 2, 0, 0], null, 'wood'],
+      ['cyl', [0.04, 0.04, 0.04, 8], [0, -0.03, 0.21], 0x3a3e48, [PI / 2, 0, 0], null, 'metal']
+    ]),
+    // 天象：三笔横着卷起来的风（不是漏斗）
+    gale: charge(strokePts(curl(-0.02, 0.18, 0.22, 0.11, PI * 1.45, 1), 0.03, 0.085), 0x7ad9c8, 'plain').concat(
+      charge(strokePts(curl(0.40, -0.20, 0.0, 0.11, PI * 1.45, 1), 0.03, 0.085), 0x7ad9c8, 'plain'),
+      charge(strokePts(curl(-0.36, 0.14, -0.24, 0.10, PI * 1.45, -1), 0.03, 0.085), 0x7ad9c8, 'plain')
+    ),
+    // 天象：银色六角星
+    starry: charge(starPts(6, 0.42, 0.19, 0, -0.03), SILVER, 'metal').concat([
+      ['oct', [0.075], [0, -0.03, 0.22], 0xffffff, null, [1, 1, 0.5], 'plain']
+    ]),
+    // 天象：一弯银色新月（两角朝右上）
+    crescent: charge(crescentPts(0.40, 0.15, 0.11, 0.33, 20).map(function (v, i) { return i % 2 ? v - 0.03 : v; }), SILVER, 'metal')
+  };
 
-  // ---------------- 体积：放大镜 ----------------
-  (function () {
-    var d = function (t) { return [t * 0.707, -t * 0.707, 0]; };
-    ICONS.model('tome_size', [
-      ['torus', [0.5, 0.09, 6, 16], [0, 0, 0], 0xffc83a, null, null, 'gold'],
-      ['cyl', [0.47, 0.47, 0.04, 16], [0, 0, 0], 0xbfe8ff, [PI / 2, 0, 0], null, 'plain'],
-      ['box', [0.08, 0.32, 0.02], [-0.2, 0.15, 0.04], 0xffffff, [0, 0, -0.7], null, 'plain'],
-      ['cyl', [0.09, 0.09, 0.2, 8], d(0.68), 0xffc83a, [0, 0, PI / 4], null, 'gold'],
-      ['cyl', [0.1, 0.08, 0.62, 8], d(1.08), 0x8b5bd9, [0, 0, PI / 4], null, 'wood'],
-      ['sphere', [0.1, 6, 4], d(1.42), 0xffc83a, null, null, 'gold']
-    ], { yaw: 0.3, pitch: 0.2 });
-  })();
-
-  // ---------------- 生命：大红心 ----------------
-  ICONS.model('tome_hp', [
-    ['tm_heart', [1, 0.22], [0, 0, 0], 0xe8203a, null, null, 'plain'],
-    ['sphere', [0.08, 6, 4], [-0.2, 0.2, 0.25], 0xffd0d8, null, [1.3, 1, 0.5], 'plain']
-  ], { yaw: 0.35, pitch: 0.15 });
-
-  // ---------------- 再生：绿心 + 白色十字 ----------------
-  ICONS.model('tome_regen', [
-    ['tm_heart', [1, 0.22], [0, 0, 0], 0x34c45a, null, null, 'plain'],
-    ['box', [0.4, 0.12, 0.08], [0, 0.04, 0.26], 0xffffff, null, null, 'plain'],
-    ['box', [0.12, 0.4, 0.08], [0, 0.04, 0.26], 0xffffff, null, null, 'plain']
-  ], { yaw: 0.35, pitch: 0.15 });
-
-  // ---------------- 护盾：发光的蓝色骑士盾 ----------------
-  ICONS.model('tome_shield', [
-    ['tm_shield', [1.25, 1.45, 0.1], [0, 0, -0.06], 0xe8f4ff, null, null, 'metal'],
-    ['tm_shield', [1.05, 1.25, 0.1], [0, 0, 0.02], 0x4ab8ff, null, null, 'plain'],
-    ['oct', [0.2], [0, 0.05, 0.14], 0xe0f8ff, null, [1, 1.3, 0.6], 'plain']
-  ], { yaw: 0.35, pitch: 0.15 });
-
-  // ---------------- 护甲：骑士桶盔 ----------------
-  ICONS.model('tome_armor', [
-    ['cyl', [0.44, 0.46, 0.86, 8], [0, 0, 0], 0xc0c8d2, [0, PI / 8, 0], null, 'ch_plate'],
-    ['cyl', [0.3, 0.44, 0.16, 8], [0, 0.51, 0], 0xb0b8c4, [0, PI / 8, 0], null, 'metal'],
-    ['cyl', [0.48, 0.48, 0.07, 8], [0, -0.42, 0], 0x8a929e, [0, PI / 8, 0], null, 'metal'],
-    ['box', [0.74, 0.08, 0.08], [0, 0.1, 0.41], 0x14141c, null, null, 'plain'],
-    ['box', [0.1, 0.62, 0.06], [0, -0.04, 0.44], 0xffc83a, null, null, 'gold'],
-    ['box', [0.62, 0.08, 0.06], [0, 0.2, 0.43], 0xffc83a, null, null, 'gold'],
-    ['box', [0.05, 0.05, 0.04], [0.2, -0.14, 0.42], 0x14141c],
-    ['box', [0.05, 0.05, 0.04], [0.2, -0.26, 0.42], 0x14141c],
-    ['box', [0.05, 0.05, 0.04], [-0.2, -0.14, 0.42], 0x14141c],
-    ['box', [0.05, 0.05, 0.04], [-0.2, -0.26, 0.42], 0x14141c]
-  ], { yaw: 0.5, pitch: 0.18, zoom: 0.88 });
-
-  // ---------------- 闪避：蓝闪蝶 ----------------
-  (function () {
-    var half = [
-      ['sphere', [0.46, 8, 5], [0.42, 0.22, -0.02], 0x1a2a6a, [0, 0, 0.45], [1, 0.74, 0.1], 'plain'],
-      ['sphere', [0.42, 8, 5], [0.42, 0.22, 0], 0x3aa8ff, [0, 0, 0.45], [1, 0.72, 0.12], 'plain'],
-      ['sphere', [0.34, 8, 5], [0.3, -0.26, -0.02], 0x1a2a6a, [0, 0, -0.5], [0.85, 1.0, 0.1], 'plain'],
-      ['sphere', [0.3, 8, 5], [0.3, -0.26, 0], 0x2a88f0, [0, 0, -0.5], [0.85, 1.0, 0.12], 'plain'],
-      ['sphere', [0.07, 5, 4], [0.66, 0.42, 0.05], 0xffffff, null, [1, 1, 0.4], 'plain'],
-      ['sphere', [0.05, 5, 4], [0.5, 0.5, 0.05], 0xffffff, null, [1, 1, 0.4], 'plain'],
-      ['box', [0.025, 0.36, 0.025], [0.08, 0.58, 0.04], 0x2a2a3a, [0, 0, -0.35]],
-      ['sphere', [0.04, 4, 3], [0.15, 0.75, 0.04], 0x2a2a3a]
-    ];
-    ICONS.model('tome_evade', xf(half, [0, -0.35, 0]).concat(xf(mirror(half), [0, 0.35, 0])).concat([
-      ['cyl', [0.065, 0.05, 0.72, 6], [0, 0, 0.04], 0x2a2a3a, null, null, 'fur'],
-      ['sphere', [0.09, 6, 4], [0, 0.4, 0.04], 0x2a2a3a]
-    ]), { yaw: 0.2, pitch: 0.35, zoom: 1.04 });
-  })();
-
-  // ---------------- 鲜血：盛满鲜血、往外淌的金杯 ----------------
-  ICONS.model('tome_blood', [
-    ['cyl', [0.34, 0.4, 0.09, 10], [0, -0.8, 0], 0xd9a53a, null, null, 'gold'],
-    ['cyl', [0.07, 0.11, 0.5, 8], [0, -0.52, 0], 0xffc83a, null, null, 'gold'],
-    ['sphere', [0.12, 8, 5], [0, -0.44, 0], 0xffd84a, null, [1, 0.8, 1], 'gold'],
-    ['ch_lathe', [12, 0.06, -0.3, 0.3, -0.2, 0.44, 0.0, 0.5, 0.28], [0, 0, 0], 0xffc83a, null, null, 'gold'],
-    ['torus', [0.49, 0.045, 4, 12], [0, 0.29, 0], 0xffe27a, [PI / 2, 0, 0], null, 'gold'],
-    ['cyl', [0.47, 0.47, 0.04, 12], [0, 0.25, 0], 0xc8102a, null, null, 'plain'],
-    ['oct', [0.09], [0, -0.05, 0.4], 0xff3a5a, null, [1, 1.3, 0.6], 'plain'],
-    ['box', [0.09, 0.3, 0.06], [0.2, 0.14, 0.42], 0xc8102a, [-0.25, 0, 0], null, 'plain'],
-    ['sphere', [0.065, 6, 4], [0.2, -0.01, 0.39], 0xc8102a, null, null, 'plain'],
-    ['box', [0.08, 0.18, 0.06], [-0.24, 0.2, 0.4], 0xc8102a, [-0.25, 0, 0], null, 'plain'],
-    ['sphere', [0.055, 6, 4], [-0.24, 0.1, 0.39], 0xc8102a, null, null, 'plain']
-  ], { yaw: 0.35, pitch: 0.38, zoom: 0.88 });
-
-  // ---------------- 荆棘：盆栽仙人掌 ----------------
-  (function () {
-    var G = 0x4e9a34, sp = function (x, y, z, rz, rx) { return ['cone', [0.04, 0.16, 3], [x, y, z], 0xfff6c8, [rx || 0, 0, rz], null, 'plain']; };
-    ICONS.model('tome_thorns', [
-      ['cyl', [0.38, 0.3, 0.42, 8], [0, -0.78, 0], 0xc8643a, null, null, 'brick'],
-      ['cyl', [0.43, 0.43, 0.12, 8], [0, -0.53, 0], 0xd8744a, null, null, 'brick'],
-      ['cyl', [0.25, 0.27, 1.0, 8], [0, -0.02, 0], 0x5aa83a, null, null, 'env_cactus'],
-      ['sphere', [0.25, 8, 4], [0, 0.48, 0], 0x5aa83a, null, [1, 0.8, 1], 'env_cactus'],
-      ['cyl', [0.12, 0.12, 0.3, 6], [-0.33, -0.08, 0], G, [0, 0, PI / 2], null, 'env_cactus'],
-      ['cyl', [0.13, 0.13, 0.45, 6], [-0.45, 0.12, 0], G, null, null, 'env_cactus'],
-      ['sphere', [0.13, 6, 4], [-0.45, 0.35, 0], G, null, null, 'env_cactus'],
-      ['cyl', [0.11, 0.11, 0.28, 6], [0.32, 0.1, 0], G, [0, 0, PI / 2], null, 'env_cactus'],
-      ['cyl', [0.12, 0.12, 0.36, 6], [0.43, 0.26, 0], G, null, null, 'env_cactus'],
-      ['sphere', [0.12, 6, 4], [0.43, 0.44, 0], G, null, null, 'env_cactus'],
-      sp(0, 0.72, 0, 0), sp(-0.27, 0.3, 0, PI / 2), sp(0.27, -0.2, 0, -PI / 2), sp(-0.27, -0.35, 0, PI / 2),
-      sp(-0.6, 0.15, 0, PI / 2), sp(-0.45, 0.52, 0, 0.3), sp(0.57, 0.3, 0, -PI / 2), sp(0.45, 0.6, 0, -0.3),
-      sp(0.1, 0.1, 0.27, 0, PI / 2), sp(-0.1, -0.3, 0.27, 0, PI / 2), sp(0.05, 0.38, 0.24, 0, 1.2)
-    ], { yaw: 0.35, pitch: 0.2 });
-  })();
-
-  // ---------------- 弹速：拖着光尾飞的箭 ----------------
-  (function () {
-    var a = [
-      ['box', [0.11, 1.5, 0.11], [0, 0.1, 0], 0xe0b878, null, null, 'wood'],
-      ['cone', [0.25, 0.54, 4], [0, 1.12, 0], 0xe8eef6, null, [1, 1, 0.4], 'metal'],
-      ['ch_tbox', [0.08, 0.4, 0.46, 0.04, 0.04], [0, -0.42, 0], 0x5ad0f0, null, null, 'ch_feather'],
-      ['ch_tbox', [0.04, 0.04, 0.46, 0.08, 0.4], [0, -0.42, 0], 0x3ab8e8, null, null, 'ch_feather']
-    ];
-    // 光尾（不受光照）：三道往后拉长的青色尾焰
-    var tail = [
-      ['cone', [0.3, 1.3, 6], [0, -1.1, -0.05], 0x7ad9f0, [PI, 0, 0], null, 'plain'],
-      ['cone', [0.16, 0.9, 5], [0.3, -0.85, -0.05], 0xbfeeff, [PI, 0, -0.12], null, 'plain'],
-      ['cone', [0.16, 0.9, 5], [-0.3, -0.85, -0.05], 0xbfeeff, [PI, 0, 0.12], null, 'plain']
-    ];
-    ICONS.model('tome_pspd', glow(xf(a, [0, 0, -0.8]), xf(tail, [0, 0, -0.8])), { yaw: 0.2, pitch: 0.15 });
-  })();
-
-  // ---------------- 持续：长明蜡烛 ----------------
-  ICONS.model('tome_dur', glow([
-    ['cyl', [0.5, 0.44, 0.1, 10], [0, -0.6, 0], 0xd9a53a, null, null, 'gold'],
-    ['cyl', [0.54, 0.54, 0.05, 10], [0, -0.54, 0], 0xffd84a, null, null, 'gold'],
-    ['torus', [0.12, 0.04, 4, 8], [0.6, -0.56, 0], 0xffd84a, null, null, 'gold'],
-    ['cyl', [0.2, 0.21, 0.92, 8], [0, -0.06, 0], 0xb48ae8, null, null, 'bone'],
-    ['cyl', [0.215, 0.2, 0.07, 8], [0, 0.4, 0], 0xd0b4ff, null, null, 'bone'],
-    ['box', [0.08, 0.32, 0.08], [0.12, 0.25, 0.16], 0xd0b4ff, null, null, 'bone'],
-    ['sphere', [0.05, 5, 4], [0.12, 0.09, 0.16], 0xd0b4ff, null, null, 'bone'],
-    ['box', [0.07, 0.2, 0.07], [-0.16, 0.31, 0.12], 0xd0b4ff, null, null, 'bone'],
-    ['box', [0.03, 0.12, 0.03], [0, 0.48, 0], 0x2a2a2a, null, null, 'plain']
-  ], [
-    ['sphere', [0.12, 6, 4], [0, 0.6, 0], 0xff8a1a, null, null, 'plain'],
-    ['cone', [0.12, 0.38, 6], [0, 0.82, 0], 0xff8a1a, null, null, 'plain'],
-    ['cone', [0.07, 0.25, 5], [0, 0.72, 0.08], 0xffe27a, null, null, 'plain'],
-    ['sphere', [0.06, 5, 4], [0, 0.6, 0.09], 0xfff4c0, null, null, 'plain']
-  ]), { yaw: 0.5, pitch: 0.25 });
-
-  // ---------------- 击退：装在弹簧上的拳击手套 ----------------
-  ICONS.model('tome_kb', [
-    ['sphere', [0.44, 10, 7], [0.3, 0, 0], 0xe02a2a, null, [1.05, 0.92, 0.95], 'ch_leather'],
-    ['sphere', [0.32, 8, 6], [0.0, -0.03, 0], 0xd02424, null, null, 'ch_leather'],
-    ['sphere', [0.13, 6, 4], [0.22, 0.2, 0.34], 0xc81e1e, null, [2.0, 1, 1], 'ch_leather'],
-    ['cyl', [0.26, 0.29, 0.34, 8], [-0.29, -0.03, 0], 0xf4f4f4, [0, 0, PI / 2], null, 'cloth'],
-    ['cyl', [0.3, 0.3, 0.06, 8], [-0.13, -0.03, 0], 0xb01818, [0, 0, PI / 2], null, 'plain'],
-    ['tm_coil', [0.15, 0.05, 2.5, 0.42], [-0.66, -0.03, 0], 0xc8d0d8, [0, 0, PI / 2], null, 'metal'],
-    ['box', [0.1, 0.4, 0.4], [-0.9, -0.03, 0], 0x7a4a24, null, null, 'wood']
-  ], { yaw: 0.0, pitch: 0.25, tilt: 0.5, zoom: 1.12 });
-
-  // ---------------- 吸引：把经验水晶卷进去的粉色旋涡 ----------------
-  (function () {
-    var p = [
-      ['tm_spiral', [1.05, 0.8, 0.1, 0.3, 0.12, 0], [0, 0, 0], 0xff5ad0, null, null, 'plain'],
-      ['tm_spiral', [1.05, 0.8, 0.1, 0.3, 0.12, PI], [0, 0, 0], 0xc02aa0, null, null, 'plain']
-    ];
-    var gems = xf(crystal(0.34, 0.15, 0x8fd8ff, 0xe0f8ff), [0.5, 0, 1.0], [0.55, 0.2, 0.4])
-      .concat(xf(crystal(0.28, 0.13, 0x6cc0ff, 0xe0f8ff), [-0.5, 0, -1.0], [-0.55, 0.16, -0.35]));
-    ICONS.model('tome_attract', glow(p.concat(gems), [['sphere', [0.16, 8, 6], [0, -0.3, 0], 0xffd0f4, null, null, 'plain']]), { yaw: 0.4, pitch: 0.75, zoom: 1.12 });
-  })();
-
-  // ---------------- 幸运：开口朝上的铁马蹄铁 + 绿色闪光 ----------------
-  (function () {
-    var c = 0xd0d8e2, a0 = PI - 0.6, a1 = 0.6, p = [['tm_band', [0.66, 0.36, a0, PI + 1.2, 0.14], [0, 0, 0], c, null, null, 'metal']];
-    // 两头的防滑钉
-    [a0 - 0.12, a1 + 0.12].forEach(function (a) { p.push(['box', [0.3, 0.13, 0.22], [Math.cos(a) * 0.51, Math.sin(a) * 0.51, 0], c, [0, 0, a + PI / 2], null, 'metal']); });
-    // 钉孔
-    [2.8, 3.4, 4.0, 5.42, 6.02, 6.62].forEach(function (a) {
-      p.push(['box', [0.07, 0.07, 0.04], [Math.cos(a) * 0.51, Math.sin(a) * 0.51, 0.12], 0x3a2a10, [0, 0, a]]);
-    });
-    // 绿色的幸运闪光（四角星）
-    [[0.0, 0.5, 0.13], [0.44, 0.84, 0.1]].forEach(function (s) {
-      p.push(['oct', [s[2]], [s[0], s[1], 0.05], 0x7aff5a, null, [0.6, 1.8, 0.5], 'plain']);
-      p.push(['oct', [s[2]], [s[0], s[1], 0.05], 0x7aff5a, null, [1.8, 0.6, 0.5], 'plain']);
-    });
-    ICONS.model('tome_luck', p, { yaw: 0.3, pitch: 0.2, tilt: -0.2, zoom: 1.22 });
-  })();
-
-  // ---------------- 经验：一簇蓝色水晶 ----------------
-  ICONS.model('tome_xp', [
-    ['dodec', [0.4], [0, -0.48, 0], 0x5a5a6a, null, [1.3, 0.5, 1.0], 'rock']
-  ].concat(
-    xf(crystal(0.7, 0.2, 0x8fd8ff, 0xe0f8ff), null, [0, 0.1, 0]),
-    xf(crystal(0.42, 0.15, 0x5aa8ff, 0xc0e4ff), [0, 0, 0.55], [-0.3, -0.12, 0.05]),
-    xf(crystal(0.36, 0.13, 0xb0e8ff, 0xe8faff), [0.2, 0, -0.6], [0.28, -0.16, 0.1])
-  ), { yaw: 0.4, pitch: 0.2 });
-
-  // ---------------- 黄金：一摞摞金币 ----------------
-  (function () {
-    var p = [], stack = function (x, z, n) {
-      for (var i = 0; i < n; i++) p.push(['cyl', [0.3, 0.3, 0.1, 12], [x + (i % 2 ? 0.025 : -0.02), -0.5 + i * 0.105, z], i % 2 ? 0xffd04a : 0xd99a22, null, null, 'gold']);
-    };
-    stack(-0.34, -0.1, 7); stack(0.3, -0.28, 5); stack(0.02, 0.36, 3);
-    ICONS.model('tome_golden', p, { yaw: 0.5, pitch: 0.42, zoom: 0.94 });
-  })();
-
-  // ---------------- 诅咒：发着绿光的紫色骷髅头 ----------------
-  ICONS.model('tome_cursed', glow([
-    ['sphere', [0.45, 10, 7], [0, 0.12, 0], 0xb48ae8, null, [1, 0.95, 1.05], 'bone'],
-    ['ch_tbox', [0.6, 0.42, 0.34, 0.62, 0.5], [0, -0.24, 0.04], 0xb48ae8, null, null, 'bone'],
-    ['sphere', [0.14, 6, 4], [-0.17, 0.0, 0.38], 0x24103a, null, [1, 1.1, 0.6], 'plain'],
-    ['sphere', [0.14, 6, 4], [0.17, 0.0, 0.38], 0x24103a, null, [1, 1.1, 0.6], 'plain'],
-    ['cone', [0.06, 0.12, 3], [0, -0.16, 0.37], 0x24103a, [PI, 0, 0], null, 'plain'],
-    ['box', [0.42, 0.14, 0.05], [0, -0.32, 0.3], 0x24103a, null, null, 'plain'],
-    ['box', [0.08, 0.1, 0.06], [-0.15, -0.31, 0.31], 0xe8dcff, null, null, 'bone'],
-    ['box', [0.08, 0.1, 0.06], [-0.05, -0.31, 0.31], 0xe8dcff, null, null, 'bone'],
-    ['box', [0.08, 0.1, 0.06], [0.05, -0.31, 0.31], 0xe8dcff, null, null, 'bone'],
-    ['box', [0.08, 0.1, 0.06], [0.15, -0.31, 0.31], 0xe8dcff, null, null, 'bone']
-  ], [
-    ['sphere', [0.065, 5, 4], [-0.17, 0.0, 0.45], 0xb0ff4a, null, null, 'plain'],
-    ['sphere', [0.065, 5, 4], [0.17, 0.0, 0.45], 0xb0ff4a, null, null, 'plain']
-  ]), { yaw: 0.3, pitch: 0.1, zoom: 0.9 });
-
-  // ---------------- 混沌：彩虹三叶结 ----------------
-  (function () {
-    var cols = [0xff3a3a, 0xff9a2a, 0xffe03a, 0x4ad95a, 0x3ac8ff, 0x4a6aff, 0xb04aff], p = [];
-    cols.forEach(function (c, i) { p.push(['tm_knot', [i / 7, (i + 1) / 7 + 0.004, 0.52, 0.16], [0, 0, 0], c, null, null, 'plain']); });
-    ICONS.model('tome_chaos', p, { yaw: 0.3, pitch: 0.45 });
-  })();
-
-  // ---------------- 对应到游戏里的魔典 ----------------
-  ['dmg', 'cd', 'qty', 'prec', 'size', 'hp', 'regen', 'shield', 'armor', 'evade', 'blood', 'thorns', 'pspd', 'dur', 'kb', 'attract', 'luck', 'xp', 'golden', 'cursed', 'chaos'].forEach(function (id) {
-    ICONS.use('tome', id, 'tome_' + id);
-  });
+  // 别的图标（家族徽章）也用这个盾：返回零件数组，盾在原点、正面朝 +z、高 1.5；
+  // opts.rim / opts.rimTex 换盾边的颜色和贴图。家族颜色在渲染时才从 TOMES 里读（data.js 在图标文件后面加载）
+  ICONS.crestParts = function (id, opts) {
+    opts = opts || {};
+    var t = typeof TOMES !== 'undefined' ? TOMES[id] : null;
+    var field = (t && CREST_FAMILY[t.family]) || 0x8a8e96;
+    return shield(field, opts.rim, opts.rimTex).concat(CHARGES[id] || []).map(function (p) { return p.slice(); });
+  };
+  function crest(id) {
+    ICONS.model('cr_' + id, function () { return new THREE.Mesh(MODEL.build(ICONS.crestParts(id), false), MODEL.material()); }, CREST_CAM);
+    ICONS.use('tome', id, 'cr_' + id);
+  }
+  Object.keys(CHARGES).forEach(crest);
 })();

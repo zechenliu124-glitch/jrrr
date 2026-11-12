@@ -1,17 +1,46 @@
 'use strict';
 // ============================================================
 //  武器：自动攻击
-//  近战挥砍、射击（连发/瞄准/追踪/爆炸/处决）、弹跳、回旋、闪电链、
-//  光环/冰霜、环绕、神盾、龙卷风、地雷、毒云、黑洞、火焰足迹、飞斧、
-//  太空面条（连线）、龙息（喷火）
-//  外观：命中火花、开火闪光、弹丸拖尾、贴地圆盘都走 fx.js 的批量绘制；
+//  近战（含骑枪冲锋 ram）、射击（从天而降 / 插地 / 冰冻 / 分裂 / 减速）、扇形飞刀、弹跳（马走日跳跃）、
+//  回旋、信使链、光环、钟声波（ring）、环绕、地雷（蜡烛 / 捕兽夹）、颜料地、藤蔓足迹、飞锅、钓竿（reel）、提灯光束（beam）
+//  外观：新武器的样子都走 Weapons.L（weapons_fx.js，没有就不画）；弹丸、拖尾、贴地圆盘走 fx.js 的批量绘制；
 //  场地模型用对象池（死掉的场地把网格还回来，不反复新建网格和材质）
 // ============================================================
-var Weapons = { projs: [], zones: [], meshes: {}, lobs: [], zpool: {} };
+var Weapons = { projs: [], zones: [], meshes: {}, lobs: [], zpool: {}, blasts: [], frame: 0 };
 
 var UPG_LABEL = {
-  damage: ['伤害', 'flat'], count: ['弹丸', 'flat'], size: ['范围', 'pct'], pspd: ['弹速', 'pct'], duration: ['持续时间', 'sec'],
-  knockback: ['击退', 'flat'], bounces: ['弹射', 'flat'], critChance: ['暴击率', 'pct'], critDmg: ['暴击伤害', 'pct']
+  damage: ['伤害', 'flat'], count: ['数量', 'flat'], size: ['范围', 'pct'], pspd: ['弹速', 'pct'], duration: ['持续时间', 'sec'],
+  knockback: ['击退', 'flat'], bounces: ['弹跳', 'flat'], critChance: ['暴击率', 'pct'], critDmg: ['暴击伤害', 'pct'],
+  pierce: ['穿透', 'flat']
+};
+
+// 弹丸种类：没有模型的用灵魂光球
+Weapons.projKind = function (k) {
+  return Weapons.meshes[k] ? k : 'soul';
+};
+
+// 弹丸动画参数（models_proj.js 的 PROJ_ANIM；没有就是空的）
+Weapons.NOANIM = {};
+Weapons.anim = function (kind) {
+  var A = typeof PROJ_ANIM !== 'undefined' ? PROJ_ANIM : null;
+  return (A && A[Weapons.baseKind(kind)]) || Weapons.NOANIM;
+};
+
+// 场地模型（飞锅等）的几何体：按种类缓存，没有模型的用飞斧
+Weapons.zoneGeo = function (kind) {
+  var c = Weapons._zg || (Weapons._zg = {}), k = Weapons.baseKind(kind) || 'axe';
+  if (!c[k]) c[k] = MODEL.build(PROJ_MODELS[k] || PROJ_MODELS.axe);
+  return c[k];
+};
+
+// 声音层的事件（audio_hooks.js 包一层）：ring / hook / land / ram / quake / stick / hop / trap / clang / split
+Weapons.emit = function (name, w, x, z, a1) {};
+// 同一帧同一把武器同一个事件只发一次
+Weapons.emitOnce = function (name, w, x, z, a1) {
+  var m = w._em || (w._em = {});
+  if (m[name] === Weapons.frame) return;
+  m[name] = Weapons.frame;
+  Weapons.emit(name, w, x, z, a1);
 };
 
 Weapons.init = function (scene) {
@@ -31,30 +60,9 @@ Weapons.init = function (scene) {
   Weapons.wColor = {};
   // 常用颜色（不在每帧里新建）
   var C = Weapons.C = {};
-  [['white', 0xffffff], ['fuse', 0xff3a1a], ['mark', 0xff3030], ['fire', 0xff6a1a], ['mist', 0x5aff4a], ['hook', 0xc0c8d0],
-    ['flail', 0xcfd6e0], ['ice', 0xdffaff], ['streak', 0xeaf4ff], ['gold', 0xffc23a], ['core', 0xffe9a0], ['ember', 0xffb030]].forEach(function (p) { C[p[0]] = new THREE.Color(p[1]); });
-  // 龙息的火焰锥：嘴边白黄 → 中段橙 → 末端暗红
-  Weapons.flameC = [];
-  for (var i = 0; i < 7; i++) {
-    var t = i / 6, c = new THREE.Color(0xfff0a0);
-    if (t < 0.5) c.lerp(new THREE.Color(0xff8a1a), t * 2); else c.set(0xff8a1a).lerp(new THREE.Color(0xd8401a), (t - 0.5) * 2);
-    Weapons.flameC.push(c);
-  }
-  // 超武流星锤的拖尾：金黄 → 橙红
-  Weapons.meteorC = [0xffd23a, 0xffaa2a, 0xff8a22, 0xff6a1a].map(function (h) { return new THREE.Color(h); });
-  // 飞斧：所有飞斧共用一个几何体（以前每扔一把就新建一个，从不释放）
-  Weapons._axeGeo = MODEL.build(PROJ_MODELS.axe);
+  [['mark', 0xff3030]].forEach(function (p) { C[p[0]] = new THREE.Color(p[1]); });
   Weapons.swooshMat = new THREE.MeshBasicMaterial({ color: 0xdfe6ff, vertexColors: true, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
   Weapons.swooshGoldMat = new THREE.MeshBasicMaterial({ color: 0xffd060, vertexColors: true, transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
-  // 黑洞的漆黑核心（紫色光环用发光精灵画）
-  Weapons.holeMat = new THREE.MeshBasicMaterial({ color: 0x12061f });
-  // 锁链的链环：拉长的圆环，长轴沿 z
-  Weapons.linkMesh = MODEL.instanced(MODEL.build([['torus', [0.12, 0.036, 4, 8], [0, 0, 0], 0xd0d6de, [0, Math.PI / 2, 0], [1.5, 1, 1], 'metal']]), 64, scene);
-  Weapons.linkMesh.visible = false;
-  Weapons._lm = new THREE.Matrix4(); Weapons._lq = new THREE.Quaternion(); Weapons._lq2 = new THREE.Quaternion(); Weapons._lr = new THREE.Quaternion();
-  Weapons._la = new THREE.Vector3(); Weapons._lb = new THREE.Vector3(); Weapons._lup = new THREE.Vector3(0, 1, 0); Weapons._ls = new THREE.Vector3(1, 1, 1);
-  Weapons._lr.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
-  Weapons._lc = new THREE.Color();
 };
 
 Weapons.clear = function () {
@@ -62,8 +70,20 @@ Weapons.clear = function () {
   Weapons.zones.forEach(Weapons.freeZone);
   Weapons.zones = [];
   Weapons.lobs = [];
+  Weapons.dropBlasts();
   for (var k in Weapons.meshes) { Weapons.meshes[k].count = 0; Weapons.meshes[k].visible = false; }
-  if (Weapons.linkMesh) { Weapons.linkMesh.count = 0; Weapons.linkMesh.visible = false; }
+  // 每把武器的临时状态（钩着的敌人、光束、冲锋记录）：上一关的敌人不能还被钩着
+  var ws = typeof P !== 'undefined' && P.weapons ? P.weapons : [];
+  for (var i = 0; i < ws.length; i++) Weapons.resetState(ws[i]);
+};
+
+Weapons.resetState = function (w) {
+  if (w.hooks) { for (var j = 0; j < w.hooks.length; j++) Weapons.hookPool.push(w.hooks[j]); w.hooks.length = 0; }
+  w.target = null;
+  w.flaming = 0;
+  if (w.ramHit) w.ramHit.clear();
+  w.ramT = 0;
+  if (w.ramOn) { w.ramOn = false; var L = Weapons.L; if (L && L.ram) L.ram(w, false); }
 };
 
 // 场地模型的对象池：key 区分种类（超武的单独一池，它们换过金色几何体）
@@ -82,7 +102,10 @@ Weapons.dropMesh = function (m) {
 Weapons.freeZone = function (z) {
   Weapons.dropMesh(z.mesh); Weapons.dropMesh(z.swoosh);
   z.mesh = null; z.swoosh = null;
+  if (z.type === 'ring' && z.hit) { z.hit.clear(); Weapons.setPool.push(z.hit); z.hit = null; }
 };
+Weapons.setPool = [];
+Weapons.takeSet = function () { return Weapons.setPool.pop() || new Set(); };
 
 // 武器颜色（缓存成 THREE.Color；超武的颜色单独缓存）
 Weapons.colorOf = function (w) {
@@ -92,14 +115,7 @@ Weapons.colorOf = function (w) {
   return c;
 };
 
-// 开火闪光的颜色：武器颜色往白色靠一半
-Weapons.muzzleHex = function (w) {
-  var cache = Weapons._muz || (Weapons._muz = {}), key = w.id + (w.def.evo ? '@' : ''), h = cache[key];
-  if (h === undefined) h = cache[key] = w.def.evo ? 0xfff0b0 : FX.mixHex(w.def.color || 0xffffff, 0xffffff, 0.5);
-  return h;
-};
-
-// 超武的弹丸种类叫 'kind@武器id'：按原来的种类做特殊处理（香蕉平转、盾牌缩小等）
+// 超武的弹丸种类叫 'kind@武器id'：按原来的种类做特殊处理（回旋弹丸平转等）
 Weapons.baseKind = function (kind) {
   var c = Weapons._bk || (Weapons._bk = {}), b = c[kind];
   if (b === undefined) { var at = typeof kind === 'string' ? kind.indexOf('@') : -1; b = c[kind] = at > 0 ? kind.slice(0, at) : kind; }
@@ -194,6 +210,7 @@ Weapons.AURA_FS = [
   'uniform float uTime;',
   'uniform float uPulse;',
   'uniform float uCamAng;',
+  'uniform float uMix;',
   'varying float vKind;',
   'varying float vAng;',
   'varying float vV;',
@@ -201,7 +218,7 @@ Weapons.AURA_FS = [
   'void main() {',
   '  vec4 o;',
   '  if (vKind < 0.5 || vKind > 2.5) {',
-  '    vec3 c = vKind > 2.5 ? mix(uCol, vec3(1.0), 0.55) : uCol;',
+  '    vec3 c = vKind > 2.5 ? mix(uCol, vec3(1.0), uMix) : uCol;',
   '    c = mix(c, vec3(1.0), uPulse * 0.5);',
   '    o = vec4(c * 0.95, 0.95);',
   '  } else if (vKind < 1.5) {',
@@ -217,9 +234,10 @@ Weapons.AURA_FS = [
   '}'
 ].join('\n');
 
-Weapons.auraMat = function (color) {
+// mix：外圈的细线往白色混多少（默认 0.55；本来就很浅的颜色，比如圣咏的暖金，用小一点的值，免得发白）
+Weapons.auraMat = function (color, mix) {
   return new THREE.ShaderMaterial({
-    uniforms: { uCol: { value: new THREE.Color(color) }, uR: { value: 3.6 }, uHgt: { value: 0.8 }, uTime: { value: 0 }, uPulse: { value: 0 }, uCamAng: { value: 0 }, uH: { value: new Float32Array(24) } },
+    uniforms: { uCol: { value: new THREE.Color(color) }, uR: { value: 3.6 }, uHgt: { value: 0.8 }, uTime: { value: 0 }, uPulse: { value: 0 }, uCamAng: { value: 0 }, uMix: { value: mix != null ? mix : 0.55 }, uH: { value: new Float32Array(24) } },
     vertexShader: Weapons.AURA_VS, fragmentShader: Weapons.AURA_FS,
     transparent: true, depthWrite: false, side: THREE.DoubleSide,
     blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor
@@ -232,7 +250,7 @@ Weapons.camAng = function () {
   return c ? Math.atan2(c.z - P.pos.z, c.x - P.pos.x) : -Math.PI / 2;
 };
 
-// 每帧：跟着玩家，采样地面高度，跳伤时闪一下，冒几颗小光点
+// 每帧：跟着玩家，采样地面高度，跳伤时闪一下，冒几颗小光点（有 def.motes 的交给 Weapons.L.aura）
 Weapons.auraLook = function (w, r, dt) {
   var m = w.ring, u = m.material.uniforms;
   var base = Math.max(W.groundAt(P.pos.x, P.pos.z, P.pos.y + 0.5), P.pos.y - 3);
@@ -250,9 +268,11 @@ Weapons.auraLook = function (w, r, dt) {
     var a = i / 24 * TAU;
     H[i] = clamp(W.groundAt(P.pos.x + Math.cos(a) * r, P.pos.z + Math.sin(a) * r, base + 1) - base, -1.2, 1.2);
   }
-  if (Math.random() < dt * 9) {
+  var L = Weapons.L;
+  if (w.def.motes && L && L.aura) L.aura(w, r, base, dt);
+  else if (Math.random() < dt * 9) {
     var ma = Math.random() * TAU, mr = Math.sqrt(Math.random()) * r;
-    FX.mote(P.pos.x + Math.cos(ma) * mr, base + 0.15, P.pos.z + Math.sin(ma) * mr, w.def.freeze ? 0xdcfaff : 0xeef6ff, 0.09, rand(0.9, 1.7), rand(0.6, 1.1));
+    FX.mote(P.pos.x + Math.cos(ma) * mr, base + 0.15, P.pos.z + Math.sin(ma) * mr, 0xeef6ff, 0.09, rand(0.9, 1.7), rand(0.6, 1.1));
   }
 };
 
@@ -260,32 +280,30 @@ Weapons.give = function (id) {
   var def = WEAPONS[id];
   var s = {};
   for (var k in def.base) s[k] = def.base[k];
-  var w = { id: id, def: def, level: 1, s: s, timer: 0.3, kills: 0, dmg: 0, charges: 0 };
+  var w = { id: id, def: def, level: 1, s: s, timer: 0.3, kills: 0, dmg: 0, perkN: 0 };   // perkN：拿过几次专属词条
   P.weapons.push(w);
   Weapons.attach(w);
   return w;
 };
 
-// 常驻视觉（光环圈、锁链芯线）挂到场景上；换关时重新挂
+// 常驻视觉（光环圈；钟声的矮墙、鱼线这些在 Weapons.L.attach 里建）挂到场景上；换关时重新挂
 Weapons.attach = function (w) {
-  var def = w.def;
+  var def = w.def, L = Weapons.L;
   if (def.type === 'aura' && !w.ring) {
-    // 圣光：浅蓝；冰霜：更冷的青色
-    w.ring = new THREE.Mesh(Weapons.auraGeo(), Weapons.auraMat(def.freeze ? 0x9ff6ff : 0x8dbef8));
+    w.ring = new THREE.Mesh(Weapons.auraGeo(), def.auraColor != null ? Weapons.auraMat(def.auraColor, 0.25) : Weapons.auraMat(0x8dbef8));
     w.ring.frustumCulled = false;
     w.ring.renderOrder = 3;
   }
-  if (def.type === 'tether' && !w.beam) {
-    // 锁链中间一根细细的深色芯线，链环用实例化网格画；芯线几何体共用（重开一局不会再多一个）
-    var bg = Weapons.tetherGeo || (Weapons.tetherGeo = new THREE.CylinderGeometry(0.035, 0.035, 1, 5, 1, true).rotateX(Math.PI / 2).translate(0, 0, 0.5));
-    w.beam = new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ color: 0x4a4e58 }));
-    w.beam.visible = false;
-  }
-  [w.ring, w.ring2, w.beam].forEach(function (m) { if (m && !m.parent) Weapons.scene.add(m); });
+  if (w.ring && !w.ring.parent) Weapons.scene.add(w.ring);
+  if (w.ring2 && !w.ring2.parent) Weapons.scene.add(w.ring2);
+  if (L && L.attach) L.attach(w);
 };
 
 Weapons.detach = function (w) {
-  [w.ring, w.ring2, w.beam].forEach(function (m) { if (m && m.parent) m.parent.remove(m); });
+  if (w.ring && w.ring.parent) w.ring.parent.remove(w.ring);
+  if (w.ring2 && w.ring2.parent) w.ring2.parent.remove(w.ring2);
+  var L = Weapons.L;
+  if (L && L.detach) L.detach(w);
 };
 
 Weapons.find = function (id) {
@@ -293,28 +311,87 @@ Weapons.find = function (id) {
   return null;
 };
 
-// ---------------- 升级 ----------------
-// 普通稀有度随机 1~2 项，更高稀有度 2 项；铁砧有几率多 1 项
+// ---------------- 升级：锻造路线 ----------------
+// 每张卡：grow × 稀有度倍率；稀有起再加 up 里随机一条 × 倍率；传说再加专属 perk（不乘倍率，最多 max 次），
+// 专属拿满以后换成另一条副词条。picks 的 kind：grow / up / perk
 Weapons.rollUpgrade = function (w, rarity) {
-  var keys = Object.keys(w.def.up);
-  var n = rarity === 0 ? (Math.random() < 0.5 ? 1 : 2) : 2;
-  var anvils = P.items.anvil || 0;
-  if (anvils && Math.random() < 1 - Math.pow(0.5, anvils)) n++;
-  var picks = [];
-  while (picks.length < n && keys.length) {
-    var k = keys.splice(Math.floor(Math.random() * keys.length), 1)[0];
-    picks.push({ stat: k, v: w.def.up[k] * RARITY_MULT[rarity] });
+  var def = w.def, m = RARITY_MULT[rarity], picks = [], k;
+  if (def.grow) for (k in def.grow) picks.push({ stat: k, v: def.grow[k] * m, kind: 'grow' });
+  var ups = def.up ? Object.keys(def.up) : [];
+  if (rarity >= 2 && ups.length) {
+    var u = ups[Math.floor(Math.random() * ups.length)];
+    picks.push({ stat: u, v: def.up[u] * m, kind: 'up' });
+    if (rarity === 4) {
+      var pk = def.perk;
+      if (pk && (w.perkN || 0) < pk.max) {
+        for (k in pk) if (k !== 'max') picks.push({ stat: k, v: pk[k], kind: 'perk' });
+      } else if (ups.length > 1) {
+        var o = ups[ups[0] === u ? 1 : 0];
+        picks.push({ stat: o, v: def.up[o] * m, kind: 'up' });
+      }
+    }
   }
   return picks;
 };
 
+// 没有 kind 的旧 picks 照样加；有专属词条的卡记一次 perkN
 Weapons.applyUpgrade = function (w, picks) {
   w.level++;
-  picks.forEach(function (p) { w.s[p.stat] = (w.s[p.stat] || 0) + p.v; });
+  var perk = false;
+  picks.forEach(function (p) { w.s[p.stat] = (w.s[p.stat] || 0) + p.v; if (p.kind === 'perk') perk = true; });
+  if (perk) w.perkN = (w.perkN || 0) + 1;
+  Relic.onUpgrade(w);   // 第 6 块：磨刀石（升级卡、勤学苦练、铁匠铺都走这里）
 };
 
+// 卡片上的数字（武器自己的数值 w.s）：precise = 前后印出来一样时多一位小数
+Weapons.statNum = function (stat, v, precise) {
+  var r1 = function (x) { return String(Math.round(x * 10) / 10); };
+  if (precise) {
+    if (stat === 'size' || stat === 'pspd') return (Math.round(v * 1000) / 10) + '%';
+    if (stat === 'critChance' || stat === 'critDmg') return '+' + (Math.round(v * 1000) / 10) + '%';
+    return v.toFixed(1);
+  }
+  switch (stat) {
+    case 'damage': return v >= 10 ? String(Math.round(v)) : r1(v);
+    case 'size': case 'pspd': return Math.round(v * 100) + '%';
+    case 'count': return String(Math.floor(v + 1e-6));
+    case 'bounces': case 'pierce': return String(Math.round(v));
+    case 'critChance': case 'critDmg': return '+' + Math.round(v * 100) + '%';
+    default: return r1(v);    // knockback、duration：一位小数
+  }
+};
+
+// 武器卡的每一行：「伤害 15 → 17」「范围 110% → 125%」「专属：数量 2 → 3」「持续时间 4 → 4.7 秒」
+// 在 w.s 的副本上依次算（同一属性的副词条和专属接着算）
+Weapons.cardLines = function (w, picks) {
+  var s = {}, k;
+  for (k in w.s) s[k] = w.s[k];
+  return picks.map(function (p) {
+    var l = UPG_LABEL[p.stat];
+    if (!l) return Weapons.upgradeText(p);
+    var a = s[p.stat] || 0, b = a + p.v;
+    s[p.stat] = b;
+    var ta = Weapons.statNum(p.stat, a), tb = Weapons.statNum(p.stat, b);
+    if (ta === tb) { ta = Weapons.statNum(p.stat, a, true); tb = Weapons.statNum(p.stat, b, true); }
+    return (p.kind === 'perk' ? '专属：' : '') + l[0] + ' ' + ta + ' → ' + tb + (l[1] === 'sec' ? ' 秒' : '');
+  });
+};
+
+// 专属词条的短句：「数量 +1」「穿透 +1」「范围 +20%」「持续时间 +0.4 秒」
+Weapons.perkText = function (pk) {
+  for (var k in pk) {
+    if (k === 'max') continue;
+    var l = UPG_LABEL[k] || [k, 'flat'], v = pk[k];
+    if (l[1] === 'pct') return l[0] + ' +' + Math.round(v * 100) + '%';
+    if (l[1] === 'sec') return l[0] + ' +' + (Math.round(v * 10) / 10) + ' 秒';
+    return l[0] + ' +' + (Math.round(v * 10) / 10);
+  }
+  return '';
+};
+
+// 旧的一行写法（「+12% 范围」），兼容用
 Weapons.upgradeText = function (p) {
-  var l = UPG_LABEL[p.stat];
+  var l = UPG_LABEL[p.stat] || [STATS[p.stat] ? STATS[p.stat].name : p.stat, 'flat'];
   var v = p.v;
   if (l[1] === 'pct') return '+' + Math.round(v * 100) + '% ' + l[0];
   if (l[1] === 'sec') return '+' + (Math.round(v * 100) / 100) + ' 秒' + l[0];
@@ -322,144 +399,186 @@ Weapons.upgradeText = function (p) {
 };
 
 // ---------------- 派生数值 ----------------
-Weapons.cd = function (w) { return w.s.cd / P.st.atkSpeed; };
+// 实际攻击速度：属性 × 被动的攻速倍率
+Weapons.atk = function (w) { return P.st.atkSpeed * Passive.atkMult(w); };   // w：哪把武器（刀油按武器算）
+Weapons.cd = function (w) { return w.s.cd / Weapons.atk(w); };
 Weapons.count = function (w) { return Math.max(1, Math.floor((w.s.count || 1) + P.st.quantity + 1e-6)); };
 Weapons.size = function (w) { return (w.s.size || 1) * P.st.size; };
 Weapons.dur = function (w) { return (w.s.duration || 1) * P.st.duration; };
 Weapons.speed = function (w) { return (w.def.speed || 20) * (w.s.pspd || 1) * P.st.projSpeed; };
 Weapons.kb = function (w) { return (w.s.knockback || 0) * P.st.knockback * 3; };
 
-// 命中时几率效果：超能台灯给每个效果额外再判定一次
-function proc(chance) {
-  if (Math.random() < chance) return true;
-  return (P.items.lamp || 0) > 0 && Math.random() < chance;
-}
+// 命中时几率效果（超武特性用，evolution.js）
+function proc(chance) { return Math.random() < chance; }
 
-// 命中火花：[星光大小, 星光颜色, 碎屑数, 碎屑颜色]（光环、毒云这类跳伤和爆炸没有；每帧最多 FX.SPARK_CAP 个）
-Weapons.SPARK = {
-  sword: [0.7, 0xffffff, 2, 0xdfe6ee], katana: [0.6, 0xffffff, 1, 0xff4a6a], corrupted: [0.7, 0xe8c8ff, 3, 0xb04aff],
-  herosword: [0.7, 0xffffff, 2, 0x9fd8ff], scythe: [0.7, 0xffffff, 2, 0xa6a6c8],
-  revolver: [0.5, 0xffffff, 1, 0xffe0a0], bone: [0.8, 0xffffff, 2, 0xf3ead0], bow: [0.6, 0xffffff, 2, 0xf4f0e0],
-  dagger: [0.6, 0xaaffe6, 2, 0x7affd0], sniper: [0.9, 0xffffff, 3, 0x8a5a2a], dexe: [0.8, 0xffffff, 2, 0xc8c8d8],
-  bloodmagic: [0.7, 0xff6a78, 4, 0x8a0a1a], dice: [0.7, 0xffffff, 2, 0xffffff], banana: [0.7, 0xfff0a0, 2, 0xffe14a],
-  chunkers: [0.9, 0xffffff, 3, 0x8a8a94], axe: [0.7, 0xd8e0e8, 1, 0xb0b8c0], shotgun: [0.6, 0xfff0d0, 2, 0xc8a070]
+// ---------------- 命中后的武器参数（计划 §4.1） ----------------
+// 减速的三种写法：数字 0.3（踩在里面每次跳伤续 0.5 秒）、数组 [0.3, 1]、对象 { k, t }；结果缓存在 def._slow
+Weapons.slowOf = function (v) {
+  if (v == null) return null;
+  if (typeof v === 'number') return { k: v, t: 0.5 };
+  if (v.length === 2) return { k: v[0], t: v[1] };
+  return { k: v.k, t: v.t };
+};
+Weapons.defSlow = function (def) {
+  if (def._slow === undefined) def._slow = Weapons.slowOf(def.slow);
+  return def._slow;
 };
 
-Weapons.hitFx = function (w, e) {
-  var sp = Weapons.SPARK[w.id];
-  if (!sp) return;
-  var evo = w.def.evo;
-  var ok = FX.spark(e.x, e.y + e.r, e.z, sp[0] * (evo ? 1.25 : 1), evo ? 0xffd870 : sp[1], sp[2], evo && w.id !== 'bloodmagic' ? 0xffd23a : sp[3], w.id === 'chunkers' ? 0.26 : 0.2);
-  if (ok && w.id === 'bloodmagic') FX.ring(e.x, e.y, e.z, 0.8, 0xd9233a, 0.25);
+// 燃烧：每秒 frac × 这次命中的伤害，持续 t 秒（和燃烧特性同一种算法；更强的持续伤害覆盖弱的，不叠加）
+Weapons.burn = function (w, e, dealt, b) {
+  if (!e.alive || e.prop || !b) return;
+  Enemies.applyDot(e, dealt * b.frac, b.t);
+  e.fireT = Math.max(e.fireT || 0, Game.time + b.t);
 };
 
-// 一次命中：计算各种加成、暴击（含超级暴击）、命中时效果
+// 直接推开（不带伤害）：和 Enemies.damage 一样按体型打折
+Weapons.push = function (e, dx, dz, v) {
+  if (!e.alive || e.prop) return;
+  var f = e.boss ? 0.03 : e.mini ? 0.1 : e.elite ? 0.3 : 1;
+  e.kx += dx * v * f; e.kz += dz * v * f;
+};
+
+// 一次命中造成伤害以后：眩晕、燃烧、减速、冰冻、分裂、颜料标记（src：弹丸 / 场地，可以没有）
+// 盾牌挡掉的命中 dealt = 0，不会走到这里
+Weapons.after = function (w, e, dealt, src) {
+  if (!(dealt > 0) || !e.alive) return;
+  var def = w.def, sl, big = e.boss || e.mini;
+  if (def.stunHit && !big && !e.prop && window.Evo && Math.random() < def.stunHit) Evo.stun(e, def.stunT || 0.5);
+  if (def.burn) Weapons.burn(w, e, dealt, def.burn);
+  if (def.slow && (sl = Weapons.defSlow(def))) {
+    Enemies.slow(e, 1 - sl.k, sl.t);
+    if (def.type === 'shot' && !e.prop) { e.mk = 'honey'; e.mkT = Game.time + sl.t; }
+  }
+  if (src && src.look === 'paint' && !e.prop) { e.mk = 'paint'; e.mkC = src.ci; e.mkT = Game.time + 1; }
+  var ch = def.chill;
+  if (ch && !big && !e.prop) {
+    // 已经被减速（随便什么减速）的再中一次就冻住；然后总是减速
+    if (e.slowT > 0 && e.slowK < 1) e.frozen = Math.max(e.frozen, ch.freeze);
+    Enemies.slow(e, 1 - ch.slow, ch.t);
+  }
+  var sp = def.splitHit;
+  if (sp && src && src.isProj && !src.frag && window.Evo && Evo.budget > 0 && Weapons.projs.length < 320) {
+    Evo.budget--;
+    var s2 = Math.sqrt(src.vx * src.vx + src.vz * src.vz) || 1;
+    Evo.split(w, e, src.dmgMult, src.vx / s2, src.vz / s2, sp.n, sp.mult);
+    Weapons.emitOnce('split', w, e.x, e.z);
+    var L = Weapons.L;
+    if (L && L.split) L.split(w, e.x, e.y + e.r, e.z);
+  }
+};
+
+// 一次命中：计算各种加成、暴击、命中时效果
 Weapons.hit = function (w, e, mult, kx, kz, opts) {
   if (!e.alive) return 0;
-  var d = (w.s.damage || 0) * (mult || 1) * P.st.damage * Passive.dmgMult(e);
-  if (P.items.glasses && e.hp > e.maxHp * 0.9) d *= 1 + 0.25 * P.items.glasses;
-  if (P.items.knuckles && dist2(e.x, e.z, P.pos.x, P.pos.z) < 36) d *= 1 + 0.2 * P.items.knuckles;
-  if (P.items.speedboi && P.hp < P.st.maxHp * 0.5) d *= 2;
+  var d = (w.s.damage || 0) * (mult || 1) * P.st.damage * Passive.dmgMult(e) * Relic.hitMult(w, e);   // 第 6 块：宝物的倍率（暴击之前）
   if (e.elite || e.boss || e.mini) d *= 1 + (P.st.eliteDmg || 0);
   if (e.marked > 0) d *= 2;
   if (P.rage > 0) d *= 2;
   var cc = P.st.critChance + (w.s.critChance || 0);
   var cm = P.st.critDmg + (w.s.critDmg || 0);
+  if (cc > 1) cm += cc - 1;                    // 暴击率超过 100% 的部分：每多 1% 变成 +1% 暴击伤害（不再二次暴击）
   var crit = 0;
-  if (Math.random() < cc) {
-    crit = 1;
-    d *= cm;
-    if (cc > 1 && Math.random() < cc - 1) d *= cm;           // 暴击率超过 100%：再暴击一次
-    if (P.items.fork && Math.random() < 1 - Math.pow(0.86, P.items.fork)) { crit = 2; d *= 2; }   // 超大暴击
-  }
+  if (Math.random() < cc) { crit = 1; d *= cm; }
   var kb = Weapons.kb(w);
-  // 大棒槌：几率造成 20 倍的 BONK
-  if (P.items.bigbonk && proc(0.02 * P.items.bigbonk)) {
-    d *= 20; kb *= 6; crit = 2;
-    FX.text(e.x, e.y + e.r * 2 + 1.2, e.z, 'BONK!', '#ff3030', 1.8);
-    Game.shake(0.2);
-  }
   var dealt = Enemies.damage(e, d, crit, (kx || 0) * kb, (kz || 0) * kb, opts);
-  if (dealt > 0 && !(opts && opts.quiet) && !FX.tickDmg) Weapons.hitFx(w, e);
+  if (crit && dealt > 0) Passive.onCrit(w, e, dealt);       // 暴击命中之后（目标可能已经死了）
+  if (dealt > 0) Relic.afterHit(w, e, dealt, crit);         // 第 6 块：命中之后（火绒盒）
+  var L = Weapons.L;
+  if (dealt > 0 && !(opts && opts.quiet) && !FX.tickDmg && L && L.hit) L.hit(w, e, crit, dealt);
   // 击退带一点向上的力，把小怪打飞
   if (kb > 4 && !e.boss && !e.mini && !e.def.flyer && e.grounded && Math.random() < 0.5) { e.vy = Math.min(8, kb * 0.6); e.grounded = false; }
-  w.dmg += dealt;
-  // 命中时效果
-  if (e.alive) {
-    if (w.def.execute && !e.boss && !e.mini && proc(w.def.execute)) {
-      // 断头巨刃处决：金色 + 红色的叉形闪光
-      if (w.def.evo) { FX.flash(e.x, e.y + e.r * 1.2, e.z, 1.8, 0xffc23a, 0.18, 3); FX.flash(e.x, e.y + e.r * 1.2, e.z, 1.2, 0xff3030, 0.18, 2); }
-      Enemies.damage(e, e.hp + 1, 2, 0, 0, { text: '处决' });
-    }
-    if (P.items.cheese && proc(0.4)) Enemies.applyDot(e, Math.max(2, d * 0.15), 3);
-    if (P.items.icecube && proc(0.2)) e.frozen = Math.max(e.frozen, 1.5);
-    if (P.items.snek) { e.poisonStacks = (e.poisonStacks || 0) + 4 * P.items.snek; Enemies.applyDot(e, Math.max(2, d * 0.05) * e.poisonStacks, 3); if (proc(0.05)) { Enemies.damage(e, d * 0.2 * e.poisonStacks, 1, 0, 0); e.poisonStacks = 0; } }
-    if (P.items.dragonfire && proc(0.15)) Weapons.fireZone(e.x, e.z, d * 0.3);
-  }
-  if (crit && P.items.demonblade && proc(0.25)) P.heal(1);
-  if (!e.alive) {
-    w.kills++;
-    if (w.id === 'bloodmagic' && Math.random() < 0.05) P.addMod('maxHp', 1);
-  }
+  if (!e.prop) w.dmg += dealt;                               // 木人（e.prop）挨的打不算进结算页每把武器的伤害
+  if (!e.alive) w.kills++;
   if (w.evo && window.Evo) Evo.onHit(w, e, dealt, mult || 1, kx, kz);   // 超武命中特性（evolution.js）
   return dealt;
 };
+Weapons.QUIET = { quiet: true };
 
 Weapons.origin = function () { return { x: P.pos.x, y: P.pos.y + 1.1, z: P.pos.z }; };
 
-// 准星方向（镜头朝向）
-Weapons.aimDir = function () {
-  var cp = Math.cos(P.pitch * 0.6);
-  return { x: Math.sin(P.yaw) * cp, y: -Math.sin(P.pitch * 0.6) + 0.12, z: Math.cos(P.yaw) * cp };
+// ---------------- 排队的范围伤害 ----------------
+// 跳跃落地、钓竿上岸的溅射：先记下来，Weapons.updateProjs 之后再结算（弹丸更新期间盾牌会挡带方向的命中）
+Weapons.bpool = [];
+Weapons.blast = function (w, x, y, z, r, mult, skip, push) {
+  var b = Weapons.bpool.pop() || {};
+  b.w = w; b.x = x; b.y = y; b.z = z; b.r = r; b.mult = mult; b.skip = skip || null; b.push = push || 0;
+  Weapons.blasts.push(b);
+  return b;
+};
+Weapons.flushBlasts = function () {
+  var bs = Weapons.blasts;
+  for (var i = 0; i < bs.length; i++) {
+    var b = bs[i], w = b.w;
+    Weapons._b = b;
+    Enemies.inRadius(b.x, b.z, b.r, Weapons.blastHit);
+    b.w = null; b.skip = null;
+    Weapons.bpool.push(b);
+  }
+  bs.length = 0;
+  Weapons._b = null;
+};
+Weapons.blastHit = function (e) {
+  var b = Weapons._b;
+  if (e === b.skip || Math.abs(e.y - b.y) > b.r + 1.5) return;
+  var dx = e.x - b.x, dz = e.z - b.z, d = Math.sqrt(dx * dx + dz * dz) || 1;
+  var dealt = Weapons.hit(b.w, e, b.mult, dx / d, dz / d);
+  if (b.push) Weapons.push(e, dx / d, dz / d, b.push);
+  Weapons.after(b.w, e, dealt, null);
+};
+Weapons.dropBlasts = function () {
+  var bs = Weapons.blasts;
+  for (var i = 0; i < bs.length; i++) { bs[i].w = null; bs[i].skip = null; Weapons.bpool.push(bs[i]); }
+  bs.length = 0;
 };
 
 // ---------------- 主循环 ----------------
 Weapons.update = function (dt) {
   FX.tickDmg = false;
+  Weapons.frame++;
   for (var i = 0; i < P.weapons.length; i++) {
     var w = P.weapons[i];
     var type = w.def.type;
-    if (type === 'aura' || type === 'orbit' || type === 'aegis' || type === 'trail' || type === 'tether' || type === 'flame') {
+    if (type === 'aura' || type === 'orbit' || type === 'trail' || type === 'tether' || type === 'flame') {
       Weapons.updatePersistent(w, dt);
       continue;
     }
+    if (w.def.ram) Weapons.ramUpdate(w, dt);
     w.timer -= dt;
-    if (w.timer <= 0) w.timer = Weapons.fire(w) ? Weapons.cd(w) : 0.15;
+    if (w.timer <= 0) { var ok = Weapons.fire(w); if (ok) Relic.onFire(w); w.timer = ok ? Weapons.cd(w) : 0.15; }   // 第 6 块：真的出手之后（旧箭袋）
   }
   Weapons.updateProjs(dt);
+  Weapons.flushBlasts();
   Weapons.updateZones(dt);
   Weapons.render(dt);
 };
 
 Weapons.RANGE = 32;
+Weapons._sky = { x: 0, y: 0, z: 0 };
+Weapons._skyOver = { vx: 0, vz: 0, vy: 0, homing: 0, sky: true };
 
 Weapons.fire = function (w) {
-  var def = w.def, o = Weapons.origin(), n = Weapons.count(w), i;
+  var def = w.def, o = Weapons.origin(), n = Weapons.count(w), i, L = Weapons.L, xs = Relic.extraShots(w);   // 第 6 块：旧箭袋多的一发
   switch (def.type) {
     case 'melee': {
       var t = Enemies.nearest(o.x, o.z, 9 * Weapons.size(w));
-      if (!t && def.id !== 'scythe') return false;
-      var ang = t ? Math.atan2(t.x - o.x, t.z - o.z) : P.facing;
+      if (!t) return false;
+      var ang = Math.atan2(t.x - o.x, t.z - o.z);
       for (i = 0; i < n; i++) Weapons.swing(w, ang + (i % 2 ? 0.5 : -0.5) * (i > 0 ? 1 : 0), i * 0.12);
       return true;
     }
     case 'shot': case 'bounce': case 'boomerang': {
-      if (def.aimed) {
-        var ad = Weapons.aimDir();
-        for (i = 0; i < n; i++) {
-          var sp = (i - (n - 1) / 2) * 0.06;
-          Weapons.launch(w, o, null, Math.atan2(ad.x, ad.z) + sp, ad.y);
-        }
-        return true;
-      }
-      var targets = Enemies.nearestN(o.x, o.z, Weapons.RANGE, def.burst ? 1 : n);
+      n += xs;   // 第 6 块：旧箭袋
+      var targets = Enemies.nearestN(o.x, o.z, Weapons.RANGE, n);
       if (!targets.length) return false;
-      if (def.burst) {
-        // 左轮：连发
-        for (i = 0; i < n; i++) Game.later(i * 0.07, function () {
-          var oo = Weapons.origin(), tt = Enemies.nearest(oo.x, oo.z, Weapons.RANGE);
-          if (tt) Weapons.launch(w, oo, tt, Math.atan2(tt.x - oo.x, tt.z - oo.z) + rand(-0.05, 0.05));
-        });
+      if (def.fromSky) {
+        // 星星从目标头顶 14 米直直落下（不追踪），碰到敌人或地面炸开
+        var sk = Weapons._sky, so = Weapons._skyOver;
+        so.vy = -Weapons.speed(w);
+        for (i = 0; i < n; i++) {
+          var st = targets[i % targets.length];
+          sk.x = st.x + rand(-0.3, 0.3); sk.y = st.y + st.r + 14; sk.z = st.z + rand(-0.3, 0.3);
+          Weapons.launch(w, sk, null, 0, 0, 1, so);
+        }
         return true;
       }
       for (i = 0; i < n; i++) {
@@ -470,10 +589,14 @@ Weapons.fire = function (w) {
       return true;
     }
     case 'shotgun': {
-      var dir = Weapons.aimDir(), base = Math.atan2(dir.x, dir.z);
+      // 自动瞄准最近的敌人，扇形甩出 fan 把
+      var tk = Enemies.nearest(o.x, o.z, Weapons.RANGE);
+      if (!tk) return false;
+      var base = Math.atan2(tk.x - o.x, tk.z - o.z), hd = Math.sqrt(dist2(o.x, o.z, tk.x, tk.z)) || 1;
+      var dy = (tk.y + tk.r - o.y) / hd, fan = Math.round(def.fan || 5) + xs, spr = def.spread || 0.14;
       var mult = 1 + (n - 1) * 0.35;
-      for (i = 0; i < 7; i++) Weapons.launch(w, o, null, base + (i - 3) * 0.09 + rand(-0.03, 0.03), dir.y + rand(-0.05, 0.05), mult);
-      Weapons.shotgunFan(w, o, dir, base);
+      for (i = 0; i < fan; i++) Weapons.launch(w, o, null, base + (i - (fan - 1) / 2) * spr + rand(-0.03, 0.03), dy, mult);
+      if (L && L.fan) L.fan(w, o, dy, base, fan);
       return true;
     }
     case 'chain': {
@@ -488,88 +611,99 @@ Weapons.fire = function (w) {
       for (i = 0; i < n; i++) Weapons.throwAxe(w, ta[i % ta.length], i);
       return true;
     }
-    case 'tornado': case 'mine': case 'puddle': case 'blackhole': {
-      if (def.type !== 'mine' && def.type !== 'tornado' && !Enemies.nearest(o.x, o.z, Weapons.RANGE)) return false;
+    case 'mine': case 'puddle': {
+      if (def.type !== 'mine' && !Enemies.nearest(o.x, o.z, Weapons.RANGE)) return false;
       for (i = 0; i < n; i++) Weapons.spawnZone(w, i);
+      return true;
+    }
+    case 'ring': {
+      // 铜钟：身边 range × 范围之内有敌人才敲；数量 n = 几圈钟声，后面每圈晚 ringGap 秒、伤害 extraMult
+      // sizeK（晨昏钟 0.6，第 13 块 D-C13-5）：范围加成超过 1 的部分只按 sizeK 算（扩得太大一圈扫全屏）
+      var sz = Weapons.size(w); if (def.sizeK && sz > 1) sz = 1 + (sz - 1) * def.sizeK;
+      var R = (def.range || 5.5) * sz;
+      if (!Enemies.nearest(P.pos.x, P.pos.z, R)) return false;
+      for (i = 0; i < n; i++) {
+        Weapons.zones.push({ type: 'ring', w: w, k: i, t: -i * (def.ringGap || 0.3), R: 0, R0: 0, Rmax: R, wt: def.waveTime || 0.45,
+          life: (def.waveTime || 0.45) + 0.15, band: def.band || 1, mult: i ? (def.extraMult || 0.6) : 1, hit: Weapons.takeSet(), on: false, x: 0, y: 0, z: 0, tick: 0 });
+      }
       return true;
     }
   }
   return false;
 };
 
-// 散射弩：枪口一道扇形的光（看得出这一排箭覆盖多宽）+ 三团小闪光
-Weapons.shotgunFan = function (w, o, dir, base) {
-  var evo = w.def.evo, fx = Math.sin(base), fz = Math.cos(base);
-  var cx = o.x + fx * 1.2, cy = o.y + dir.y * 1.2 + 0.15, cz = o.z + fz * 1.2;
-  var kind = evo ? 'slash1.3' : 'slash0.9';
-  FX.spawn(kind, evo ? 0xffd84a : 0xffe2a0, { x: cx, y: cy, z: cz, s0: 1.4, s1: 3.2, life: 0.13, a0: 0.95, ry: base });
-  if (evo) {
-    FX.spawn('slashT1.3', 0xffffff, { x: cx, y: cy + 0.01, z: cz, s0: 1.3, s1: 3.0, life: 0.11, a0: 0.85, ry: base });
-    FX.ring(o.x, P.pos.y, o.z, 1.6, 0xffc23a, 0.18);
-  }
-  for (var k = -1; k <= 1; k++) {
-    var a = base + k * 0.27, d = 2.6;
-    FX.flash(o.x + Math.sin(a) * d, cy, o.z + Math.cos(a) * d, 0.9, evo ? 0xffe28a : 0xffd890, 0.09, 0);
-  }
-};
-
 // ---------------- 近战 ----------------
-// 斩击外观：细剑是细而亮的刀光加白芯，腐化之剑底下压一层深紫色
-Weapons.SLASH_LOOK = {
-  katana: { thin: true, core: true },
-  corrupted: { under: 0x2a0a3a, underA: 0.45 }
-};
-// 超武：腐化之剑保留紫色刀光（金色只做外弧）
-Weapons.SLASH_LOOK_EVO = {
-  katana: { thin: true, core: true },
-  corrupted: { under: 0x2a0a3a, underA: 0.5, mainHex: 0xc870ff, goldOuter: 0xffc23a }
-};
-
 Weapons.swing = function (w, ang, delay) {
   var def = w.def;
   var go = function () {
     var size = Weapons.size(w);
     var r = (def.range || 4) * size, arc = def.arc || 2;
-    var o = Weapons.origin();
-    var dirs = def.back ? [ang, ang + Math.PI] : [ang];
-    var mult = 1;
-    if (def.lowHp) { var f = 1 - P.hp / P.st.maxHp; mult = 1 + f * 1.5; if (P.hp < P.st.maxHp * 0.3) mult *= 2; }
-    var look = (def.evo ? Weapons.SLASH_LOOK_EVO : Weapons.SLASH_LOOK)[w.id] || null;
-    // 连砍好几下时地上的环只画第一下的
-    var ringOk = !(Game.time - (w.ringT || -9) < 0.3);
-    if (arc > 4 && ringOk) w.ringT = Game.time;
-    dirs.forEach(function (a) {
-      if (arc > 4) FX.sweep(o.x, P.pos.y, o.z, r, a, def.color, def.evo, ringOk);
-      else {
-        // 往镜头这边砍的刀光（双向斩的后半刀）淡一点、小一点：不会糊满屏幕下半部分
-        FX.slashA = Math.cos(a - P.yaw) < -0.3 ? 0.45 : 1;
-        FX.slash(o.x, P.pos.y, o.z, r, a, def.color, arc, def.evo, look);
-        FX.slashA = 1;
-      }
-      var first = null, fd = 1e9;
-      Enemies.inRadius(o.x, o.z, r, function (e) {
-        var ea = Math.atan2(e.x - o.x, e.z - o.z);
-        var diff = Math.abs(((ea - a + Math.PI) % TAU + TAU) % TAU - Math.PI);
-        if (diff > arc / 2 && dist2(o.x, o.z, e.x, e.z) > 2.2) return;
-        if (Math.abs(e.y + e.r - o.y) > r + e.r) return;
-        var d2 = dist2(o.x, o.z, e.x, e.z);
-        if (d2 < fd) { fd = d2; first = e; }
-        Weapons.hit(w, e, mult, Math.sin(a), Math.cos(a));
-      });
-      // 细剑：最近的那个敌人身上一个白色的叉形闪光
-      if (first && w.id === 'katana') {
-        FX.flash(first.x, first.y + first.r, first.z, 0.9, 0xffffff, 0.1, 3);
-        FX.flash(first.x, first.y + first.r, first.z, 0.7, def.evo ? 0xffd23a : 0xff6a88, 0.1, 2);
-      }
-      // 断罪圣剑：刀光正中一颗大大的圣光十字星
-      if (def.evo && w.id === 'sword') FX.flash(o.x + Math.sin(a) * r * 0.92, P.pos.y + 1.05, o.z + Math.cos(a) * r * 0.92, 3, 0xfff0b8, 0.15, 2);
+    var o = Weapons.origin(), a = ang, L = Weapons.L;
+    // 往镜头这边砍的刀光淡一点、小一点：不会糊满屏幕下半部分
+    FX.slashA = Math.cos(a - P.yaw) < -0.3 ? 0.45 : 1;
+    if (L && L.slash) L.slash(w, o.x, P.pos.y, o.z, r, a, arc);
+    else FX.slash(o.x, P.pos.y, o.z, r, a, def.color, arc, def.evo, null);
+    FX.slashA = 1;
+    if (def.slamFx && L && L.slam) L.slam(w, o.x + Math.sin(a) * r * 0.8, P.pos.y, o.z + Math.cos(a) * r * 0.8, r);
+    var fx = Math.sin(a), fz = Math.cos(a);
+    Enemies.inRadius(o.x, o.z, r, function (e) {
+      var ea = Math.atan2(e.x - o.x, e.z - o.z);
+      var diff = Math.abs(((ea - a + Math.PI) % TAU + TAU) % TAU - Math.PI);
+      if (diff > arc / 2 && dist2(o.x, o.z, e.x, e.z) > 2.2) return;
+      if (Math.abs(e.y + e.r - o.y) > r + e.r) return;
+      var dealt = Weapons.hit(w, e, 1, fx, fz);
+      Weapons.after(w, e, dealt, null);
     });
-    if (def.heroProj) {
-      var t = Enemies.nearest(o.x, o.z, Weapons.RANGE);
-      Weapons.launch(w, o, t, ang, 0, 1, { kind: 'wave', pierce: 99, life: 0.9, r: 1.2 * size });
+    // 出师之剑：刀光中段 delay 秒后炸开一道剑痕
+    var qk = def.quake;
+    if (qk) {
+      var qx = o.x + fx * r * 0.55, qz = o.z + fz * r * 0.55, qy = W.groundAt(qx, qz, P.pos.y + 2), qr = (qk.r || 2.2) * size;
+      Weapons.zones.push({ type: 'quake', w: w, x: qx, y: qy, z: qz, t: -(qk.delay || 0.3), life: 1, r: qr, mult: qk.mult || 0.7, tick: 0 });
+      if (L && L.quake) L.quake(w, qx, qy, qz, qr, 0);
     }
   };
   if (delay > 0) Game.later(delay, go); else go();
+};
+
+// ---------------- 骑枪冲锋（只在骑着坐骑、够快的时候） ----------------
+// 只读 P.riding / P.speed() / P.vel，不改玩家的任何状态；每 0.15 秒扫一次速度方向的扇面，同一个敌人 cd 秒最多一次
+Weapons.RAM_STEP = 0.15;
+Weapons.ramUpdate = function (w, dt) {
+  var rm = w.def.ram, L = Weapons.L, sp = P.speed();
+  if (!(P.riding && sp >= rm.minSpeed)) {
+    w.ramT = 0;
+    if (w.ramOn) { w.ramOn = false; if (L && L.ram) L.ram(w, false); }
+    return;
+  }
+  var fx = P.vel.x / sp, fz = P.vel.z / sp;
+  w.ramOn = true;
+  if (L && L.ram) L.ram(w, true, fx, fz, dt);
+  w.ramT = (w.ramT || 0) + dt;
+  while (w.ramT >= Weapons.RAM_STEP) {
+    w.ramT -= Weapons.RAM_STEP;
+    Weapons.ramPass(w, sp, fx, fz);
+  }
+};
+Weapons.ramPass = function (w, sp, fx, fz) {
+  var rm = w.def.ram, o = Weapons.origin(), r = (rm.range || 3) * Weapons.size(w), half = (rm.arc || 1.1) / 2;
+  var a = Math.atan2(fx, fz), now = Game.time, cd = rm.cd || 0.45, L = Weapons.L;
+  var mult = clamp(0.5 + sp / (rm.div || 16), 0.5, rm.maxMult || 3), n = 0;
+  var hm = w.ramHit || (w.ramHit = new Map());
+  if (hm.size > 400) hm.clear();
+  Enemies.inRadius(o.x, o.z, r, function (e) {
+    var ea = Math.atan2(e.x - o.x, e.z - o.z);
+    var diff = Math.abs(((ea - a + Math.PI) % TAU + TAU) % TAU - Math.PI);
+    if (diff > half) return;
+    if (Math.abs(e.y + e.r - o.y) > r + e.r) return;
+    var last = hm.get(e.id);
+    if (last !== undefined && now - last < cd) return;
+    hm.set(e.id, now);
+    var dealt = Weapons.hit(w, e, mult, fx, fz);
+    Weapons.after(w, e, dealt, null);
+    if (L && L.ramHit) L.ramHit(w, e);
+    n++;
+  });
+  if (n && now - (w.ramEmT == null ? -9 : w.ramEmT) >= 0.35) { w.ramEmT = now; Weapons.emitOnce('ram', w, P.pos.x, P.pos.z, sp); }
 };
 
 // ---------------- 弹丸 ----------------
@@ -578,50 +712,60 @@ Weapons.launch = function (w, o, t, ang, vyDir, dmgMult, over) {
   var dx = Math.sin(ang), dz = Math.cos(ang);
   var vy;
   if (vyDir != null) vy = vyDir * sp;
-  else if (t) { var hd = Math.sqrt(dist2(o.x, o.z, t.x, t.z)) || 1; vy = (t.y + t.r - o.y) / hd * sp; }
+  else if (t) {
+    var hd = Math.sqrt(dist2(o.x, o.z, t.x, t.z)) || 1;
+    vy = (t.y + t.r - o.y) / hd * sp;
+  }
   else vy = 0;
+  // 种类：按逻辑种类（def.proj 去掉超武后缀）取动画参数；有几种花色的轮流用
+  var lk = Weapons.baseKind(def.proj), an = Weapons.anim(lk);
+  if (an.variants > 1) { var vi = (w.varN = ((w.varN || 0) + 1) % an.variants); if (vi) lk = lk + vi; }
+  // 超武（含分裂碎片的替身武器）用金色的那一份网格
+  var kind = Weapons.projKind(lk), gold = def.evo && window.Evo;
+  if (gold) kind = Evo.kindOf(kind, w.id);
   var p = {
-    w: w, kind: (!def.evo && PROJ_BY_WEAPON[w.id]) || def.proj, x: o.x, y: o.y, z: o.z, vx: dx * sp, vy: vy, vz: dz * sp,
+    w: w, kind: kind, x: o.x, y: o.y, z: o.z, vx: dx * sp, vy: vy, vz: dz * sp, isProj: true, an: an,
     r: (def.projR || 0.5) * size, life: (def.life || 1.6) * (w.s.duration && def.type === 'shot' && def.homing ? Weapons.dur(w) : 1),
     pierce: Math.round(w.s.pierce || 0), bounces: Math.round(w.s.bounces || 0),
     hit: new Set(), t: 0, spin: def.spin || 0, grav: 0, scale: size, dmgMult: dmgMult || 1, homing: def.homing || 0, explode: !!def.explode
   };
+  if (an.back) { p.kindB = Weapons.projKind(an.back); if (gold) p.kindB = Evo.kindOf(p.kindB, w.id); }
   if (def.type === 'bounce') { p.grav = 16; p.vy = 6; p.life = 3; }
-  if (def.type === 'boomerang') { p.boom = true; p.out = (def.out || 14) * Math.sqrt(size); p.ox = o.x; p.oz = o.z; p.pierce = 999; p.life = 4; }
-  if (def.dice) { p.face = randi(1, 6); p.dmgMult *= p.face; }
+  if (def.hop) {
+    // 马走日：抛物线跳过去（0.9 秒落地），空中碰到的敌人各打一次，落地砸一小片再跳向下一个
+    p.hop = true; p.grav = 20; p.vy = 9; p.life = def.life || 4; p.spin = 0;
+    p.hops = new Set();
+    var hs = t ? clamp(Math.sqrt(dist2(o.x, o.z, t.x, t.z)) / 0.9, 4, sp) : sp;
+    p.vx = dx * hs; p.vz = dz * hs;
+    if (t) p.hops.add(t.id);
+  }
+  if (def.type === 'boomerang') { p.boom = true; p.out = (def.out || 14) * Math.sqrt(size); p.ox = o.x; p.oz = o.z; p.pierce = 999; p.life = 4; p.bsp = sp; }
   if (over) for (var k in over) p[k] = over[k];
-  if (def.type === 'shotgun') p.tk = 1.8;   // 散射弩的短箭飞不远：拖尾拉长一点，看得出扇面
+  if (def.type === 'shotgun') p.tk = 1.8;   // 扇形飞刀飞不远：拖尾拉长一点，看得出扇面
+  if (Passive.onLaunch) Passive.onLaunch(w, p);   // 被动改弹丸（小丑：攒下的弹跳）
   Weapons.projs.push(p);
-  // 开火闪光（分裂碎片和剑气不算）
-  if (!w.frag && !(over && over.kind === 'wave')) Weapons.muzzle(w, p, o, dx, dz, sp ? vy / sp : 0, size);
+  // 开火闪光（分裂碎片和扇形飞刀不算，飞刀有 L.fan；同一帧同一把武器只闪一次，在 Weapons.L.muzzle 里判断）
+  var L = Weapons.L;
+  if (!w.frag && def.type !== 'shotgun' && L && L.muzzle) L.muzzle(w, p, o, dx, dz, sp ? vy / sp : 0, size);
   return p;
 };
 
-// 开火：枪口一颗四角星；重弩更大还震一下屏，并且画一道弹道（在第一次绘制时按最终的速度方向画）
-Weapons.muzzle = function (w, p, o, dx, dz, dy, size) {
-  var def = w.def;
-  if (w.id === 'sniper') { p.trc = true; p.ox0 = o.x + dx * 0.8; p.oy0 = o.y + dy * 0.8; p.oz0 = o.z + dz * 0.8; }
-  if (w.id === 'shotgun' || (w._muzT === Game.time && !def.burst)) return;
-  w._muzT = Game.time;
-  if (w.id === 'sniper') {
-    FX.flash(o.x + dx * 0.8, o.y + dy * 0.8, o.z + dz * 0.8, 1.2, def.evo ? 0xffe9a0 : 0xfff0c8, 0.08, 2);
-    if (def.evo) FX.ring(o.x, P.pos.y, o.z, 1.2, window.Evo ? Evo.GOLD : 0xffc23a, 0.15);
-    Game.shake(0.05);
-  } else if (def.burst) FX.flash(o.x + dx * 0.7, o.y + dy * 0.7, o.z + dz * 0.7, 0.6, Weapons.muzzleHex(w), 0.06, 2);
-  else FX.flash(o.x + dx * 0.7, o.y + dy * 0.7, o.z + dz * 0.7, 0.8 * Math.min(2, size), Weapons.muzzleHex(w), 0.08, 2);
+// 投枪插在地上：变成一个场地，delay 秒后震开周围的敌人（插着的投枪在 Weapons.render 里画）
+Weapons.stickZone = function (p, gy) {
+  var w = p.w, sk = w.def.stick, size = Weapons.size(w);
+  Weapons.zones.push({ type: 'stick', w: w, x: p.x, y: gy, z: p.z, yaw: Math.atan2(p.vx, p.vz), t: -(sk.delay || 0.4), life: 1,
+    r: (sk.r || 2.2) * size, k: sk.k || 0.8, kind: p.kind, scale: p.scale || 1, tick: 0 });
 };
 
-// 弹道光带的终点：沿方向每 3 米看一次地面，最远 39 米
-Weapons.tracerEnd = function (x, y, z, vx, vy, vz, out) {
-  var s = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1, ux = vx / s, uy = vy / s, uz = vz / s, d = 3;
-  for (; d <= 39; d += 3) if (y + uy * d < W.groundAt(x + ux * d, z + uz * d, y + uy * d + 1)) break;
-  d = Math.min(d, 39);
-  out.x = x + ux * d; out.y = y + uy * d; out.z = z + uz * d;
-  return out;
+// 弹丸结束（寿命到、落地、穿透用完）：投枪插地
+Weapons.endProj = function (p, gy) {
+  if (p.ended) return;
+  p.ended = true;
+  if (p.w && p.w.def && p.w.def.stick && !p.frag) Weapons.stickZone(p, gy);
 };
 
 Weapons.updateProjs = function (dt) {
-  var ps = Weapons.projs;
+  var ps = Weapons.projs, L = Weapons.L;
   Weapons.dustN = 0;
   for (var i = ps.length - 1; i >= 0; i--) {
     var p = ps[i];
@@ -635,22 +779,33 @@ Weapons.updateProjs = function (dt) {
       h[6] = h[3]; h[7] = h[4]; h[8] = h[5]; h[3] = h[0]; h[4] = h[1]; h[5] = h[2]; h[0] = p.x; h[1] = p.y; h[2] = p.z;
       p.tn = Math.min(3, (p.tn || 0) + 1);
     }
-    if (p.homing) {
+    // 追踪（回旋的猎隼只在飞出去的路上追）
+    if (p.homing && !p.back) {
       var ht = Enemies.nearest(p.x, p.z, 16, p.hit);
       if (ht) {
         var hx = ht.x - p.x, hy = ht.y + ht.r - p.y, hz = ht.z - p.z, hd = Math.sqrt(hx * hx + hy * hy + hz * hz) || 1;
         var sp = Math.sqrt(p.vx * p.vx + p.vy * p.vy + p.vz * p.vz);
         var k = Math.min(1, dt * p.homing);
         p.vx = lerp(p.vx, hx / hd * sp, k); p.vy = lerp(p.vy, hy / hd * sp, k); p.vz = lerp(p.vz, hz / hd * sp, k);
+        // 猎隼转弯不减速：插值会把速度越插越短（在人堆里越飞越慢、回不来），按出手时的速度放回去
+        if (p.bsp) {
+          var ns = Math.sqrt(p.vx * p.vx + p.vy * p.vy + p.vz * p.vz) || 1, f = p.bsp / ns;
+          p.vx *= f; p.vy *= f; p.vz *= f;
+        }
       }
     }
     if (p.boom) {
       var od = Math.sqrt(dist2(p.x, p.z, p.ox, p.oz));
-      if (!p.back && od > p.out) { p.back = true; p.hit.clear(); }
+      // 飞够远、或者飞出去的时间够飞直线到 out 了（一路追着拐弯），就往回飞
+      if (!p.back && (od > p.out || p.t > p.out / p.bsp + 0.4)) { p.back = true; p.hit.clear(); }
       if (p.back) {
+        // 往回飞：按出手时的速度掉头。以前是把速度往反方向插值，正对着飞出去的时候速度越插越小，停在半路回不来
+        // 转弯快慢：每秒至少 7 弧度，离骑士越近转得越快（转弯半径不超过离骑士距离的 1/1.2），不会绕着骑士转圈落不到手臂上
         var bx = P.pos.x - p.x, bz = P.pos.z - p.z, bd = Math.sqrt(bx * bx + bz * bz) || 1;
-        var bs = Math.sqrt(p.vx * p.vx + p.vz * p.vz);
-        p.vx = lerp(p.vx, bx / bd * bs, Math.min(1, dt * 6)); p.vz = lerp(p.vz, bz / bd * bs, Math.min(1, dt * 6));
+        var bs = p.bsp || Math.sqrt(p.vx * p.vx + p.vz * p.vz);
+        var ca = Math.atan2(p.vx, p.vz), da = ((Math.atan2(bx, bz) - ca + Math.PI) % TAU + TAU) % TAU - Math.PI;
+        ca += Math.min(Math.abs(da), dt * Math.max(7, 1.2 * bs / bd)) * (da < 0 ? -1 : 1);
+        p.vx = Math.sin(ca) * bs; p.vz = Math.cos(ca) * bs;
         p.vy = (P.pos.y + 1.1 - p.y) * 4;
         if (bd < 1.4) p.life = 0;
       }
@@ -659,7 +814,8 @@ Weapons.updateProjs = function (dt) {
     p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
     var gy = W.groundAt(p.x, p.z, p.y + 1);
     if (p.y < gy + 0.15) {
-      if (p.explode) { Weapons.explode(p); p.life = 0; }
+      if (p.hop) { if (p.vy < 0) Weapons.hopLand(p, gy); else p.y = gy + 0.15; }
+      else if (p.explode) { Weapons.explode(p); p.life = 0; }
       else if (p.grav && p.bounces >= 0) {
         p.y = gy + 0.15; p.vy = Math.abs(p.vy) * 0.6 + 4;
         p.sq = 0.06;
@@ -667,14 +823,20 @@ Weapons.updateProjs = function (dt) {
       }
       else if (!p.boom && !p.homing) {
         p.y = gy + 0.15; p.vy = 0;
-        if (!p.dusted && p.w && p.w.id === 'shotgun' && Weapons.dustN < 6) { p.dusted = true; Weapons.dustN++; FX.burst(p.x, gy + 0.1, p.z, 3, 0x8a7a5a, 2.5, 0.2); }
+        // 投枪：落地以后贴着地面再滑一段（剩下的每层穿透 2 米，起伏的地面上也能扎到身后的敌人），滑够了才插住
+        if (p.w && p.w.def.stick && !p.frag) {
+          p.slid = (p.slid || 0) + Math.sqrt(p.vx * p.vx + p.vz * p.vz) * dt;
+          if (p.slid >= 2 * (p.pierce + 1)) p.life = 0;
+        }
+        if (!p.dusted && p.w && p.w.def.type === 'shotgun' && Weapons.dustN < 6) { p.dusted = true; Weapons.dustN++; FX.burst(p.x, gy + 0.1, p.z, 3, 0x8a7a5a, 2.5, 0.2); }
       }
       else if (p.homing) p.y = gy + 0.15;
     }
     // 弹射以后目标没了、一路往天上飞的弩箭：飞到离地 10 米以上就收掉（不会在山顶上空留下乱飞的亮点）
     if ((p.bnc || p.frag) && p.vy > 0 && p.y - gy > 10) p.life = 0;
     if (p.life <= 0) {
-      if (p.w && p.w.id === 'shotgun' && !p.dusted && Weapons.dustN < 6) { Weapons.dustN++; FX.burst(p.x, Math.max(gy, p.y - 0.5) + 0.1, p.z, 3, 0x8a7a5a, 2.5, 0.2); }
+      if (p.w && p.w.def.type === 'shotgun' && !p.dusted && Weapons.dustN < 6) { Weapons.dustN++; FX.burst(p.x, Math.max(gy, p.y - 0.5) + 0.1, p.z, 3, 0x8a7a5a, 2.5, 0.2); }
+      Weapons.endProj(p, gy);
       ps.splice(i, 1);
       continue;
     }
@@ -686,15 +848,17 @@ Weapons.updateProjs = function (dt) {
       p.hit.add(e.id);
       if (p.explode) { Weapons.explode(p); p.life = 0; return false; }
       var s2 = Math.sqrt(p.vx * p.vx + p.vz * p.vz) || 1;
-      if (p.soul) Enemies.damage(e, p.soulDmg, 0, p.vx / s2, p.vz / s2);
-      else Weapons.hit(p.w, e, p.dmgMult, p.vx / s2, p.vz / s2);
-      if (p.spin && p.grav) p.sq = 0.06;   // 骨头砸中：压扁一下
-      if (p.face === 6 && !p.sixed) {
-        p.sixed = true; p.w.s.critChance = (p.w.s.critChance || 0) + 0.005;
-        FX.text(e.x, e.y + 2.5, e.z, '6!', '#ffd84a', 1.2);
-        FX.flash(e.x, e.y + 2, e.z, 1.2, 0xffd84a, 0.22, 2);
-        FX.burst(e.x, e.y + 1.6, e.z, 4, 0xffd23a, 4, 0.22);
+      if (p.soul) {
+        if (p.blastR) { Weapons.soulBlast(p); p.life = 0; return false; }   // 兔子：碰到就炸开
+        var sd = Enemies.damage(e, p.soulDmg, 0, p.vx / s2, p.vz / s2);
+        if (p.onHit) p.onHit(p, e, sd);
       }
+      else {
+        var dealt = Weapons.hit(p.w, e, p.dmgMult, p.vx / s2, p.vz / s2);
+        Weapons.after(p.w, e, dealt, p);
+      }
+      if (p.hop) return;                       // 跳在半空的棋子：碰到谁打谁，不改路线、不结束
+      if (p.spin && p.grav) p.sq = 0.06;   // 砸中：压扁一下
       if (p.pierce > 0) { p.pierce--; return; }
       if (p.bounces > 0) {
         p.bounces--;
@@ -705,26 +869,35 @@ Weapons.updateProjs = function (dt) {
           p.vx = nx / nd * s; p.vz = nz / nd * s; p.vy = (nt.y + nt.r - p.y) / nd * s + (p.grav ? 3 : 0);
           p.life = Math.max(p.life, 1);
           p.bnc = true;
-          // 弹射点一颗小星光
-          var bk = Weapons.baseKind(p.kind);
-          if (bk === 'dagger') FX.flash(p.x, p.y, p.z, 0.7, p.w && p.w.def.evo ? 0xffe9a0 : 0x9affe0, 0.1, 2);
-          else if (bk === 'bolt') FX.flash(p.x, p.y, p.z, 0.45, 0xffffff, 0.08, 2);
           return false;
         }
       }
       p.life = 0;
       return false;
     });
-    if (p.life <= 0) ps.splice(i, 1);
+    if (p.life <= 0) { Weapons.endProj(p, W.groundAt(p.x, p.z, p.y + 1)); ps.splice(i, 1); }
   }
 };
 
-// 爆炸外观：魔弹的冲击环是紫色，超武是金色；炼狱法杖的超武爆炸有自己的样子（金环、火舌、焦痕）
-Weapons.BOOM_OPT = {
-  rocket: { ring: 0xc070ff }, rocket_evo: { ring: 0xffc23a },
-  firestaff_evo: { evo: true }, sniper_evo: { ring: 0xffc23a }, mines_evo: { ring: 0xffc23a }
+// 马走日落地：砸一小片（排队结算），还有弹跳次数就跳向下一个没跳过的敌人
+Weapons.hopLand = function (p, gy) {
+  var w = p.w, def = w.def, r = (def.hopR || 1.4) * Weapons.size(w), L = Weapons.L;
+  p.y = gy + 0.15;
+  Weapons.blast(w, p.x, gy, p.z, r, def.hopMult || 0.5, null, 0);
+  if (L && L.hop) L.hop(w, p.x, gy, p.z, r);
+  Weapons.emitOnce('hop', w, p.x, p.z);
+  p.landN = (p.landN || 0) + 1;
+  var nt = p.bounces > 0 ? Enemies.nearest(p.x, p.z, 14, p.hops) : null;
+  if (!nt) { p.life = 0; return; }
+  p.bounces--;
+  p.hops.add(nt.id);
+  var nx = nt.x - p.x, nz = nt.z - p.z, nd = Math.sqrt(nx * nx + nz * nz) || 1;
+  var hs = clamp(nd / 0.9, 4, Weapons.speed(w));
+  p.vx = nx / nd * hs; p.vz = nz / nd * hs; p.vy = 9;
+  p.life = Math.max(p.life, 1.5);
 };
-Weapons.boomOpt = function (w) { return Weapons.BOOM_OPT[w.def.evo ? w.id + '_evo' : w.id] || null; };
+
+Weapons.boomOpt = function (w) { var L = Weapons.L; return L && L.boomOpt ? L.boomOpt(w) : null; };
 
 Weapons.explode = function (p) {
   var w = p.w, r = (w.def.blast || 3) * Weapons.size(w);
@@ -732,25 +905,29 @@ Weapons.explode = function (p) {
   Enemies.inRadius(p.x, p.z, r, function (e) {
     if (Math.abs(e.y - p.y) > r + 1.5) return;
     var dx = e.x - p.x, dz = e.z - p.z, d = Math.sqrt(dx * dx + dz * dz) || 1;
-    Weapons.hit(w, e, p.dmgMult, dx / d, dz / d);
-    if (w.def.burn && e.alive) { Enemies.applyDot(e, w.s.damage * P.st.damage * w.def.burn, 2); e.fireT = Game.time + 2; }
+    var dealt = Weapons.hit(w, e, p.dmgMult, dx / d, dz / d);
+    Weapons.after(w, e, dealt, null);
   });
 };
 
-// ---------------- 闪电 ----------------
+// ---------------- 闪电 / 信鸽 ----------------
+// chainLook：外观交给 Weapons.L（信鸽、鼓）；noSplash：第一个目标身边不溅射（信鸽）
 Weapons.chain = function (w, first, jumps) {
   if (!first.alive) return;
-  var cur = first, hit = new Set();
+  var def = w.def, cur = first, hit = new Set(), L = Weapons.L, look = def.chainLook && L && L.chain;
   var reach = 9 * Weapons.size(w);
   var gy = first.y + first.r;
-  FX.bolt(first.x, gy + 18, first.z, first.x, gy, first.z);
-  // 落点：3 颗白色火花；冲击环（超武的金环在 evolution.js 里画，这里就不画蓝环了）
-  FX.burst(first.x, gy, first.z, 3, 0xffffff, 5, 0.15);
-  if (!w.def.evo) FX.ring(first.x, first.y, first.z, 1.6 * Weapons.size(w), 0xbfe0ff, 0.25);
-  Enemies.inRadius(first.x, first.z, 1.6 * Weapons.size(w), function (e) { if (e !== first) Weapons.hit(w, e, 0.5, 0, 0); });
+  if (look) { if (L.chainStart) L.chainStart(w, first); L.chain(w, 0, first.x, gy + 18, first.z, first.x, gy, first.z); }
+  else {
+    FX.bolt(first.x, gy + 18, first.z, first.x, gy, first.z);
+    // 落点：3 颗白色火花；冲击环（超武的金环在 evolution.js 里画，这里就不画蓝环了）
+    FX.burst(first.x, gy, first.z, 3, 0xffffff, 5, 0.15);
+    if (!w.def.evo && !def.noSplash) FX.ring(first.x, first.y, first.z, 1.6 * Weapons.size(w), 0xbfe0ff, 0.25);
+  }
+  if (!def.noSplash) Enemies.inRadius(first.x, first.z, 1.6 * Weapons.size(w), function (e) { if (e !== first) Weapons.hit(w, e, 0.5, 0, 0); });
   var px = first.x, py = gy, pz = first.z;
   for (var j = 0; j <= jumps && cur; j++) {
-    if (j > 0) FX.bolt(px, py, pz, cur.x, cur.y + cur.r, cur.z);
+    if (j > 0) { if (look) L.chain(w, j, px, py, pz, cur.x, cur.y + cur.r, cur.z); else FX.bolt(px, py, pz, cur.x, cur.y + cur.r, cur.z); }
     hit.add(cur.id);
     Weapons.hit(w, cur, 1, 0, 0);
     px = cur.x; py = cur.y + cur.r; pz = cur.z;
@@ -761,13 +938,15 @@ Weapons.chain = function (w, first, jumps) {
 // ---------------- 常驻武器 ----------------
 // 位置对象重复使用（每帧不新建）
 Weapons.orbAt = function (w, i, x, y, z) {
-  var o = w.orbs[i] || (w.orbs[i] = { x: 0, y: 0, z: 0 });
+  var o = w.orbs[i] || (w.orbs[i] = { x: 0, y: 0, z: 0, a: 0 });
   o.x = x; o.y = y; o.z = z;
   return o;
 };
 
+Weapons.hookPool = [];
+
 Weapons.updatePersistent = function (w, dt) {
-  var def = w.def, size = Weapons.size(w);
+  var def = w.def, size = Weapons.size(w), L = Weapons.L;
   w.tick = (w.tick || 0) - dt;
   switch (def.type) {
     case 'aura': {
@@ -776,130 +955,93 @@ Weapons.updatePersistent = function (w, dt) {
       if (w.tick <= 0) {
         w.tick = Weapons.cd(w);
         w.pulse = 1;
-        var glints = 0;
         FX.tickDmg = true;
         Enemies.inRadius(P.pos.x, P.pos.z, r, function (e) {
           if (Math.abs(e.y - P.pos.y) > 3.5) return;
-          if (def.freeze) {
-            // 刚被冻住的敌人身上闪一颗白色星光
-            if (!(e.frozen > 0) && glints < 8) { glints++; FX.flash(e.x, e.y + e.r * 1.6, e.z, 0.8, 0xdffaff, 0.22, 2); }
-            e.frozen = Math.max(e.frozen, Weapons.dur(w));
-          }
           var dx = e.x - P.pos.x, dz = e.z - P.pos.z, d = Math.sqrt(dx * dx + dz * dz) || 1;
           Weapons.hit(w, e, 1, dx / d, dz / d);
         });
         FX.tickDmg = false;
-        // 冰霜：圈里蹦出几块冰碴
-        if (def.freeze) {
-          var nb = randi(4, 6), by = w.ring ? w.ring.position.y : P.pos.y;
-          for (var b = 0; b < nb; b++) {
-            var ba = Math.random() * TAU, br = Math.sqrt(Math.random()) * r * 0.95;
-            FX.part(P.pos.x + Math.cos(ba) * br, by + 0.2, P.pos.z + Math.sin(ba) * br, rand(-1, 1), rand(2.6, 3.6), rand(-1, 1), def.evo && b === 0 ? 0xffe066 : b % 2 ? 0x9ff6ff : 0xe8fbff, rand(0.15, 0.25), rand(0.5, 0.75));
-          }
-        }
       }
       return;
     }
     case 'orbit': {
-      var n = Weapons.count(w), rad = (def.range || 3.2) * Math.sqrt(size);
-      w.ang = (w.ang || 0) + dt * 2 * (w.s.pspd || 1) * P.st.projSpeed;
+      var n = Weapons.count(w), rad = (def.range || 3.2) * Math.sqrt(size), hr = (def.hitR || 0.8) * size;
+      // 被动的攻速（发条、钟声、军旗……）让它转得更快：每个敌人的再打冷却从来卡不住，只加冷却等于没加
+      w.ang = (w.ang || 0) + dt * 2 * (w.s.pspd || 1) * P.st.projSpeed * Passive.atkMult(w);
       w.orbs = w.orbs || [];
       w.cool = w.cool || new Map();
       w.orad = rad;
       for (var i = 0; i < n; i++) {
         var a = w.ang + i / n * TAU;
         var ox = P.pos.x + Math.cos(a) * rad, oz = P.pos.z + Math.sin(a) * rad;
-        Weapons.orbAt(w, i, ox, P.pos.y + 0.8, oz);
-        Enemies.inRadius(ox, oz, 0.8 * size, function (e) {
+        Weapons.orbAt(w, i, ox, P.pos.y + 0.8, oz).a = a;
+        Enemies.inRadius(ox, oz, hr, function (e) {
           var last = w.cool.get(e.id);
           if (last !== undefined && Game.time - last < Weapons.cd(w)) return;
           w.cool.set(e.id, Game.time);
           var dx = e.x - P.pos.x, dz = e.z - P.pos.z, d = Math.sqrt(dx * dx + dz * dz) || 1;
-          Weapons.hit(w, e, 1, dx / d, dz / d);
+          var dealt = Weapons.hit(w, e, 1, dx / d, dz / d);
+          Weapons.after(w, e, dealt, null);
         });
       }
       w.orbs.length = n;
       if (w.cool.size > 800) w.cool.clear();
       return;
     }
-    case 'aegis': {
-      // 盾牌数量 = 可格挡次数，按冷却回复
-      var maxC = Weapons.count(w);
-      if (w.charges < maxC && w.tick <= 0) { w.charges++; w.tick = Weapons.cd(w) * 2; }
-      if (w.charges >= maxC) w.tick = Weapons.cd(w) * 2;
-      w.ang = (w.ang || 0) + dt * 2.5;
-      w.orbs = w.orbs || [];
-      // 盾牌绕得远一点（2 米），不会一直挡在角色身上
-      for (var c = 0; c < w.charges; c++) {
-        var aa = w.ang + c / Math.max(1, w.charges) * TAU;
-        Weapons.orbAt(w, c, P.pos.x + Math.cos(aa) * 2.0, P.pos.y + 1, P.pos.z + Math.sin(aa) * 2.0);
-      }
-      w.orbs.length = w.charges;
-      return;
-    }
     case 'trail': {
       if (w.tick <= 0 && P.speed() > 1.5 && P.onGround) {
-        w.tick = Weapons.cd(w);
-        Weapons.fireZone(P.pos.x, P.pos.z, 0, w);
+        w.tick = Math.max(0, w.tick + Weapons.cd(w));   // 余数留到下一段（帧率不同段数一样），一帧最多一段（第 13 块 P3）
+        Weapons.trailZone(w);
       }
       return;
     }
     case 'tether': {
-      var range = (def.range || 14) * Math.sqrt(size);
-      if (w.tick <= 0 && !w.target) {
-        var t = Enemies.nearest(P.pos.x, P.pos.z, range);
-        if (t) { w.target = t; w.left = Weapons.dur(w); w.ttick = 0; } else w.tick = 0.3;
+      // 钓竿：钩住最近的 count 个敌人，只打钩住的那个；把它拽过来，拽到 landR 以内摔上岸（3 倍伤害 + 溅射）
+      var range = (def.range || 15) * Math.sqrt(size), hs = w.hooks || (w.hooks = []);
+      if (!hs.length && w.tick <= 0) {
+        var tgs = Enemies.nearestN(P.pos.x, P.pos.z, range, Weapons.count(w));
+        if (tgs.length) {
+          for (var j = 0; j < tgs.length; j++) {
+            var hk = Weapons.hookPool.pop() || {};
+            hk.e = tgs[j]; hk.left = Weapons.dur(w); hk.tick = 0;
+            hs.push(hk);
+          }
+          Weapons.emitOnce('hook', w, P.pos.x, P.pos.z);
+        } else w.tick = 0.3;
       }
-      if (w.target) {
-        w.left -= dt; w.ttick -= dt;
-        if (!w.target.alive) w.target = Enemies.nearest(P.pos.x, P.pos.z, range);
-        if (!w.target || w.left <= 0 || dist2(P.pos.x, P.pos.z, w.target.x, w.target.z) > range * range * 1.5) {
-          w.target = null; w.beam.visible = false; w.tick = Weapons.cd(w);
-          return;
+      if (!hs.length) { w.target = null; return; }
+      for (var q = hs.length - 1; q >= 0; q--) {
+        if (Weapons.reelHook(w, hs[q], range, dt)) {
+          Weapons.hookPool.push(hs[q]);
+          hs.splice(q, 1);
         }
-        var tx = w.target.x, ty = w.target.y + w.target.r, tz = w.target.z;
-        var sx = P.pos.x, sy = P.pos.y + 1.1, sz = P.pos.z;
-        var L = Math.sqrt((tx - sx) * (tx - sx) + (ty - sy) * (ty - sy) + (tz - sz) * (tz - sz)) || 1;
-        w.beam.visible = true;
-        w.beam.position.set(sx, sy, sz);
-        w.beam.lookAt(tx, ty, tz);
-        w.beam.scale.set(size, size, L);
-        if (w.ttick <= 0) {
-          w.ttick = 0.25 / P.st.atkSpeed;
-          w.pulseT = 0;   // 每次跳伤：一团白光顺着锁链跑过去
-          var wid = 1.0 * size, lx = tx - sx, lz = tz - sz, ll = lx * lx + lz * lz || 1;
-          FX.tickDmg = true;
-          Enemies.inRadius((sx + tx) / 2, (sz + tz) / 2, Math.sqrt(ll) / 2 + wid, function (e) {
-            var t2 = clamp(((e.x - sx) * lx + (e.z - sz) * lz) / ll, 0, 1);
-            var cx = sx + lx * t2, cz = sz + lz * t2;
-            if (dist2(e.x, e.z, cx, cz) < (wid + e.r) * (wid + e.r)) Weapons.hit(w, e, 1, 0, 0);
-          });
-          FX.tickDmg = false;
-        }
-        w.pulseT = (w.pulseT == null ? 1 : w.pulseT) + dt;
       }
+      if (hs.length) w.target = hs[0].e;
+      else { w.target = null; w.tick = Weapons.cd(w); }
       return;
     }
     case 'flame': {
-      var fr = (def.range || 7) * size;
+      // 提灯：瞄一次（扫过去的正中间经过最近的敌人），然后不再跟着转；方向一次左一次右
+      var bl = (def.range || 11) * size;
       if (w.tick <= 0 && !w.flaming) {
-        var ft = Enemies.nearest(P.pos.x, P.pos.z, fr);
-        if (ft) { w.flaming = Weapons.dur(w); w.fang = Math.atan2(ft.x - P.pos.x, ft.z - P.pos.z) - 0.6; w.ftick = 0; } else w.tick = 0.3;
+        var ft = Enemies.nearest(P.pos.x, P.pos.z, bl);
+        if (ft) {
+          w.flaming = Weapons.dur(w);
+          w.fdir = -w.fdir || 1;
+          w.fsweep = (def.spin || 1.2) * w.flaming;
+          w.fang0 = w.fang = Math.atan2(ft.x - P.pos.x, ft.z - P.pos.z) - w.fdir * w.fsweep / 2;
+          w.ftick = 0;
+        } else w.tick = 0.3;
       }
       if (w.flaming) {
         w.flaming -= dt; w.ftick -= dt;
-        w.fang += dt * 1.6;
+        w.fang += w.fdir * (def.spin || 1.2) * dt;
         var fx = Math.sin(w.fang), fz = Math.cos(w.fang);
-        Weapons.flameLook(w, fr, fx, fz, dt);
+        if (L && L.beam) L.beam(w, fx, fz, bl, dt);
         if (w.ftick <= 0) {
-          w.ftick = 0.15 / P.st.atkSpeed;
-          FX.tickDmg = true;
-          Enemies.inRadius(P.pos.x, P.pos.z, fr, function (e) {
-            var ea = Math.atan2(e.x - P.pos.x, e.z - P.pos.z);
-            var diff = Math.abs(((ea - w.fang + Math.PI) % TAU + TAU) % TAU - Math.PI);
-            if (diff < 0.4) Weapons.hit(w, e, 1, fx, fz);
-          });
-          FX.tickDmg = false;
+          w.ftick = Math.max(0, w.ftick + (def.tick || 0.08) / Weapons.atk(w));   // 余数留到下一跳（帧率不同跳数一样），一帧最多一跳
+          Weapons.beamTick(w, bl, fx, fz);
         }
         if (w.flaming <= 0) { w.flaming = 0; w.tick = Weapons.cd(w); }
       }
@@ -908,101 +1050,92 @@ Weapons.updatePersistent = function (w, dt) {
   }
 };
 
-// 龙息：一条从嘴边的白黄到末端暗红的火焰锥（每帧抖一点），里面翻滚的亮色火块，末端偶尔冒一缕烟
-Weapons.FLAME_PAL = [0xfff0a0, 0xffd23a, 0xffa22a, 0xff7a1a, 0xff5a1a];
-// 喷向镜头的时候（火焰扫到身后）整体淡一些、火块少一些，不会糊满屏幕
-Weapons.camFacing = function (fx, fz) {
-  var c = Game.camera ? Game.camera.position : null;
-  if (!c) return 0;
-  var cx = c.x - P.pos.x, cz = c.z - P.pos.z, l = Math.sqrt(cx * cx + cz * cz) || 1;
-  return (fx * cx + fz * cz) / l;
-};
-Weapons.flameLook = function (w, fr, fx, fz, dt) {
-  var x0 = P.pos.x, y0 = P.pos.y + 1.05, z0 = P.pos.z, ks = clamp(fr / 9, 0.8, 1.5);
-  var cf = Weapons.camFacing(fx, fz), kc = 1 - 0.7 * clamp((cf - 0.2) / 0.7, 0, 1);
-  w.flameK = kc;
-  FX.glow(x0 + fx * 0.9, y0, z0 + fz * 0.9, 1.1, 1.1, Weapons.C.white, 0.5 * kc, 0);
-  for (var q = 0; q < 7; q++) {
-    var t = q / 6, fd = lerp(1, fr, t) + rand(-0.2, 0.2), fs = lerp(0.9, 3.0, t) * ks * rand(0.9, 1.1);
-    FX.glow(x0 + fx * fd + rand(-0.2, 0.2), y0 + t * 0.35 + rand(-0.15, 0.15), z0 + fz * fd + rand(-0.2, 0.2), fs, fs * 0.8, Weapons.flameC[q], lerp(0.75, 0.35, t) * kc, 0);
+// 一根鱼线：返回 true = 放开（目标死了、时间到、跑太远、上岸了）
+Weapons.reelHook = function (w, h, range, dt) {
+  var def = w.def, e = h.e, L = Weapons.L;
+  h.left -= dt;
+  if (!e.alive || h.left <= 0) return true;
+  var dx = P.pos.x - e.x, dz = P.pos.z - e.z, d = Math.sqrt(dx * dx + dz * dz);
+  if (d > range * 1.5) return true;
+  var ux = d > 1e-6 ? dx / d : 0, uz = d > 1e-6 ? dz / d : 0;
+  // 只打钩住的这一个
+  h.tick -= dt;
+  if (h.tick <= 0) {
+    h.tick = Math.max(0, h.tick + 0.3 / Weapons.atk(w));   // 余数留到下一跳，一帧最多一跳
+    FX.tickDmg = true;
+    var dealt = Weapons.hit(w, e, 1, 0, 0);
+    FX.tickDmg = false;
+    Weapons.after(w, e, dealt, null);
+    if (!e.alive) { if (!e.prop) Passive.onReel(w, e); return true; }   // 钓死在线上也算钓上一条
   }
-  var n = Math.floor(dt * 120 * kc + Math.random());
-  for (var k = 0; k < n; k++) {
-    var dd = rand(1, fr), sp = rand(4, 7), ft = dd / fr;
-    FX.part(x0 + fx * dd + rand(-0.4, 0.4), y0 - 0.1 + rand(-0.2, 0.4), z0 + fz * dd + rand(-0.4, 0.4), fx * sp + rand(-1, 1), rand(1, 3), fz * sp + rand(-1, 1), Weapons.FLAME_PAL[Math.min(4, Math.floor(ft * 4 + Math.random() * 1.5))], rand(0.3, 0.55) * Math.min(1.3, ks) * (0.5 + 0.5 * kc), 0.35);
+  if (d <= (def.landR || 2.2)) {
+    // 上岸：狠狠一摔，周围的敌人被溅到、被推开
+    var dl = Weapons.hit(w, e, def.landK || 3, -ux, -uz);
+    Weapons.after(w, e, dl, null);
+    Weapons.blast(w, e.x, e.y, e.z, (def.splashR || 3) * Math.sqrt(Weapons.size(w)), 1, e, 8);
+    Weapons.emitOnce('land', w, e.x, e.z);
+    if (L && L.land) L.land(w, e);
+    if (!e.prop) Passive.onReel(w, e);                 // 渔夫：鱼篓里多一条鱼
+    return true;
   }
-  if (Math.random() < dt * 14 * kc) FX.smoke(x0 + fx * fr, y0 + 0.4, z0 + fz * fr, 1, 0x5a4a42);
+  // 拽过来：直接给击退速度（每帧覆盖，不累加）；Boss、小 Boss、道具拽不动，精英 0.3 倍
+  // 下一帧 Enemies.update 先把击退乘 exp(−7·dt) 再走：这里先除掉，拽的速度在 30 / 60 / 120 帧都是 pull（第 13 块 P4）
+  if (!e.boss && !e.mini && !e.prop) {
+    var f = (def.pull || 7) * (e.elite ? 0.3 : 1) * Math.exp(7 * dt);
+    e.kx = ux * f; e.kz = uz * f;
+  }
+  if (L && L.reel) L.reel(w, h, dt);
+  return false;
 };
 
-// 神盾格挡：P.hurt 时调用，返回是否挡下
-Weapons.aegisBlock = function (src) {
-  var w = Weapons.find('aegis');
-  if (!w || w.charges <= 0) return false;
-  w.charges--;
-  w.tick = Weapons.cd(w) * 2;
-  var r = 3.5 * Weapons.size(w), x = P.pos.x, y = P.pos.y, z = P.pos.z, evo = w.def.evo;
-  // 被用掉的那面盾白光一闪
-  var used = w.orbs && w.orbs[w.charges];
-  if (used) FX.flash(used.x, used.y, used.z, 1.8, 0xffffff, 0.15, 0);
-  FX.flash(x, y + 1.1, z, 2.5, 0xfff2c0, 0.15, 2);
-  FX.ring(x, y, z, r, 0xffd84a, 0.35);
-  FX.ring(x, y, z, r * 0.6, 0xffffff, 0.28);
-  FX.burst(x, y + 1, z, 10, 0xffd84a, 6, 0.25);
-  if (evo) {
-    // 不破圣盾：金色光罩 + 六道放射的光
-    FX.flash(x, y + 1, z, 3, 0xffc23a, 0.3, 0);
-    for (var k = 0; k < 6; k++) {
-      var a = k / 6 * TAU + (w.ang || 0);
-      FX.flash(x + Math.cos(a) * r * 0.8, y + 0.8, z + Math.sin(a) * r * 0.8, 1.5, 0xfff0b0, 0.25, 2);
-    }
-  }
-  Game.shake(0.12);
-  // 格挡通常发生在敌人更新里（那里的伤害按跳伤显示）：震荡波是正经的反击，照常显示数字和火花
-  var tk = FX.tickDmg;
-  FX.tickDmg = false;
-  Enemies.inRadius(x, z, r, function (e) {
-    var dx = e.x - x, dz = e.z - z, d = Math.sqrt(dx * dx + dz * dz) || 1;
-    Weapons.hit(w, e, 1, dx / d, dz / d);
+// 光束跳伤：beamW 以内（半角）、距离 bl 以内、高度差 3 米以内的敌人
+Weapons.beamTick = function (w, bl, fx, fz) {
+  var half = w.def.beamW || 0.15, a = w.fang, L = Weapons.L;
+  FX.tickDmg = true;
+  Enemies.inRadius(P.pos.x, P.pos.z, bl, function (e) {
+    if (Math.abs(e.y - P.pos.y) > 3) return;
+    var ea = Math.atan2(e.x - P.pos.x, e.z - P.pos.z);
+    var diff = Math.abs(((ea - a + Math.PI) % TAU + TAU) % TAU - Math.PI);
+    if (diff >= half) return;
+    var dealt = Weapons.hit(w, e, 1, fx, fz);
+    Weapons.after(w, e, dealt, null);
+    if (dealt > 0 && L && L.beamHit) L.beamHit(w, e);
   });
-  FX.tickDmg = tk;
-  FX.text(x, y + 2.4, z, '格挡', '#ffd84a', 1);
-  return true;
+  FX.tickDmg = false;
 };
+
+// 旧的格挡武器已删；Passive.blocks 还在调（第 5 块的被动不再格挡）
+Weapons.aegisBlock = function () { return false; };
 
 // ---------------- 场地类 ----------------
+Weapons.MINE_CAP = 40;
 Weapons.spawnZone = function (w, idx) {
   var def = w.def, size = Weapons.size(w);
   var t = Enemies.nearestN(P.pos.x, P.pos.z, Weapons.RANGE, idx + 1)[idx] || Enemies.nearest(P.pos.x, P.pos.z, Weapons.RANGE);
   var z = { w: w, type: def.type, t: 0, life: Weapons.dur(w), r: (def.range || 2.5) * size, tick: 0 };
-  if (def.type === 'tornado') {
-    z.x = P.pos.x; z.z = P.pos.z;
-    var a = Math.random() * TAU, sp = 7 * (w.s.pspd || 1) * P.st.projSpeed;
-    z.vx = Math.cos(a) * sp; z.vz = Math.sin(a) * sp; z.sp = sp;
-  } else if (def.type === 'mine') {
+  if (def.type === 'mine') {
     var ma = Math.random() * TAU, mr = rand(2, 7);
     z.x = P.pos.x + Math.cos(ma) * mr; z.z = P.pos.z + Math.sin(ma) * mr; z.armed = 0.5;
     z.life = 10 + Weapons.dur(w) * 2;
+    z.model = def.zoneModel || 'mine';
+    z.trigR = (def.trigR || 1.6) * size;
+    Weapons.mineCap(w);
   } else {
     if (!t) return;
     z.x = t.x + rand(-1, 1) * Math.min(idx, 1); z.z = t.z + rand(-1, 1) * Math.min(idx, 1);
   }
   z.y = W.groundAt(z.x, z.z, P.pos.y + 3);
-  var key = def.type + (w.evo ? '@' + w.id : '');
-  if (def.type === 'tornado') {
-    // 叠加发光的漏斗（每个龙卷风自己的材质：离镜头近时单独变淡）
-    z.mesh = Weapons.takeMesh(key, function () {
-      var m = new THREE.Mesh(ZONE_MODELS.tornado, Weapons.windMat());
-      m.renderOrder = 4;
-      return m;
-    });
-    z.dustT = 0; z.seed = Math.random() * TAU;
-  } else if (def.type === 'mine') {
-    z.mesh = Weapons.takeMesh(key, function () { return new THREE.Mesh(ZONE_MODELS.mine, MODEL.material()); });
-  } else if (def.type === 'blackhole') {
-    z.mesh = Weapons.takeMesh(key, function () { return new THREE.Mesh(ZONE_MODELS.blackhole, Weapons.holeMat); });
+  if (def.type === 'mine') {
+    var zm = ZONE_MODELS, g = zm[z.model] || zm.mine;
+    z.mesh = Weapons.takeMesh('mine:' + z.model + (w.evo ? '@' + w.id : ''), function () { return new THREE.Mesh(g, MODEL.material()); });
+    z.mesh.geometry = g;      // 捕兽夹合上时换过几何体：每次拿出来都放回原样
+    z.gkey = 'mine:' + z.model;
   } else if (def.type === 'puddle') {
-    // 毒云画成贴地的像素圆盘；先扔一个瓶子过去（0.25 秒），落地碎了圆盘才显出来，伤害照旧马上开始
+    // 先扔一个桶 / 一挂鞭炮过去（0.25 秒），落地才显出来，伤害照旧马上开始
     z.vis0 = 0.25; z.seed = Math.random() * TAU;
+    z.look = def.look || null;
+    z.ci = (w.lobN = (w.lobN || 0) + 1) - 1;
+    z.ci %= 7;
     z.sl = FX.slope(z.x, z.z, z.r, z.y, [0, 0]);
     Weapons.lob(w, z);
   }
@@ -1010,23 +1143,41 @@ Weapons.spawnZone = function (w, idx) {
   Weapons.zones.push(z);
 };
 
-// 火焰地面（火焰行者、龙火物品）
-Weapons.fireZone = function (x, z, dmg, w) {
-  var fireCount = 0;
-  for (var i = 0; i < Weapons.zones.length; i++) if (Weapons.zones[i].type === 'fire') fireCount++;
-  if (fireCount > 60) return;
-  var size = w ? Weapons.size(w) : 1;
-  var zz = { w: w || null, type: 'fire', t: 0, life: w ? Weapons.dur(w) : 2, r: (w ? w.def.range : 1.8) * size, tick: 0, x: x, z: z, dmg: dmg };
+// 一把武器活着的地雷超过 40 个：最老的那个原地炸掉（iPad 上的性能保护）
+Weapons.mineCap = function (w) {
+  var zs = Weapons.zones, n = 0, old = null;
+  for (var i = 0; i < zs.length; i++) {
+    var z = zs[i];
+    if (z.type !== 'mine' || z.w !== w || z.fired) continue;
+    n++;
+    if (!old && !z.fireNow) old = z;
+  }
+  if (n >= Weapons.MINE_CAP && old) old.fireNow = true;
+};
+
+// 藤蔓足迹：脚下一小片带刺的地（全场最多 60 片）
+Weapons.TRAIL_CAP = 60;
+Weapons.trailZone = function (w) {
+  var zs = Weapons.zones, n = 0;
+  for (var i = 0; i < zs.length; i++) if (zs[i].type === 'trail') n++;
+  if (n >= Weapons.TRAIL_CAP) return null;
+  var def = w.def, x = P.pos.x, z = P.pos.z;
+  var zz = { w: w, type: 'trail', t: 0, life: Weapons.dur(w), r: (def.range || 1.5) * Weapons.size(w), tick: 0, x: x, z: z, look: def.trailLook || null, seed: Math.random() * TAU };
   zz.y = W.groundAt(x, z, P.pos.y + 2);
   zz.sl = FX.slope(x, z, zz.r, zz.y, [0, 0]);
-  Weapons.zones.push(zz);
+  zs.push(zz);
+  return zz;
 };
 
 Weapons.throwAxe = function (w, t, idx) {
-  var size = Weapons.size(w);
+  var size = Weapons.size(w), def = w.def;
   var z = { w: w, type: 'axe', t: 0, x: P.pos.x, y: P.pos.y + 1.2, z: P.pos.z, tx: t.x + rand(-1.5, 1.5) * idx, tz: t.z + rand(-1.5, 1.5) * idx, life: 99, hover: Weapons.dur(w) + 0.4, r: 1.6 * size, tick: 0 };
-  var evo = !!w.evo;
-  z.mesh = Weapons.takeMesh('axe' + (evo ? '@' + w.id : ''), function () { return new THREE.Mesh(Weapons._axeGeo, MODEL.material()); });
+  var evo = !!w.evo, g = Weapons.zoneGeo(def.proj), kind = Weapons.baseKind(def.proj);
+  z.kind = kind;
+  z.flat = !!Weapons.anim(kind).flat;
+  z.mesh = Weapons.takeMesh('axe:' + kind + (evo ? '@' + w.id : ''), function () { return new THREE.Mesh(g, MODEL.material()); });
+  z.mesh.geometry = g;
+  z.gkey = 'axe:' + kind;
   // 看起来的大小有上限（砍到的范围不变）
   z.vs = Math.min(1.8, 0.9 + 0.45 * size);
   z.mesh.scale.setScalar(z.vs);
@@ -1041,28 +1192,25 @@ Weapons.throwAxe = function (w, t, idx) {
   Weapons.zones.push(z);
 };
 
-// 毒瓶：扔过去的抛物线（只是外观）
+// 扔过去的桶 / 鞭炮：抛物线（只是外观）；kind 是飞着的模型
 Weapons.lob = function (w, z) {
   var o = Weapons.origin();
-  Weapons.lobs.push({ x0: o.x, y0: o.y + 0.2, z0: o.z, x1: z.x, y1: z.y + 0.3, z1: z.z, t: 0, life: 0.25, evo: !!w.evo });
+  Weapons.lobs.push({ x0: o.x, y0: o.y + 0.2, z0: o.z, x1: z.x, y1: z.y + 0.3, z1: z.z, t: 0, life: 0.25, evo: !!w.evo, kind: Weapons.projKind(w.def.lob || 'bucket'), look: z.look, w: w, ci: z.ci });
 };
 
 Weapons.updateLobs = function (dt) {
-  var L = Weapons.lobs;
-  for (var i = L.length - 1; i >= 0; i--) {
-    var b = L[i];
+  var B = Weapons.lobs, L = Weapons.L;
+  for (var i = B.length - 1; i >= 0; i--) {
+    var b = B[i];
     b.t += dt;
     if (b.t >= b.life) {
-      // 玻璃碎了：白色和绿色的碎块 + 一圈小光
-      FX.burst(b.x1, b.y1, b.z1, 3, 0xeaffea, 5, 0.17);
-      FX.burst(b.x1, b.y1, b.z1, 3, b.evo ? 0xffe066 : 0x5aff4a, 5, 0.2);
-      FX.flash(b.x1, b.y1 + 0.2, b.z1, 1.4, 0x9dff6a, 0.15, 2);
-      L.splice(i, 1);
+      if (L && L.lobLand) L.lobLand(b);
+      B.splice(i, 1);
     }
   }
 };
 
-// 地面圆盘叠在一起时变淡：数一数中心离得很近的同类圆盘（毒云一次扔好几个、火焰足迹一路连着，叠起来不会变成一整块地毯）
+// 地面圆盘叠在一起时变淡：数一数中心离得很近的同类圆盘（一次扔好几片、藤蔓一路连着，叠起来不会变成一整块地毯）
 Weapons.overlap = function (z, zs) {
   var k = 0, rr = z.r * z.r * 0.64;
   for (var j = 0; j < zs.length; j++) {
@@ -1074,11 +1222,25 @@ Weapons.overlap = function (z, zs) {
   return 1 / (1 + 0.7 * k);
 };
 
+// 场地伤害用的临时变量（回调里读，不每帧建闭包）
+Weapons._z = null;
+Weapons.zoneTickHit = function (e) {
+  var z = Weapons._z;
+  if (Math.abs(e.y - z.y) > 3) return;
+  var dealt = Weapons.hit(z.w, e, 1, 0, 0, Math.random() < 0.5 ? Weapons.QUIET : null);
+  Weapons.after(z.w, e, dealt, z);
+};
+Weapons.zoneBlastHit = function (e) {
+  var z = Weapons._z;
+  var r = z.br || z.r;
+  if (Math.abs(e.y - z.y) > r + 1.5) return;
+  var dx = e.x - z.x, dz = e.z - z.z, d = Math.sqrt(dx * dx + dz * dz) || 1;
+  var dealt = Weapons.hit(z.w, e, z.mult, dx / d, dz / d);
+  Weapons.after(z.w, e, dealt, null);
+};
+
 Weapons.updateZones = function (dt) {
-  var zs = Weapons.zones, cam = Game.camera ? Game.camera.position : null;
-  Weapons.lickN = 0;
-  Weapons.windN = 0;
-  for (var j = 0; j < zs.length; j++) if (zs[j].type === 'tornado') Weapons.windN++;
+  var zs = Weapons.zones, L = Weapons.L;
   Weapons.updateLobs(dt);
   for (var i = zs.length - 1; i >= 0; i--) {
     var z = zs[i], w = z.w;
@@ -1086,81 +1248,35 @@ Weapons.updateZones = function (dt) {
     z.tick -= dt;
     var dead = z.t >= z.life;
     switch (z.type) {
-      case 'tornado': {
-        var tgt = Enemies.nearest(z.x, z.z, 10);
-        if (tgt && Math.random() < 0.7) { z.vx = lerp(z.vx, (tgt.x - z.x) * 2, dt * 1.5); z.vz = lerp(z.vz, (tgt.z - z.z) * 2, dt * 1.5); }
-        else { z.vx += rand(-20, 20) * dt; z.vz += rand(-20, 20) * dt; }
-        var sp = Math.sqrt(z.vx * z.vx + z.vz * z.vz) || 1;
-        if (sp > z.sp * 1.3) { z.vx *= z.sp * 1.3 / sp; z.vz *= z.sp * 1.3 / sp; }
-        z.x += z.vx * dt; z.z += z.vz * dt;
-        z.y = W.groundAt(z.x, z.z, z.y + 2);
-        if (z.tick <= 0) {
-          z.tick = 0.3;
-          var nh = 0;
-          FX.tickDmg = true;
-          Enemies.inRadius(z.x, z.z, z.r, function (e) { nh++; var a = Math.random() * TAU; Weapons.hit(w, e, 1, Math.cos(a), Math.sin(a)); if (!e.boss) e.vy = 6; });
-          FX.tickDmg = false;
-          // 卷到人的时候（隔一次）：地上闪一圈淡淡的像素环，标出卷到的范围
-          if (nh) z.ringK = (z.ringK || 0) + 1;
-          if (nh && z.ringK % 2 === 1) {
-            var rg = FX.ring(z.x, z.y, z.z, z.r, w.evo ? 0xffc23a : 0xcfe6ff, 0.32, w.evo ? 0.26 : 0.22);
-            rg.s0 = z.r * 0.9;
-          }
-        }
-        Weapons.tornadoLook(z, dt, cam);
-        break;
-      }
       case 'mine': {
         z.armed -= dt;
         z.mesh.position.set(z.x, z.y + 0.1, z.z);
-        if (z.armed <= 0) {
-          // 上了膛：引信头一闪一闪的红光
-          if (Math.sin(z.t * 10 + i) > 0.25) FX.glow(z.x + 0.133, z.y + 0.95, z.z, 0.4, 0.4, Weapons.C.fuse, 0.9, 0);
-          var trig = false;
-          Enemies.inRadius(z.x, z.z, 1.6, function () { trig = true; return false; });
-          if (trig || dead) {
-            var br = (w.def.blast || 3.6) * Weapons.size(w);
-            FX.boom(z.x, z.y + 0.5, z.z, br, w.def.color, Weapons.boomOpt(w));
-            Enemies.inRadius(z.x, z.z, br, function (e) { var dx = e.x - z.x, dz = e.z - z.z, d = Math.sqrt(dx * dx + dz * dz) || 1; Weapons.hit(w, e, 1, dx / d, dz / d); });
-            dead = true;
-          }
+        if (z.shut > 0) {
+          // 捕兽夹合上以后再留 0.6 秒，不再触发
+          z.shut -= dt;
+          dead = z.shut <= 0;
+          break;
+        }
+        if (z.armed <= 0 || z.fireNow) {
+          if (L && L.mine) L.mine(z, dt);
+          var trig = !!z.fireNow;
+          if (!trig) Enemies.inRadius(z.x, z.z, z.trigR || 1.6, function () { trig = true; return false; });
+          if (trig || dead) { Weapons.mineFire(z); dead = !(z.shut > 0); }
         }
         break;
       }
-      case 'puddle': case 'fire': {
+      case 'puddle': case 'trail': {
         var fade = Math.min(1, (z.life - z.t) * 2);
         if (z.vis0) fade *= clamp((z.t - z.vis0) / 0.15, 0, 1);
         if (z.tick <= 0) {
-          z.tick = z.type === 'fire' ? 0.3 : 0.25;
+          z.tick = Math.max(0, z.tick + (z.type === 'trail' ? 0.3 : 0.25));   // 余数留到下一跳，一帧最多一跳（第 13 块 P3）
           FX.tickDmg = true;
-          Enemies.inRadius(z.x, z.z, z.r, function (e) {
-            if (Math.abs(e.y - z.y) > 3) return;
-            if (z.type === 'puddle') { Weapons.hit(w, e, 1, 0, 0, { quiet: Math.random() < 0.5 }); e.poisoned = 2; }
-            else if (w) Weapons.hit(w, e, 1, 0, 0, { quiet: Math.random() < 0.5 });
-            else Enemies.damage(e, z.dmg, 0, 0, 0, { quiet: true });
-          });
+          Weapons._z = z;
+          Enemies.inRadius(z.x, z.z, z.r, Weapons.zoneTickHit);
+          Weapons._z = null;
           FX.tickDmg = false;
         }
-        var ov = Weapons.overlap(z, zs);
-        if (z.type === 'puddle') Weapons.puddleLook(z, fade, ov);
-        else Weapons.fireLook(z, fade, dt, ov);
-        break;
-      }
-      case 'blackhole': {
-        z.mesh.position.set(z.x, z.y + 1.5, z.z);
-        var bs = Weapons.holeSize(z);
-        z.mesh.scale.setScalar(bs);
-        z.mesh.rotation.y += dt * 5;
-        FX.glow(z.x, z.y + 1.5, z.z, bs * 2.9, bs * 2.9, Weapons.colorOf(w), 0.7, 1);
-        FX.glow(z.x, z.y + 1.5, z.z, bs * 3.6, bs * 3.6, Weapons.colorOf(w), 0.4, 0);
-        Weapons.holeLook(z, bs, dt);
-        var pull = (w.s.knockback || 6) * P.st.knockback;
-        Enemies.inRadius(z.x, z.z, z.r * 2.4, function (e) {
-          if (e.boss) return;
-          var dx = z.x - e.x, dz = z.z - e.z, d = Math.sqrt(dx * dx + dz * dz) || 1;
-          e.kx += dx / d * pull * 4 * dt; e.kz += dz / d * pull * 4 * dt;
-        });
-        if (z.tick <= 0) { z.tick = 0.25; FX.tickDmg = true; Enemies.inRadius(z.x, z.z, z.r, function (e) { Weapons.hit(w, e, 1, 0, 0, { quiet: Math.random() < 0.6 }); }); FX.tickDmg = false; }
+        if (L && L.zone) L.zone(z, fade, Weapons.overlap(z, zs), dt);
         break;
       }
       case 'axe': {
@@ -1173,7 +1289,54 @@ Weapons.updateZones = function (dt) {
           z.y = lerp(z.y, W.groundAt(z.x, z.z, z.y + 2) + 1.2, Math.min(1, dt * 5));
         }
         Weapons.axeLook(z, dx2, dz2, dt);
-        if (z.tick <= 0) { z.tick = 0.2; Enemies.inRadius(z.x, z.z, z.r, function (e) { var dx = e.x - z.x, dz = e.z - z.z, d = Math.sqrt(dx * dx + dz * dz) || 1; Weapons.hit(w, e, 1, dx / d, dz / d); }); }
+        if (z.tick <= 0) {
+          z.tick = Math.max(0, z.tick + (w.def.tick || 0.2));   // 余数留到下一跳，一帧最多一跳（第 13 块 P3）
+          var hn = 0;
+          Enemies.inRadius(z.x, z.z, z.r, function (e) {
+            var dx = e.x - z.x, dz = e.z - z.z, d = Math.sqrt(dx * dx + dz * dz) || 1;
+            var dealt = Weapons.hit(w, e, 1, dx / d, dz / d);
+            Weapons.after(w, e, dealt, null);
+            if (dealt > 0) hn++;
+          });
+          if (hn) { if (L && L.clang) L.clang(z); Weapons.emitOnce('clang', w, z.x, z.z); }
+        }
+        break;
+      }
+      case 'ring': {
+        // 钟声：t < 0 还没敲；敲响时定在玩家脚下，半径从 0 线性涨到 Rmax（waveTime 秒）
+        if (z.t < 0) { dead = false; break; }
+        if (!z.on) {
+          z.on = true;
+          z.x = P.pos.x; z.z = P.pos.z; z.y = W.groundAt(z.x, z.z, P.pos.y + 1);
+          if (z.k > 0) Weapons.emitOnce('ring', w, z.x, z.z, z.k);
+        }
+        if (z.R < z.Rmax) {
+          // 涨到 Rmax 的那一帧还打；之后只剩 0.15 秒的淡出，不再打
+          z.R0 = z.R;
+          z.R = z.Rmax * Math.min(1, z.t / z.wt);
+          Weapons._z = z;
+          Enemies.inRadius(z.x, z.z, z.R, Weapons.ringHit);
+          Weapons._z = null;
+        } else z.R0 = z.R;
+        if (L && L.ring) L.ring(z, dt);
+        break;
+      }
+      case 'quake': case 'stick': {
+        // 出师之剑的剑痕 / 插地的投枪：t 到 0 时震一下
+        if (z.t < 0) { dead = false; break; }
+        Weapons._z = z;
+        if (z.type === 'quake') {
+          Enemies.inRadius(z.x, z.z, z.r, Weapons.zoneBlastHit);
+          if (L && L.quake) L.quake(w, z.x, z.y, z.z, z.r, 1);
+          Weapons.emitOnce('quake', w, z.x, z.z);
+        } else {
+          z.mult = z.k;
+          Enemies.inRadius(z.x, z.z, z.r, Weapons.zoneBlastHit);
+          if (L && L.stick) L.stick(w, z.x, z.y, z.z, z.r);
+          Weapons.emitOnce('stick', w, z.x, z.z);
+        }
+        Weapons._z = null;
+        dead = true;
         break;
       }
     }
@@ -1181,118 +1344,42 @@ Weapons.updateZones = function (dt) {
   }
 };
 
-// 龙卷风的风：叠加发光，几乎透明，只有斜着往上卷的几道风痕是亮的（底部和顶部淡出）
-Weapons.WIND_VS = [
-  'varying vec3 vP;',
-  'varying vec3 vCol;',
-  'void main() {',
-  '  vP = position; vCol = color;',
-  '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
-  '}'
-].join('\n');
-Weapons.WIND_FS = [
-  'uniform float uTime;',
-  'uniform float uA;',
-  'varying vec3 vP;',
-  'varying vec3 vCol;',
-  'void main() {',
-  '  float h = clamp(vP.y / 3.8, 0.0, 1.0);',
-  '  float a = atan(vP.z, vP.x) / 6.2831853;',
-  '  float s = fract(a * 3.0 + h * 1.6 - uTime * 2.2);',
-  '  float band = smoothstep(0.0, 0.08, s) * (1.0 - smoothstep(0.2, 0.4, s));',
-  '  band = floor(band * 4.0 + 0.5) / 4.0;',
-  '  float body = 0.16 + 0.84 * band;',
-  '  float fade = smoothstep(0.0, 0.3, h) * (1.0 - 0.55 * smoothstep(0.65, 1.0, h));',
-  '  gl_FragColor = vec4(vCol * body * fade * uA, 1.0);',
-  '}'
-].join('\n');
-Weapons.windTime = { value: 0 };
-// 龙卷风看起来的大小有上限（卷人的范围不变，地上的像素环标出范围）
-Weapons.windScale = function (w) { return Math.min(1.2, 0.7 + 0.28 * Weapons.size(w)); };
-Weapons.windMat = function () {
-  return new THREE.ShaderMaterial({
-    uniforms: { uTime: Weapons.windTime, uA: { value: 0.6 } },
-    vertexShader: Weapons.WIND_VS, fragmentShader: Weapons.WIND_FS, vertexColors: true,
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
-  });
+// 钟声扫到：前沿这一帧扫过了它，或者它在前沿后面 band 米以内；每圈每个敌人只打一次
+Weapons.ringHit = function (e) {
+  var z = Weapons._z;
+  if (z.hit.has(e.id) || Math.abs(e.y - z.y) >= 3.5) return;
+  var dx = e.x - z.x, dz = e.z - z.z, d = Math.sqrt(dx * dx + dz * dz);
+  if (d - e.r > z.R || d + e.r < z.R0 - z.band) return;
+  z.hit.add(e.id);
+  var k = d > 1e-6 ? 1 / d : 0;
+  var dealt = Weapons.hit(z.w, e, z.mult, dx * k, dz * k);
+  Weapons.after(z.w, e, dealt, null);
 };
 
-// 龙卷风：发光的漏斗（大小有上限，离镜头近了变淡）+ 绕着往上转的白色风痕 + 脚下卷起的尘土
-Weapons.tornadoLook = function (z, dt, cam) {
-  var vs = Weapons.windScale(z.w), m = z.mesh;
-  m.position.set(z.x, z.y, z.z);
-  m.rotation.y += dt * 6;
-  m.scale.setScalar(vs);
-  Weapons.windTime.value = Game.time;
-  var fade = cam ? clamp((Math.sqrt((cam.x - z.x) * (cam.x - z.x) + (cam.z - z.z) * (cam.z - z.z)) - 2) / 5, 0.25, 1) : 1;
-  var lf = Math.min(1, z.t * 4, (z.life - z.t) * 3);
-  // 同时有很多个龙卷风时每个都淡一点
-  m.material.uniforms.uA.value = 0.55 * fade * lf / Math.sqrt(Math.max(1, Weapons.windN / 4));
-  var H = 4.2 * vs;
-  for (var k = 0; k < 3; k++) {
-    var h = (z.t * 0.8 + k / 3) % 1, a = z.t * 7 + k * 2.1 + z.seed, rad = lerp(0.35, 1.15, h) * vs;
-    FX.glow(z.x + Math.cos(a) * rad, z.y + 0.3 + h * H, z.z + Math.sin(a) * rad, 0.8 * vs, 0.32 * vs, Weapons.C.streak, 0.5 * fade * lf * (1 - h * 0.5), 0);
+// 地雷触发：爆炸伤害 + 蜡烛点燃（Weapons.after）；捕兽夹只夹住踩上去的（触发半径以内）
+Weapons.mineFire = function (z) {
+  var w = z.w, def = w.def, br = (def.blast || 3.6) * Weapons.size(w), L = Weapons.L;
+  z.fired = true;
+  FX.boom(z.x, z.y + 0.5, z.z, br, def.color, Weapons.boomOpt(w));
+  Weapons._z = z; z.mult = 1; z.br = br;
+  Enemies.inRadius(z.x, z.z, br, Weapons.zoneBlastHit);
+  Weapons._z = null;
+  if (def.root && window.Evo) {
+    Enemies.inRadius(z.x, z.z, z.trigR || 1.6, function (e) { if (e.alive && !e.boss && !e.mini && !e.prop) Evo.stun(e, def.root); });
   }
-  z.dustT -= dt;
-  if (z.dustT <= 0) {
-    z.dustT = 0.1;
-    var da = Math.random() * TAU;
-    FX.part(z.x + Math.cos(da) * 0.7 * vs, z.y + 0.1, z.z + Math.sin(da) * 0.7 * vs, -Math.sin(da) * 3, rand(2, 3.5), Math.cos(da) * 3, Math.random() < 0.6 ? 0xdfe8f0 : 0x8a7a5a, rand(0.14, 0.22), 0.7, -1);
-  }
-};
-
-// 毒云：暗绿的像素圆盘 + 亮绿色的像素边 + 两三团慢慢飘的毒雾（不再是一大块荧光绿的地毯）
-Weapons.puddleLook = function (z, fade, ov) {
-  var evo = z.w && z.w.evo;
-  FX.decal(z.x, z.y + 0.1, z.z, z.r, z.sl[0], z.sl[1], evo ? 0x5a8a1a : 0x3fbf3a, (evo ? 0.22 : 0.18) * fade * ov, 0.38 * fade * ov, 0);
-  var ks = clamp(z.r / 3, 1, 1.5);
-  for (var k = 0; k < 2; k++) {
-    var a = z.seed + k * 2.6 + z.t * 0.35, rr = z.r * (0.22 + 0.25 * k), gs = (1.5 + 0.4 * k) * ks;
-    FX.glow(z.x + Math.cos(a) * rr, z.y + 0.6 + 0.3 * (1 + Math.sin(z.t * 0.8 + k * 1.7)), z.z + Math.sin(a) * rr, gs, gs * 0.75, Weapons.C.mist, 0.09 * fade * ov, FX.NOPULL);
-  }
-};
-
-// 火焰地面：烧焦的暗红像素圆盘（零星的火星格子一闪一闪）+ 亮橙色的边 + 两三簇跳动的火苗光 + 往上窜的火星
-// （火苗光的位置每 0.15 秒换一次，看起来在烧；全场火星每帧最多 8 颗）
-Weapons.fireLook = function (z, fade, dt, ov) {
-  var evo = z.w && z.w.evo, k = fade * ov;
-  FX.decal(z.x, z.y + 0.1, z.z, z.r, z.sl[0], z.sl[1], 0x7a2208, 0.3 * k, 0.5 * k, 1);
-  FX.glow(z.x, z.y + 0.35, z.z, z.r * 1.5, z.r * 0.8, Weapons.C.fire, 0.12 * k, FX.NOPULL);
-  var seed = z.seed || (z.seed = Math.random() * 100);
-  for (var q = 0; q < 2; q++) {
-    var ph = Math.floor(z.t * 6.5 + q * 0.5 + seed);
-    var hx = Math.sin(ph * 12.9898 + q * 78.233) * 43758.5453, hz = Math.sin(ph * 39.346 + q * 11.135) * 24634.6345;
-    hx -= Math.floor(hx); hz -= Math.floor(hz);
-    var fl = 0.75 + 0.25 * Math.sin(z.t * 23 + q * 2.1 + seed), fs = Math.min(1.4, 0.5 + z.r * 0.18);
-    FX.glow(z.x + (hx - 0.5) * z.r * 1.1, z.y + 0.5 * fl * fs, z.z + (hz - 0.5) * z.r * 1.1, 0.7 * fl * fs, 1.3 * fl * fs, evo ? Weapons.C.core : Weapons.C.ember, 0.6 * k, FX.NOPULL);
-  }
-  if (Weapons.lickN < 8 && Math.random() < dt * 30 * fade) {
-    Weapons.lickN++;
-    FX.mote(z.x + rand(-z.r, z.r) * 0.6, z.y + 0.15, z.z + rand(-z.r, z.r) * 0.6, evo ? pick([0xffffff, 0xffe066, 0xffd23a]) : pick([0xffd23a, 0xff8a1a, 0xff4a1a]), rand(0.2, 0.32), rand(2, 3), 0.35);
-  }
-};
-
-// 黑洞核心看起来的大小有上限（大范围的超武黑洞不会变成挡住半个画面的黑球；吸人和伤害的范围不变）
-Weapons.holeSize = function (z) { return Math.min(z.r * 0.4, 1.0 + z.r * 0.06) * (1 + Math.sin(z.t * 8) * 0.08); };
-
-// 黑洞：两颗亮点沿着光环转，四周的小光点被吸进去
-Weapons.holeLook = function (z, bs, dt) {
-  var cy = z.y + 1.5, evo = z.w && z.w.evo, cm = Game.camera ? Game.camera.matrixWorld.elements : null;
-  if (cm) {
-    for (var k = 0; k < 2; k++) {
-      var a = z.t * 4 + k * Math.PI, rr = bs * 1.16;
-      var ox = (cm[0] * Math.cos(a) + cm[4] * Math.sin(a)) * rr, oy = (cm[1] * Math.cos(a) + cm[5] * Math.sin(a)) * rr, oz = (cm[2] * Math.cos(a) + cm[6] * Math.sin(a)) * rr;
-      FX.glow(z.x + ox, cy + oy, z.z + oz, 0.7, 0.7, Weapons.C.white, 0.6, 2);
+  if (L && L.mineFire) L.mineFire(z);
+  if (z.model === 'trap') {
+    Weapons.emitOnce('trap', w, z.x, z.z);
+    var shut = ZONE_MODELS.trapShut;
+    if (shut && z.mesh) {
+      z.mesh.geometry = shut; z.gkey = 'trapShut';
+      if (w.evo && window.Evo && Evo.dressZone) Evo.dressZone(z);
     }
-  }
-  var n = Math.floor(dt * 45 + Math.random());
-  for (var i = 0; i < n; i++) {
-    var ma = Math.random() * TAU, R = z.r * 2, sy = rand(-0.6, 1.2);
-    FX.part(z.x + Math.cos(ma) * R, cy + sy, z.z + Math.sin(ma) * R, -Math.cos(ma) * R / 0.5, -sy / 0.5, -Math.sin(ma) * R / 0.5, evo ? (Math.random() < 0.5 ? 0xffe066 : 0xfff6d0) : (Math.random() < 0.6 ? 0xb08aff : 0xffffff), 0.13, 0.5, 0);
+    z.shut = 0.6;
   }
 };
 
-// 飞斧：飞行时翻跟头；停下来绕一根斜 30° 的轴转，脚下一圈淡淡的旋风刀光标出砍到的范围
+// 飞斧 / 平底锅：飞行时翻跟头；停下来绕一根斜 30° 的轴转（平底锅这种 flat 的平着转），脚下一圈淡淡的旋风刀光标出砍到的范围
 Weapons.axeLook = function (z, dx, dz, dt) {
   var m = z.mesh;
   m.position.set(z.x, z.y, z.z);
@@ -1302,9 +1389,8 @@ Weapons.axeLook = function (z, dx, dz, dt) {
     m.rotation.x += dt * 14;
     m.rotation.z = 0;
   } else {
-    m.rotation.order = 'ZYX';
-    m.rotation.x = 0;
-    m.rotation.z = 0.52;
+    if (z.flat) { m.rotation.order = 'YXZ'; m.rotation.x = 0; m.rotation.z = 0; }
+    else { m.rotation.order = 'ZYX'; m.rotation.x = 0; m.rotation.z = 0.52; }
     m.rotation.y += dt * 16;
     var sw = z.swoosh;
     if (sw) {
@@ -1316,12 +1402,45 @@ Weapons.axeLook = function (z, dx, dz, dt) {
   }
 };
 
-// 灵魂收割者：追踪灵魂
-Weapons.spawnSouls = function (x, y, z, n) {
+// 追踪的小弹丸（第 5 / 6 块：猎隼扑击、兔子、护卫蜂、乌鸦）：不走 Weapons.hit（不暴击、不算武器伤害、不触发 onCrit / dmgMult）
+// o（可选）：{ kind = 'soul', dmg, vx, vy, vz（不给就是原来的随机散开，水平速度 spd = 10、vy = 3）, homing = 6, life = 3, r = 0.6, grav = 0,
+//            scale = 1, blastR（碰到敌人炸开的半径；0 = 单体）, onHit(p, e, dealt), onBlast(p)（炸开的样子）, tag + max（同一个 tag 同时最多几个） }
+// 返回发出去的个数
+Weapons.spawnSouls = function (x, y, z, n, o) {
+  if (o && o.tag && o.max != null) {
+    var have = 0;
+    for (var j = 0; j < Weapons.projs.length; j++) if (Weapons.projs[j].tag === o.tag) have++;
+    n = Math.min(n, o.max - have);
+  }
+  var made = 0;
   for (var i = 0; i < n; i++) {
     var a = Math.random() * TAU;
-    Weapons.projs.push({ w: null, soul: true, soulDmg: (10 + P.level * 2) * P.st.damage, kind: 'soul', x: x, y: y + 1, z: z, vx: Math.cos(a) * 10, vy: 3, vz: Math.sin(a) * 10, r: 0.6, life: 3, pierce: 0, bounces: 0, hit: new Set(), t: 0, spin: 0, grav: 0, scale: 1, dmgMult: 1, homing: 6 });
+    if (!o) {
+      Weapons.projs.push({ w: null, soul: true, soulDmg: (10 + P.level * 2) * P.st.damage, kind: 'soul', x: x, y: y + 1, z: z, vx: Math.cos(a) * 10, vy: 3, vz: Math.sin(a) * 10, r: 0.6, life: 3, pierce: 0, bounces: 0, hit: new Set(), t: 0, spin: 0, grav: 0, scale: 1, dmgMult: 1, homing: 6 });
+      made++;
+      continue;
+    }
+    var kind = o.kind || 'soul', sp = o.spd != null ? o.spd : 10;
+    var p = { w: null, soul: true, soulDmg: o.dmg != null ? o.dmg : (10 + P.level * 2) * P.st.damage, kind: kind, an: Weapons.anim(kind),
+      x: x, y: y + 1, z: z, vx: o.vx != null ? o.vx : Math.cos(a) * sp, vy: o.vy != null ? o.vy : 3, vz: o.vz != null ? o.vz : Math.sin(a) * sp,
+      r: o.r || 0.6, life: o.life || 3, pierce: 0, bounces: 0, hit: new Set(), t: 0, spin: 0, grav: o.grav || 0, scale: o.scale || 1, dmgMult: 1,
+      homing: o.homing != null ? o.homing : 6, blastR: o.blastR || 0, onHit: o.onHit || null, onBlast: o.onBlast || null, tag: o.tag || null };
+    Weapons.projs.push(p);
+    made++;
   }
+  return made;
+};
+
+// 灵魂弹丸炸开（兔子）：半径 blastR 内每个敌人（道具不算）打一下
+Weapons.soulBlast = function (p) {
+  var r = p.blastR;
+  Enemies.inRadius(p.x, p.z, r, function (e) {
+    if (e.prop || Math.abs(e.y - p.y) > r + 1.5) return;
+    var dx = e.x - p.x, dz = e.z - p.z, d = Math.sqrt(dx * dx + dz * dz) || 1;
+    var dealt = Enemies.damage(e, p.soulDmg, 0, dx / d, dz / d);
+    if (p.onHit) p.onHit(p, e, dealt);
+  });
+  if (p.onBlast) p.onBlast(p);
 };
 
 // ---------------- 绘制 ----------------
@@ -1351,7 +1470,7 @@ Weapons.drawTail = function (p, tl) {
   }
 };
 
-var _wm = null, _wq = null, _ws = null, _wp = null, _we = null, _wcount = {}, _wtr = { x: 0, y: 0, z: 0 };
+var _wm = null, _wq = null, _ws = null, _wp = null, _we = null, _wcount = {};
 Weapons.put = function (kind, x, y, z, rx, ry, s, sq, rz) {
   var m = Weapons.meshes[kind];
   if (!m || _wcount[kind] >= 500) return;
@@ -1367,117 +1486,83 @@ Weapons.render = function (dt) {
   if (!_wm) { _wm = new THREE.Matrix4(); _wq = new THREE.Quaternion(); _ws = new THREE.Vector3(); _wp = new THREE.Vector3(); _we = new THREE.Euler(); }
   dt = dt || 1 / 30;
   for (var k in Weapons.meshes) _wcount[k] = 0;
-  var put = Weapons.put;
+  var put = Weapons.put, L = Weapons.L;
   var ps = Weapons.projs;
   for (var i = 0; i < ps.length; i++) {
-    var p = ps[i], bk = Weapons.baseKind(p.kind);
+    var p = ps[i], bk = Weapons.baseKind(p.kind), an = p.an || Weapons.NOANIM;
     var yaw = Math.atan2(p.vx, p.vz), hs = Math.sqrt(p.vx * p.vx + p.vz * p.vz);
-    // 月刃（超武香蕉）平着转；普通香蕉翻滚
-    var flat = bk === 'banana' && p.kind !== bk, rs = PROJ_ROLLSPIN[bk];
-    put(p.kind, p.x, p.y, p.z, flat ? 0.25 : p.spin ? p.t * p.spin : -Math.atan2(p.vy, hs || 0.001), p.spin && bk === 'banana' ? p.t * p.spin : yaw, p.scale || 1, p.sq, rs ? p.t * rs : 0);
+    // 翻滚（spin）、绕飞行方向转（roll）、扇翅膀（flap）、窜天猴左右摇（wobble）
+    var rx = p.spin ? p.t * p.spin : an.spin ? p.t * an.spin : -Math.atan2(p.vy, hs || 0.001);
+    var rz = an.roll ? p.t * an.roll : an.flap ? Math.sin(p.t * 28) * an.flap : 0;
+    if (p.w && p.w.def && p.w.def.wobble) yaw += Math.sin(p.t * 14) * p.w.def.wobble * 0.4;
+    if (p.hop) rx = 0;
+    // 画出来的大小上限（PROJ_ANIM.maxS，第 10 块：投石车的石弹）；命中半径、爆炸范围不变
+    put(p.back && p.kindB ? p.kindB : p.kind, p.x, p.y, p.z, rx, yaw, an.maxS ? Math.min(p.scale || 1, an.maxS) : p.scale || 1, p.sq, rz);
     // 发光的弹丸核心（超武的种类有自己的金色光晕）
     var gl = Weapons.glowC[p.kind] || Weapons.glowC[bk];
     if (gl) Weapons.glowAt(gl, p.x, p.y, p.z, p.scale || 1, p.t, p.w);
     // 拖尾
     if (p.tr) { var tl = Weapons.tailOf(p.kind); if (tl && (!tl.back || p.back)) Weapons.drawTail(p, tl); }
-    // 火球一路掉火星
-    if (bk === 'fireball' && Math.random() < dt * 30) FX.mote(p.x + rand(-0.2, 0.2), p.y, p.z + rand(-0.2, 0.2), Math.random() < 0.5 ? 0xffb030 : 0xff6a1a, rand(0.1, 0.16), rand(0.6, 1.4), 0.45);
-    // 重弩：出手时一道直直的弹道光（按这一帧的最终方向）
-    if (p.trc) {
-      p.trc = false;
-      var ev = p.w && p.w.def.evo, e2 = Weapons.tracerEnd(p.ox0, p.oy0, p.oz0, p.vx, p.vy, p.vz, _wtr);
-      FX.bolt(p.ox0, p.oy0, p.oz0, e2.x, e2.y, e2.z, ev ? (window.Evo ? Evo.BOLT_C : 0xffd04a) : 0xfff0c8, { straight: true, life: 0.12, w: ev ? 0.62 : 0.42, ca: 0.35, flash: false });
-    }
+    if (L && L.proj) L.proj(p, bk, dt);
   }
-  // 毒瓶（飞行中带一团绿光）
+  // 扔出去的桶 / 鞭炮
   for (i = 0; i < Weapons.lobs.length; i++) {
     var b = Weapons.lobs[i], s = Math.min(1, b.t / b.life), lh = 1.2 + Math.sqrt(dist2(b.x0, b.z0, b.x1, b.z1)) * 0.12;
     var bx = lerp(b.x0, b.x1, s), by = lerp(b.y0, b.y1, s) + 4 * lh * s * (1 - s), bz = lerp(b.z0, b.z1, s);
-    put('bottle', bx, by, bz, b.t * 14, b.t * 6, 1.1, 0);
-    FX.glow(bx, by, bz, 0.9, 0.9, Weapons.C.mist, 0.45, 0);
+    put(b.kind, bx, by, bz, b.t * 14, b.t * 6, 1.1, 0);
+    b.x = bx; b.y = by; b.z = bz;
+    if (L && L.lob) L.lob(b);
+  }
+  // 插在地上的投枪（场地画，不是每支一个网格）：枪头朝下斜插 35°
+  var zs = Weapons.zones;
+  for (i = 0; i < zs.length; i++) {
+    var z = zs[i];
+    if (z.type !== 'stick') continue;
+    var sc = z.scale || 1;
+    put(z.kind, z.x - Math.sin(z.yaw) * 0.4 * sc, z.y + 0.42 * sc, z.z - Math.cos(z.yaw) * 0.4 * sc, 0.61, z.yaw, sc, 0);
   }
   Weapons.renderOrbs(put);
+  Relic.render(put);   // 第 6 块：宝物画的东西（猎犬、铁蒺藜）
   for (k in Weapons.meshes) {
     var m = Weapons.meshes[k];
     m.count = _wcount[k];
     m.visible = _wcount[k] > 0;
     if (_wcount[k]) m.instanceMatrix.needsUpdate = true;
   }
-  Weapons.renderLinks();
   Weapons.renderStatus(dt);
+  if (L && L.tick) L.tick(dt);
 };
 
-// 环绕的东西：流星锤（大小有上限，从镜头旁边经过时缩小；身后拖一串光）、神盾的盾牌
+// 环绕的东西：锡兵、风筝（大小有上限，从镜头旁边经过时缩小；脸朝着前进的方向；身后的拖尾在 Weapons.L.orbit）
 Weapons.renderOrbs = function (put) {
-  var cam = Game.camera ? Game.camera.position : null;
+  var cam = Game.camera ? Game.camera.position : null, L = Weapons.L;
   for (var j = 0; j < P.weapons.length; j++) {
     var w = P.weapons[j];
     if (!w.orbs) continue;
-    var kind = w.def.proj, bk = Weapons.baseKind(kind), og = Weapons.glowC[kind], size = Weapons.size(w), evo = w.def.evo;
-    var flail = bk === 'flail', osc = flail ? Math.min(1.4, 0.8 + 0.3 * size) : bk === 'shield' ? Math.min(1.1, 0.8 * size) : size;
+    var kind = Weapons.projKind(w.def.proj), og = Weapons.glowC[kind] || Weapons.glowC[Weapons.baseKind(kind)], size = Weapons.size(w);
+    var osc = Math.min(1.4, 0.8 + 0.3 * size);
     var n = w.orbs.length;
     for (var q = 0; q < n; q++) {
       var ob = w.orbs[q], s = osc;
-      if (flail && cam) {
+      if (cam) {
         // 从镜头旁边经过时缩小（不会占满画面的下面三分之一）
         var cd = Math.sqrt((cam.x - ob.x) * (cam.x - ob.x) + (cam.y - ob.y) * (cam.y - ob.y) + (cam.z - ob.z) * (cam.z - ob.z));
         if (cd < 9) s *= clamp((cd - 2) / 7, 0.12, 1);
       }
-      put(kind, ob.x, ob.y, ob.z, 0, Game.time * 4 + q, s, 0);
+      ob.yaw = Math.atan2(-Math.sin(ob.a), Math.cos(ob.a));
+      put(kind, ob.x, ob.y, ob.z, 0, ob.yaw, s, 0);
       if (og) Weapons.glowAt(og, ob.x, ob.y, ob.z, s, Game.time + q, w);
-      if (flail && w.orad) {
-        // 沿轨道往后拖的光（普通：铁灰色；超武：金黄到橙红的流星尾，偶尔掉火星）
-        var a0 = w.ang + q / n * TAU, nt = evo ? 4 : 3;
-        for (var k = 1; k <= nt; k++) {
-          var a = a0 - 0.12 * k;
-          FX.glow(P.pos.x + Math.cos(a) * w.orad, ob.y, P.pos.z + Math.sin(a) * w.orad, 0.9 * s, 0.9 * s, evo ? Weapons.meteorC[k - 1] : Weapons.C.flail, evo ? lerp(0.5, 0.1, (k - 1) / 3) : [0.4, 0.25, 0.12][k - 1], 0);
-        }
-        if (evo && Math.random() < 0.25) FX.part(ob.x, ob.y, ob.z, rand(-1, 1), rand(1, 3), rand(-1, 1), Math.random() < 0.5 ? 0xffd23a : 0xff6a1a, 0.16, 0.4);
-      }
+      if (L && L.orbit) L.orbit(w, ob, q, s, ob.a);
     }
   }
 };
 
-// 锁链：一节节交错 90° 的链环 + 目标身上的钩子光 + 每次跳伤顺着锁链跑过去的白光
-Weapons.renderLinks = function () {
-  var lm = Weapons.linkMesh, n = 0;
-  for (var j = 0; j < P.weapons.length; j++) {
-    var w = P.weapons[j];
-    if (w.def.type !== 'tether' || !w.target || !w.beam || !w.beam.visible) continue;
-    var tg = w.target, size = Weapons.size(w), evo = w.def.evo;
-    var sx = P.pos.x, sy = P.pos.y + 1.1, sz = P.pos.z, tx = tg.x, ty = tg.y + tg.r, tz = tg.z;
-    var dx = tx - sx, dy = ty - sy, dz = tz - sz, L = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-    var step = 0.34 * Math.min(1.6, size), cnt = Math.min(64 - n, Math.max(2, Math.floor(L / step)));
-    Weapons._la.set(sx, sy, sz); Weapons._lb.set(tx, ty, tz);
-    Weapons._lm.lookAt(Weapons._lb, Weapons._la, Weapons._lup);
-    Weapons._lq.setFromRotationMatrix(Weapons._lm);
-    Weapons._lq2.copy(Weapons._lq).multiply(Weapons._lr);
-    var ls = Math.min(1.6, size), lc = Weapons._lc.set(evo ? 0xffd060 : 0xffffff);
-    Weapons._ls.set(ls, ls, ls);
-    for (var i = 0; i < cnt; i++) {
-      var f = (i + 0.5) / cnt;
-      Weapons._la.set(sx + dx * f, sy + dy * f, sz + dz * f);
-      Weapons._lm.compose(Weapons._la, i % 2 ? Weapons._lq2 : Weapons._lq, Weapons._ls);
-      lm.setMatrixAt(n, Weapons._lm);
-      lm.setColorAt(n, lc);
-      n++;
-    }
-    FX.glow(tx, ty, tz, 1, 1, evo ? Weapons.C.gold : Weapons.C.hook, 0.5, 0);
-    if (w.pulseT != null && w.pulseT < 0.18) {
-      var pf = w.pulseT / 0.18;
-      FX.glow(lerp(sx, tx, pf), lerp(sy, ty, pf), lerp(sz, tz, pf), 1.1, 1.1, Weapons.C.white, 0.8 * (1 - pf * 0.4), 0);
-    }
-  }
-  lm.count = n;
-  lm.visible = n > 0;
-  if (n) { lm.instanceMatrix.needsUpdate = true; lm.instanceColor.needsUpdate = true; }
-};
-
-// 敌人身上的状态：被标记的敌人头顶一个跳动的红色准星；被火烧的敌人冒火星（中毒的绿色在 enemies.js 里）
+// 敌人身上的状态：被标记的敌人头顶一个跳动的红色准星；被火烧的敌人冒火星；蜂蜜、颜料这类标记交给 Weapons.L.status
 Weapons.renderStatus = function (dt) {
-  var L = Enemies.list, nm = 0, ne = 0, pulse = 0.75 + Math.sin(Game.time * 9) * 0.25, top = window.Evo && Evo.topOf;
-  for (var i = 0; i < L.length; i++) {
-    var e = L[i];
+  var EL = Enemies.list, nm = 0, ne = 0, pulse = 0.75 + Math.sin(Game.time * 9) * 0.25, top = window.Evo && Evo.topOf, L = Weapons.L, now = Game.time;
+  var st = L && L.status;
+  for (var i = 0; i < EL.length; i++) {
+    var e = EL[i];
     if (!e.alive) continue;
     if (e.marked > 0 && nm < 60) {
       nm++;
@@ -1485,16 +1570,17 @@ Weapons.renderStatus = function (dt) {
       FX.glow(e.x, hy, e.z, 0.95 * pulse, 0.95 * pulse, Weapons.C.mark, 0.75, 1);
       FX.glow(e.x, hy, e.z, 0.4, 0.4, Weapons.C.mark, 0.8, 3);
     }
-    if (e.fireT > Game.time && !e.evoBurnListed && ne < 8 && Math.random() < dt * 6) {
+    if (e.fireT > now && !e.evoBurnListed && ne < 8 && Math.random() < dt * 6) {
       ne++;
       FX.mote(e.x + rand(-0.3, 0.3), e.y + e.r * rand(0.8, 1.8), e.z + rand(-0.3, 0.3), Math.random() < 0.5 ? 0xffb030 : 0xff6a1a, 0.15, rand(1, 2), 0.5);
     }
+    if (st && e.mkT > now) L.status(e, dt);
   }
 };
 
 // ============================================================
 //  伤害数字：Enemies.damage 结算时告诉 FX 是哪个敌人（同一个敌人的数字合并）；
-//  处决 / 斩杀的字交给 FX.execText 限流（FX.text 认出这一次的字），不显示的伤害加进头顶已有的数字里；
+//  斩杀的字交给 FX.execText 限流（FX.text 认出这一次的字），不显示的伤害加进头顶已有的数字里；
 //  敌人自己的更新里结算的伤害（中毒、燃烧的持续伤害）算跳伤：同一个敌人 0.9 秒只出一个数字
 //  （只改显示，伤害照旧）
 // ============================================================

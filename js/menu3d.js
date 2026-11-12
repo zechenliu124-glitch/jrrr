@@ -19,7 +19,7 @@ Game.showMenuModel = function (id) {
   Game.scene.add(m);
   Game.menuModel = m;
   Game.menuCharId = id;
-  Game.menuPose = { t: 0, run: 0, phase: 0, air: 0, vy: 0, slide: 0, flex: 0, land: 0 };
+  Game.menuPose = { t: 0, run: 0, phase: 0, air: 0, vy: 0, slide: 0, land: 0 };
   Game.menuAreaKey = '';
   Game.menuYaw = Game.menuViewYaw();
 };
@@ -73,9 +73,6 @@ Game.updateMenuCamera = function (dt) {
   var y0 = W.terrainH(0, 0), a = Game.menuPose;
   a.t += dt;
   m.position.y = y0;
-  // 胸甲猛男时不时秀一下肌肉
-  a.flex = 0;
-  if (m.userData.id === 'chad') { var c = a.t % 7; if (c > 4.5) a.flex = Math.min(1, (c - 4.5) * 4, (7 - c) * 4); }
   CHAR_MODELS.pose(m, a);
   // 每 6 秒亮一下滑铲坐骑（rides.js；菜单里按 R 一直亮着）
   if (typeof Ride !== 'undefined') Ride.showcase(m, a, dt, Game.menuCharId);

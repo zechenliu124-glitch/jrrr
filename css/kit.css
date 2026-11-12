@@ -102,7 +102,7 @@
 
 /* ---------------------------------------------------------------- 3. 面板里：正文不描边、卡片、勾选框 */
 /* 实心面板里的正文、表格、说明不描边（标题、按钮、卡片名字才描边） */
-.statRow, .hint, .setting, .keys, #itemList, #charDesc > div:not(.cdTitle), .cardSub, .cardLines,
+.statRow, .hint, .setting, .keys, #itemList, #charDesc > div:not(.cdTitle), .cardSub, .cardLines, .cardGoal,
 .mlBody, .mlSub, .mlNote, .maName, .maDesc, .maRew, .muName, .muEff, .mrName, .mrBest, .meParts, .meBal, .meItemT, .meItemN, .sfxRow, .sfxTitle { text-shadow: none; }
 /* 卡片（升级、宝箱、商人）：四个角补 3×3 黑格成缺角；史诗、传说外面再加一圈稀有度颜色的硬边。不发光、不闪、没有小星星 */
 .modal .card::after {
@@ -269,9 +269,9 @@ body #fxBars > div { transition: transform 0.24s steps(4, end); }
 #kmDim { position: fixed; inset: 0; z-index: 4; pointer-events: none; background: rgba(6, 9, 20, 0.55); opacity: 0; }
 body.fxDead #kmDim { opacity: 1; transition: opacity 0.3s steps(3, end); }
 body.fxDead #hud, body.kmEnd #hud { opacity: 0; transition: opacity 0.2s steps(2, end); }
-/* 传送门：不要旋转的光条，换成一格格变密的紫色像素点阵（只动 opacity） */
-#fxWarp .core { background-color: #2c0a56;
-  background-image: linear-gradient(45deg, #13041f 25%, transparent 25%, transparent 75%, #13041f 75%), linear-gradient(45deg, #13041f 25%, transparent 25%, transparent 75%, #13041f 75%);
+/* 传送门：不要旋转的光条，换成一格格变密的蓝白像素点阵（和出口传送门的漩涡同一种蓝白 #9fd8ff；只动 opacity） */
+#fxWarp .core { background-color: #8cc8f0;
+  background-image: linear-gradient(45deg, #2c5a88 25%, transparent 25%, transparent 75%, #2c5a88 75%), linear-gradient(45deg, #2c5a88 25%, transparent 25%, transparent 75%, #2c5a88 75%);
   background-size: 12px 12px; background-position: 0 0, 6px 6px; }
 #fxWarp.in { animation: kmWarpIn 0.55s steps(4, end) forwards; }
 #fxWarp.out { animation: kmWarpOut 0.6s steps(4, end) forwards; }

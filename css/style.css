@@ -1,5 +1,5 @@
 /* 骑士魔法 —— 像素风 HUD 与菜单：一种像素字体 + 硬描边，深色面板配缺角黑框（单一游戏画风，不跟随系统深浅色） */
-/* 布局：全屏 3D 画布；顶部细经验条；左上 数据/生命/武器/魔典/任务，正上 倒计时/Boss，右上 等级/小地图；下方被动物品栏；触屏时右下角按钮 */
+/* 布局：全屏 3D 画布；顶部细经验条；左上 数据/生命/武器/纹章/任务，正上 倒计时/Boss，右上 等级/小地图；下方被动物品栏；触屏时右下角按钮 */
 /* 规则见 docs/knight-magic/design/UI_STYLE.md：字号只用 12/18/24/36/48（下面的 --fs-*），描边只用 --ol*；
    像素边框（--fr-*）、按钮、面板、凹槽、局内公告这些公共组件在 css/kit.css（js/kit.js） */
 :root {
@@ -98,7 +98,7 @@ body.touch #touchZone { display: block; }
 /* 进度条（经验、生命、护盾、Boss）的长度直接跳到新值：不做 width 动画（动画只用 transform / opacity，UI_STYLE §6） */
 #xpFill { height: 100%; width: 0; background: var(--xp); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.45), inset 0 -2px 0 rgba(0, 40, 90, 0.35); }
 
-/* 左上：数据行 → 生命条 → 武器 → 魔典 → 任务 */
+/* 左上：数据行 → 生命条 → 当前目标 → 武器 → 纹章盾 + 右边一列（第 12 块 a） */
 #topLeft { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 17px); left: max(12px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; align-items: flex-start; gap: 7px; transform-origin: top left; }
 /* 画面上的数字：像素加粗（--olB + 1 个字体像素的字距） */
 #statRow { display: flex; align-items: center; gap: 12px; font-size: var(--fs-m); line-height: var(--fs-m); letter-spacing: var(--o); white-space: nowrap; text-shadow: var(--olB); }
@@ -118,28 +118,25 @@ body.touch #touchZone { display: block; }
 #hpBar.low #hpFill::after { animation: lowhp 0.9s steps(1, end) infinite; }
 @keyframes lowhp { 50% { opacity: 1; } }
 
-/* 武器 / 魔典：像素图块，每行 4 个，等级写在图块下面；图块里面 36 像素正好放一个图标（1 倍 / iPad 2 倍，像素整齐） */
+/* 武器：像素图块，每行 4 个，等级写在图块下面；图块里面 36 像素正好放一个图标（1 倍 / iPad 2 倍，像素整齐）。纹章栏是一面小盾（文件最后「第 12 块 a」） */
 .slots { display: grid; grid-template-columns: repeat(4, 40px); gap: 15px 6px; padding-bottom: 12px; }
-/* 往下让 3 像素：超武武器栏左上角的「超」角标（evolution.js）不压到生命条 */
+/* 往下让 3 像素：超武武器栏左上角的「超」角标（evolution.js）不压到上面的任务框 */
 #weaponSlots { margin-top: 3px; }
 .slot { position: relative; width: 40px; height: 40px; border: 2px solid transparent; border-image: var(--fr-tile) 4 4 6 4 / 4px 4px 6px 4px / 0 0 2px 0 stretch; background-color: #5a6378; background-image: var(--tone) !important; background-clip: padding-box; display: flex; align-items: center; justify-content: center; font-size: var(--fs-m); line-height: 18px; color: #fff; text-shadow: var(--ol1), 0 var(--o2) 0 #000; box-shadow: var(--bevel); }
 /* 空栏位：没有投影的小边框 */
 .slot.empty { background-color: rgba(6, 10, 22, 0.55); background-image: none !important; border-image: var(--fr-tile0) 4 / 4px stretch; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
 .slot.empty::after { content: ""; width: 4px; height: 4px; background: rgba(255, 255, 255, 0.28); }
 .slotLv { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 3px; font-size: var(--fs-s); line-height: 12px; letter-spacing: var(--o); color: #fff; white-space: nowrap; text-shadow: var(--olB); }
-/* 魔典：左边一条书脊 */
-#tomeSlots .slot:not(.empty) { padding-left: 3px; box-shadow: inset 5px 0 0 rgba(0, 0, 0, 0.32), var(--bevel); }
 /* 超武栏位：保留 evolution.js 的金框（不用像素边框） */
 #weaponSlots .slot.evoSlot { border-image: none; }
 
-/* 任务框 */
-#quest { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: -3px; }
+/* 任务框：生命条下面一行「当前目标」（火漆章、这一步）；纹章盾右边那一列（#questSide）是午夜钟声、护卫冠军、挑战精英 */
+#quest { display: flex; flex-direction: column; align-items: flex-start; margin-top: 3px; }
 /* 画面上允许的底板只有小面板（--fr-plate）：任务框、互动提示、状态条 */
 .questRow { display: flex; align-items: center; gap: 6px; padding: 3px 12px 3px 6px; background: rgba(0, 0, 0, 0.58); background-clip: padding-box; border: 2px solid transparent; border-image: var(--fr-plate) 4 4 7 4 / 4px 4px 7px 4px / 0 0 3px 0 stretch; font-size: var(--fs-m); line-height: 24px; white-space: nowrap; text-shadow: var(--ol1); }
-.questBox { flex: none; width: 14px; height: 14px; border: 2px solid currentColor; background: rgba(0, 0, 0, 0.5); box-shadow: 0 0 0 1px #000; }
-.questRow.red { color: #ff5a4a; }
-.questRow.boss { color: #ffc2b8; }
-/* 颜色按用途（紫色只给魔晶）：进传送门是进度 = 金，挑战精英是强敌 = 橙 */
+/* 颜色按用途：点燃烽火台、打首领 = 浅红，午夜钟声 = 红，进传送门是进度 = 金，护卫冠军、挑战精英是强敌 = 橙（紫色只给魔晶） */
+.questRow.red { color: var(--redM); }
+.questRow.boss { color: var(--redL); }
 .questRow.go { color: var(--goldL); }
 .questRow.purple { color: var(--orgL); }
 
@@ -178,10 +175,15 @@ body.touch #touchZone { display: block; }
 .cmp.e { right: 0; top: 50%; transform: translateY(-50%); }
 
 /* 左下：角色被动等状态文字 */
-#bottomLeft { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; flex-direction: column; gap: 2px; max-width: 32vw; }
-#passiveText { font-size: var(--fs-m); line-height: 24px; color: var(--accent); text-shadow: var(--ol1), 0 var(--o2) 0 #000; }
+#bottomLeft { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; flex-direction: column; gap: 2px; max-width: max(32vw, 150px); }
+#passiveText { font-size: var(--fs-m); line-height: 24px; color: var(--accent); text-shadow: var(--ol1), 0 var(--o2) 0 #000; white-space: nowrap; }
 #passiveText:empty { display: none; }
+/* 狂暴那一行（第 13 块 T2）：在被动那一行上面，样子一样 */
+#rageText { font-size: var(--fs-m); line-height: 24px; color: var(--accent); text-shadow: var(--ol1), 0 var(--o2) 0 #000; white-space: nowrap; }
+#rageText:empty { display: none; }
+/* 触屏：在互动提示（底边 132）上面一点；窄屏（分屏，600 以下）居中的提示能伸到左边，多行的圣锻炉提示到 ~190，所以那时抬到 196 */
 body.touch #bottomLeft { bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); }
+@media (max-width: 600px) { body.touch #bottomLeft { bottom: calc(env(safe-area-inset-bottom, 0px) + 196px); } }
 
 /* 下方：被动物品栏（多了往上换行） */
 #itemBar { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); transform: translateX(-50%); width: min(780px, calc(100vw - 420px)); display: flex; flex-wrap: wrap-reverse; justify-content: center; gap: 4px; }
@@ -200,6 +202,15 @@ body.touch #itemBar { left: calc(45vw + 30px); right: calc(max(26px, env(safe-ar
 
 #prompt { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 132px); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); padding: 6px 14px; background: rgba(0, 0, 0, 0.62); background-clip: padding-box; border: 2px solid transparent; border-image: var(--fr-plate) 4 4 7 4 / 4px 4px 7px 4px / 0 0 3px 0 stretch; font-size: var(--fs-m); line-height: 24px; text-align: center; text-shadow: var(--ol1); }
 #prompt.bad { color: #ff8a7a; }
+/* 进行中（立了誓的石碑、比武中、滚石在滚）：进度的金色，不是拒绝的红色（ui.js UI.setPrompt 的 busy） */
+#prompt.busy { color: var(--goldL); }
+/* 触屏上居中的提示牌会压到右边的圆形互动按钮时（UI.promptFit）：靠左，右边离按钮 9 像素（按钮 72 + 离右边 max(26, 安全区) + 14），在短语之间折行 */
+#prompt.kmLeft { left: max(16px, env(safe-area-inset-left, 0px)); transform: none; text-align: left; max-width: calc(100vw - max(16px, env(safe-area-inset-left, 0px)) - max(26px, env(safe-area-inset-right, 0px)) - 95px); }
+#prompt.kmLeft .kmPl { display: block; }
+#prompt.kmLeft .kmPq { display: inline-block; max-width: 100%; vertical-align: top; }
+#prompt.kmLeft .kmPq:not(:last-child) { margin-right: 24px; }
+/* 靠左的提示牌短的说法也超过 2 行时（UI.promptCap）：12 号字，最多 3 行，不盖住脚下的血条 */
+#prompt.kmLeft.kmSmall { font-size: var(--fs-s); line-height: 18px; }
 
 /* 触屏 */
 #joyBase { position: fixed; left: 0; top: 0; width: 120px; height: 120px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.55); background: rgba(0, 0, 0, 0.22); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45), inset 0 0 0 2px rgba(0, 0, 0, 0.35); pointer-events: none; z-index: 6; }
@@ -219,7 +230,7 @@ body.touch #touchBtns { display: block; }
 /* 面板里的小标题和正文不描边（只有大标题、按钮、卡片名字描边） */
 .modal h3 { margin: 12px 0 6px; font-size: var(--fs-m); line-height: 24px; color: var(--muted); }
 .cards { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; padding: 4px 2px 8px; }
-/* 卡片：边框颜色 = 稀有度（绿/蓝/紫/红/黄）；四个缺角、史诗 / 传说外面那圈硬边在 kit.css。不要软光晕 */
+/* 卡片：边框颜色 = 稀有度（白/绿/蓝/紫/橙）；四个缺角、史诗 / 传说外面那圈硬边在 kit.css。不要软光晕 */
 .card { position: relative; flex: 1 1 230px; max-width: 280px; min-height: 172px; padding: 12px 12px 10px; text-align: left; border: 3px solid var(--rc); background: linear-gradient(180deg, var(--rg), rgba(0, 0, 0, 0) 52px), linear-gradient(180deg, #1c2744, #0e1528); color: #fff; box-shadow: 0 0 0 2px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.55), 0 6px 0 2px #000; cursor: pointer; display: flex; flex-direction: column; gap: 9px; animation: cardIn 0.2s steps(4, jump-start) backwards; }
 /* 三张以上一排（升级、商人、圣锻炉）：每张取整数宽（竖屏 (764 − 28) / 3 = 245.33 → 245 像素，一排 763 像素居中在半个像素 = 整的屏幕像素上），
    卡片里的字不落在小数像素上（发虚）；横屏还是 280 像素，一张、两张的一排不变。手机（700 像素以下）一张一行，不用这条 */
@@ -244,10 +255,16 @@ body.touch .cardTop { padding-right: 0; }
 /* 每一行折行时几行差不多长（中文不留一两个字的尾巴：「…把敌人 / 卷飞」）；text-wrap: pretty 管不住两个字的尾巴。
    字由 UI.card 按短语排好（Kit.phrase：每段一个 .kmNb），balance 只在整段之间匀，不会在词中间断开（「龙卷 / 风」） */
 .cardLines div { text-wrap: balance; }
+/* 下一个目标（「Lv8 可觉醒（需要 雄狮纹章 Lv2）」「再来一枚：百兽之王」）：金色 = 进度 / 机会；实心面板上不描边，字由 Kit.phrase 排 */
+.cardGoal { font-size: var(--fs-m); line-height: 24px; color: var(--goldL); text-shadow: none; text-wrap: balance; }
 .cardRarity { font-size: var(--fs-m); line-height: 24px; color: var(--rc); text-align: right; text-shadow: var(--ol1); }
 /* 价格（商人）：金币色；买不起时灰（卡片本身也变暗，后面写「还差 N」） */
 .cardRarity.cardPrice { color: var(--goldM); }
 .card:disabled .cardRarity.cardPrice { color: var(--muted); }
+/* 宝箱卡右下角的「收下」不是稀有度那个字：用金色（选中 / 动作），稀有度颜色只给边框和稀有度的字（UI_STYLE §2.4 R1） */
+.card[data-act="takeItem"] .cardRarity { color: var(--goldM); }
+/* 别的动作字（「离开」「复制」，UI.card 加 .cardAct）：普通的字色，不用稀有度颜色 */
+.cardRarity.cardAct { color: var(--text2); }
 .cardKey { position: absolute; top: 8px; right: 8px; min-width: 20px; padding: 1px 4px 2px; border: 2px solid #000; background: #0b1020; color: var(--accent); font-size: var(--fs-s); line-height: 12px; text-align: center; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2); }
 body.touch .cardKey { display: none; }
 .banishing .card { border-style: dashed; }
@@ -271,7 +288,7 @@ body.touch .cardKey { display: none; }
 .sbtn .cnt { display: inline-block; margin-left: 9px; padding: 0 6px; border: 2px solid #000; background: #0b1020; font-size: var(--fs-m); line-height: 18px; color: var(--goldM); text-shadow: none; vertical-align: 1px; }
 body.touch .sbtn .key { display: none; }
 .hint { margin-top: 9px; font-size: var(--fs-m); line-height: 24px; color: var(--muted); }
-/* 暂停：左边属性（下面是设置和操作说明），右边一整列是武器魔典、物品（超武进度接在物品下面），iPad 横屏和桌面不用往下翻 */
+/* 暂停：左边属性（下面是设置和操作说明），右边一整列是武器纹章、宝物（超武进度接在宝物下面），iPad 横屏和桌面不用往下翻 */
 #pauseModal { width: min(1080px, calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
 .pauseCols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "st inv" "set inv"; gap: 12px 16px; text-align: left; }
 /* 左栏取整数宽（1.25 : 1 往下取整到 1 像素）：右栏从整像素开始，里面的字不会落在半个设备像素上（不支持 round() 的浏览器用上面那行） */
@@ -388,7 +405,6 @@ select { min-height: 36px; padding: 4px 10px; border: 3px solid #000; border-rad
   background-color: #161d36 !important;
   background-image: radial-gradient(circle at 50% 42%, rgba(124, 152, 222, 0.24), rgba(124, 152, 222, 0) 70%), linear-gradient(rgba(255, 255, 255, 0.05) 50%, rgba(0, 0, 0, 0.14) 50%) !important;
 }
-#tomeSlots .slot.hasIcon { padding-left: 0; box-shadow: var(--bevel); }
 /* 物品栏：稀有度色条画在图标上面（图标会挡住原来画在底下的那条） */
 .itm.hasIcon::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--rc, transparent); box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.55); pointer-events: none; }
 /* 超武：暗金底（evolution.js 给栏位加金框、金光、“超”角标） */
@@ -404,7 +420,7 @@ select { min-height: 36px; padding: 4px 10px; border: 3px solid #000; border-rad
 /* 暂停界面：超武进度每行前面的图标（evolution.js 的 30 像素图块放大到能放下 36 像素图标，行的上下留白少一点） */
 .evoPIc.hasIcon { width: 40px; height: 40px; }
 .evoPRow.icoRow { padding-top: 2px; padding-bottom: 2px; padding-left: 2px; }
-/* 暂停界面右栏：武器一组、魔典一组（等级写在右下角），两组之间空宽一点 */
+/* 暂停界面右栏：武器一组、纹章一组（等级写在右下角），两组之间空宽一点 */
 .gearRow { display: flex; flex-wrap: wrap; gap: 14px 20px; padding: 2px 4px 10px 2px; }
 .gearGrp { display: flex; flex-wrap: wrap; gap: 14px 8px; }
 .invItem.gear { border-color: #46557a; }
@@ -427,7 +443,7 @@ select { min-height: 36px; padding: 4px 10px; border: 3px solid #000; border-rad
   #toasts { max-width: calc(100vw - 32px); }
   .pauseCols { grid-template-columns: minmax(0, 1fr); grid-template-areas: "st" "inv" "set"; }
 }
-/* iPad 竖屏：物品栏是整行宽，里面再分两列：左边武器魔典和物品，右边超武进度（evolution.js 接在物品后面的 #evoPause），不用往下翻 */
+/* iPad 竖屏：物品栏是整行宽，里面再分两列：左边武器纹章和宝物，右边超武进度（evolution.js 接在宝物后面的 #evoPause），不用往下翻 */
 @media (orientation: portrait) and (min-width: 701px) {
   .pcInv { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto 1fr; column-gap: 18px; align-content: start; }
   .pcInv > * { grid-column: 1; min-width: 0; }
@@ -440,13 +456,17 @@ select { min-height: 36px; padding: 4px 10px; border: 3px solid #000; border-rad
   #mapBox { width: 120px; height: 120px; }
   #minimap { left: 10px; top: 10px; width: 100px; height: 100px; }
 }
+/* 很窄的分屏（320 px）：右上那一列从 x 173 开始（宝箱数、小地图）；血条 180 宽会伸到小地图框里 4 px，缩到 156（离宝箱数 5 px） */
+@media (max-width: 340px) {
+  #hpBar { width: 156px; }
+}
 @media (max-width: 700px) {
-  /* 手机竖屏：两个角之间放不下倒计时，正上方那一列挪到两个角下面；武器、魔典图块小一点（32 像素） */
+  /* 手机竖屏：两个角之间放不下倒计时，正上方那一列挪到两个角下面；武器、纹章图块小一点（32 像素） */
   .slots { grid-template-columns: repeat(4, 32px); gap: 12px 4px; }
   .slot { width: 32px; height: 32px; }
   #topCenter { top: calc(env(safe-area-inset-top, 0px) + 210px); }
   #itemBar { width: calc(100vw - 24px); }
-  .card { flex-basis: 100%; max-width: none; min-height: 0; }
+  .card { flex-basis: 100%; max-width: none; min-height: 0; min-width: 0; }   /* min-width 0：一段很长的不折行的字（.kmNb 定了宽）不把卡片撑出弹窗，段里在词和词之间折 */
   .pauseCols { grid-template-columns: minmax(0, 1fr); grid-template-areas: "st" "inv" "set"; }
   #statList { grid-template-columns: minmax(0, 1fr); }
   .pcSet { grid-template-columns: minmax(0, 1fr); }
@@ -466,4 +486,83 @@ select { min-height: 36px; padding: 4px 10px; border: 3px solid #000; border-rad
 }
 @media (prefers-reduced-motion: reduce) {
   .card, .toast, #hpBar.low #hpFill::after, #goldBox.pop { animation: none; }
+}
+/* 烽火台的屏幕边缘圈（ui.js UI.updateBeaconEdge）：9×9 像素圈，1 秒一闪；减弱动态效果时常亮 */
+#beaconEdge { position: absolute; left: 0; top: 0; width: 27px; height: 27px; margin: -13px 0 0 -13px; pointer-events: none; z-index: 3; }
+#beaconEdge svg { width: 27px; height: 27px; display: block; }
+#beaconEdge.on { animation: beaconBlink 1s steps(2, jump-none) infinite; }
+@keyframes beaconBlink { from { opacity: 1; } to { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { #beaconEdge.on { animation: none; } }
+body.kmRM #beaconEdge.on { animation: none; }   /* 游戏里的「减弱动态效果」开关也一样（settings.js 给 body 加 kmRM） */
+/* 行商驴车的四件宝物：两张一排，2 × 2（横竖屏一样；手机还是一张一行） */
+@media (min-width: 701px) {
+  #shopCards { max-width: 578px; margin: 0 auto; }
+  #shopCards > .card { flex: 0 1 auto; width: min(280px, calc((100% - 14px) / 2)); width: min(280px, round(down, calc((100% - 14px) / 2), 1px)); }
+}
+
+/* ---- 第 12 块 a：纹章盾、任务框、火漆章、窄屏倒计时 ---- */
+/* 左上一列：数据行 → 生命条 → 当前目标 → 武器 → 纹章盾（左）+ 右边一列 #questSide（午夜钟声、护卫冠军、挑战精英、增益、速度）。
+   盾往左浮动：右边那一列放得下的行挨着盾，放不下（第三行起、太宽的行）就排到盾下面 */
+#gearRow { display: flow-root; width: 238px; }
+#questSide > * { width: max-content; max-width: 148px; margin-bottom: 6px; }
+#questSide > :last-child { margin-bottom: 0; }
+#questSide .questRow { padding: 1px 6px; }
+#questSide .questRow .kmIco { --ip: 2px; margin-left: -3px; }
+#questSide #mxBuffs { width: fit-content; max-width: 148px; }
+/* 速度读数是普通的块：变成独立的格式化上下文，才会排在盾旁边而不是垫在盾下面 */
+#questSide #speedText { display: flow-root; padding-top: 1px; padding-bottom: 1px; }
+/* 纹章盾：两层不动的 SVG（ui.js UI.shieldSvg）：底下一层是整面盾，四格的图标放在上面，最上面一层只有黑边和斜面（盖住图标超出圆弧的几个像素）。
+   --q 每格多大、--b 边多宽、--ch 盾上沿那一排图块（第 5、6 格）占多高 */
+#tomeSlots.kmShield { --q: 36px; --b: 4px; --ch: 0px; position: relative; float: left; width: 82px; height: calc(92px + var(--ch)); margin: 0 9px 6px 0; padding: 0; isolation: isolate; }
+/* 盾下面那 6 像素只给排到盾下面的行留空：这一列本身不往下多占 */
+#gearRow { margin-bottom: -6px; }
+#tomeSlots.chief1, #tomeSlots.chief2 { --ch: 37px; }
+#tomeSlots .shBg, #tomeSlots .shRim { position: absolute; left: 0; top: var(--ch); display: block; pointer-events: none; }
+#tomeSlots .shBg { z-index: 0; }
+#tomeSlots .shRim { z-index: 2; }
+#tomeSlots .s28 { display: none; }
+#tomeSlots .slot.shQ { position: absolute; width: var(--q); height: var(--q); padding: 0; border: 0; border-image: none; background: none !important; box-shadow: none !important; }
+#tomeSlots .shQ.q0 { left: var(--b); top: calc(var(--b) + var(--ch)); }
+#tomeSlots .shQ.q1 { left: calc(var(--b) + var(--q) + 2px); top: calc(var(--b) + var(--ch)); }
+#tomeSlots .shQ.q2 { left: var(--b); top: calc(var(--b) + var(--q) + 2px + var(--ch)); }
+#tomeSlots .shQ.q3 { left: calc(var(--b) + var(--q) + 2px); top: calc(var(--b) + var(--q) + 2px + var(--ch)); }
+/* 第 5、6 格：普通的小图块，压在盾的上沿（盖住 2 像素黑边 + 1 像素斜面） */
+#tomeSlots .slot.shC { position: absolute; top: 0; z-index: 3; }
+#tomeSlots.chief1 .shC.c0 { left: 21px; }
+#tomeSlots.chief2 .shC.c0 { left: 0; }
+#tomeSlots.chief2 .shC.c1 { left: 42px; }
+/* 等级：只写数字，在这一格朝外的上角（左边两格左上、右边两格和上沿的图块右上）；满级金色 */
+#tomeSlots .shLv { position: absolute; top: 0; left: 1px; z-index: 3; font-size: var(--fs-s); font-weight: 400; line-height: 12px; letter-spacing: var(--o); color: #fff; white-space: nowrap; text-shadow: var(--olB); pointer-events: none; }
+#tomeSlots .q1 .shLv, #tomeSlots .q3 .shLv, #tomeSlots .shC .shLv { left: auto; right: 1px; }
+#tomeSlots .shLv.max { color: var(--goldM); }
+/* 当前目标：左上角金色小签，火漆章 18 像素、后一个压住前一个 6 像素，最后是这一步还没盖的空章圈 */
+/* 小签压在面板左上角（上沿往上 8 像素，下沿 10 像素）：这一行往下让 2 像素，章挂在小签下面，字从小签右边开始（章那一块至少 46 像素宽）。
+   最长的一步「击败首领（Boss）×2」：iPad 233 像素宽（≤ 238），窄屏 177（≤ 180） */
+#quest .qMain { position: relative; padding: 5px 9px 1px 6px; }
+#quest .qTab { position: absolute; left: 2px; top: -6px; z-index: 1; }
+/* 章靠右排（紧挨着字），左边空出来的那块在小签底下 */
+#quest .qSeals { display: flex; align-items: center; justify-content: flex-end; flex: none; min-width: 46px; }
+#quest .qSeals .kmIco { --ip: 2px; }
+#quest .qSeals .kmIco + .kmIco { margin-left: -6px; }
+/* 新盖的章：往下落 6 像素、淡入，0.18 秒 steps(3)（只动这一个章；减弱动态效果时不动） */
+#quest .kmStamp { animation: kmStamp 0.18s steps(3, jump-start); }
+/* 升级弹窗开着时（4 张卡的弹窗更高，横屏会切到当前目标的字）先把当前目标藏起来 */
+body:has(#levelModal:not(.hidden)) #quest { visibility: hidden; }
+@keyframes kmStamp { from { transform: translateY(-6px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #quest .kmStamp { animation: none; } }
+body.kmRM #quest .kmStamp { animation: none; }
+/* 窄屏：盾小一号（每格 28 像素，斜面 1 像素，64 × 72），右边那一列 107 像素宽 */
+@media (max-width: 700px) {
+  #gearRow { width: 180px; }
+  #questSide > *, #questSide #mxBuffs { max-width: 107px; }
+  #tomeSlots.kmShield { --q: 28px; --b: 3px; width: 64px; height: calc(72px + var(--ch)); }
+  #tomeSlots.chief1, #tomeSlots.chief2 { --ch: 30px; }
+  #tomeSlots .s36 { display: none; }
+  #tomeSlots .s28 { display: block; }
+  #tomeSlots.chief1 .shC.c0 { left: 16px; }
+  #tomeSlots.chief2 .shC.c1 { left: 32px; }
+}
+/* 窄屏（≤ 560 px 宽）：倒计时那一列挪到两个角下面，还要在左上那一列下面（--tlBottom，ui.js UI.watchTopLeft 量） */
+@media (max-width: 560px) and (min-height: 561px) {
+  #topCenter { top: max(calc(env(safe-area-inset-top, 0px) + 210px), calc(var(--tlBottom, 0px) + 9px)); }
 }

@@ -10,12 +10,13 @@ var P = {
   airRide: false, riding: false, graceT: 0, kickLock: 0, slideT: 0, airTime: 0, groundY: 0, groundVy: 0,
   diveT: 0, diving: false, moonT: 0, wallHugT: 0, hugTextT: 0, flipT: 0, flipDone: false, camBob: 0, camBobY: 0, latchT: 0, hints: {},
   radius: 0.55, height: 1.8,
-  hp: 100, shield: 0, shieldDelay: 0, invuln: 0,
+  hp: 100, shield: 0, shieldX: 0, shieldDelay: 0, invuln: 0,   // shieldX：P.shield 里被动加的那一层（在普通护盾上面，先扣它）
   level: 1, xp: 0, xpNext: 10,
   gold: 0, kills: 0,
-  st: {}, mods: [], weapons: [], tomes: [], items: {},
+  st: {}, mods: [], weapons: [], tomes: [], items: {}, sets: {},
   char: null, model: null, body: null, hpBar: null, hpFill: null, anim: null, facing: 0, walkPhase: 0, alive: true,
-  damageDealt: 0, regenAcc: 0, poison: 0
+  damageDealt: 0, regenAcc: 0, poison: 0,
+  temp: [], peakY: 0, slideK: 1, fricK: 1, slopeK: 1
 };
 
 P.GRAVITY = 26;
@@ -38,7 +39,7 @@ P.STEER_MAX_ANGLE = 2.6;                 // 输入和速度方向几乎相反时
 // 摔落伤害：落地速度超过 SAFE（约 9.3 米高）后每多 1 米/秒扣 K × 最大生命，最多 MAX；不会摔死
 P.FALL = { SAFE: 22, K: 0.02, MAX: 0.30 };
 P.HINTS = {
-  fall: '摔伤了！落地前按住滑铲、落在斜坡上就不会摔',
+  fall: '摔伤了！落地前按住滑铲就不会摔',
   slopeLand: '滑铲落坡：不摔伤，还加速！'
 };
 P.NO_TWIST = {};
@@ -56,19 +57,32 @@ P.recalc = function () {
   if (ch && ch.stats) for (k in ch.stats) st[k] += ch.stats[k];
   if (ch && ch.perLevel) for (k in ch.perLevel) st[k] += ch.perLevel[k] * (P.level - 1);
   st.maxHp += P.level - 1;                       // 每级 +1 最大生命
-  var dmgMult = 1;
+  // 纹章：两行属性都是加法（|| 0：测试 / 截图工具直接塞进来的纹章可能没有 value2）
+  var owned = {};
   for (var i = 0; i < P.tomes.length; i++) {
     var t = P.tomes[i], def = TOMES[t.id];
-    if (def.stat === 'chaos') continue;
-    if (def.mult) dmgMult *= t.mult;
-    else st[def.stat] += t.value;
+    if (!def) continue;
+    if (t.level >= 1) owned[t.id] = true;
+    st[def.stat] += t.value || 0;
+    if (def.stat2) st[def.stat2] += t.value2 || 0;
   }
+  // 套装：同家族三枚都在纹章栏里
+  var sets = {};
+  for (i = 0; i < CREST_SETS.length; i++) {
+    var cs = CREST_SETS[i], all = true;
+    for (var j = 0; j < cs.members.length && all; j++) all = !!owned[cs.members[j]];
+    if (!all) continue;
+    sets[cs.family] = true;
+    for (k in cs.stats) st[k] += cs.stats[k];
+  }
+  P.sets = sets;
   for (var id in P.items) {
     var it = ITEMS[id];
     if (it && it.stats) for (k in it.stats) st[k] += it.stats[k] * P.items[id];
   }
+  Relic.stats(st);   // 第 6 块：宝物由别的状态算出来的属性（家族徽章），顺便重建宝物的钩子表
   for (i = 0; i < P.mods.length; i++) st[P.mods[i].stat] += P.mods[i].value;
-  st.damage *= dmgMult;
+  for (i = 0; i < P.temp.length; i++) if (P.temp[i].stat in st) st[P.temp[i].stat] += P.temp[i].value;   // 临时属性（跟 mods 一样是加法）
   st.maxHp = Math.max(1, st.maxHp);
   st.armor = Math.max(0, st.armor);
   st.evasion = Math.max(0, st.evasion);
@@ -76,11 +90,34 @@ P.recalc = function () {
   st.moveSpeed = Math.max(0.3, st.moveSpeed);
   var oldMax = P.st.maxHp || st.maxHp;
   P.st = st;
+  P.slideK = 1 + Math.min(0.4, Math.max(0, st.slide || 0));       // 滑行：速度上限和空中加速，最多 +40%
+  var wax = P.items.skiwax || 0;                                    // 滑雪蜡（宝物）
+  P.fricK = Math.max(0.6, Math.pow(0.75, wax));                     // 滑铲摩擦系数，最低 0.6
+  P.slopeK = 1 + Math.min(0.3, 0.15 * wax);                         // 下坡加速，最多 +30%
   if (st.maxHp > oldMax) P.hp += st.maxHp - oldMax;
   P.hp = Math.min(P.hp, st.maxHp);
 };
 
 P.addMod = function (stat, value) { P.mods.push({ stat: stat, value: value }); P.recalc(); };
+
+// 额外护盾层（修女的歌声；第 6 块也能用）：加在 P.shield 上，这一层最多 cap；返回真的加了多少
+P.addShieldX = function (v, cap) { var add = Math.max(0, Math.min(v, cap - P.shieldX)); P.shieldX += add; P.shield += add; return add; };
+
+// ---------------- 临时属性 ----------------
+// P.temp 里每条 { stat, value, t, key }：t 秒后自动去掉（t = Infinity 一直在）
+P.addTemp = function (stat, value, t, key) {   // 同 key 同属性的旧条目先去掉（刷新，不叠加）；同 key 不同属性并存；返回条目
+  if (key != null) for (var i = P.temp.length - 1; i >= 0; i--) if (P.temp[i].key === key && P.temp[i].stat === stat) P.temp.splice(i, 1);
+  var e = { stat: stat, value: value, t: t == null ? Infinity : t, key: key == null ? null : key };
+  P.temp.push(e); P.recalc(); return e;
+};
+P.clearTemp = function (key, noRecalc) {       // 去掉这个 key 的所有条目；返回去掉了几条
+  var n = 0; for (var i = P.temp.length - 1; i >= 0; i--) if (P.temp[i].key === key) { P.temp.splice(i, 1); n++; }
+  if (n && !noRecalc) P.recalc(); return n;
+};
+P.updateTemp = function (dt) {                 // P.update 里、Passive.update 之前调用（弹窗时不走时间）
+  var gone = false; for (var i = P.temp.length - 1; i >= 0; i--) { var e = P.temp[i]; e.t -= dt; if (e.t <= 0) { P.temp.splice(i, 1); gone = true; } }
+  if (gone) P.recalc();
+};
 
 P.armorPct = function () { return P.st.armor / (0.75 + P.st.armor); };
 P.evadePct = function () {
@@ -94,18 +131,18 @@ P.reset = function (charId) {
   P.char = CHARACTERS[charId];
   P.level = 1; P.xp = 0; P.xpNext = P.xpFor(1);
   P.gold = 0; P.kills = 0; P.damageDealt = 0; P.poison = 0; P.rage = 0;
-  P.mods = []; P.weapons = []; P.tomes = []; P.items = {};
+  P.mods = []; P.temp = []; P.weapons = []; P.tomes = []; P.items = {}; P.sets = {};
   P.st = {};
   Passive.reset();
   P.recalc();
-  P.hp = P.st.maxHp; P.shield = P.st.shield;
+  P.hp = P.st.maxHp; P.shield = P.st.shield; P.shieldX = 0;
   P.alive = true; P.invuln = 0;
   P.vel.set(0, 0, 0);
   P.pos.set(0, W.terrainH(0, 0) + 0.5, 0);
   P.yaw = 0; P.pitch = 0.32;
   P.sliding = false; P.airRide = false; P.riding = false; P.graceT = 0; P.kickLock = 0; P.slideT = 0; P.airTime = 0;
   P.diveT = 0; P.diving = false; P.moonT = 0; P.wallHugT = 0; P.hugTextT = 0; P.flipT = 0; P.flipDone = false; P.camBob = 0; P.camBobY = 0;
-  P.latchT = 0; P.hints = {}; P.groundY = P.pos.y; P.groundVy = 0;
+  P.latchT = 0; P.hints = {}; P.groundY = P.pos.y; P.groundVy = 0; P.peakY = P.pos.y;
   if (Input.setTouchSlide) Input.setTouchSlide(false);
   Weapons.give(P.char.weapon);
   // 模型：外层放在脚下（不转），里面是角色（跟着跑动方向转）和脚下的血条
@@ -118,7 +155,7 @@ P.reset = function (charId) {
   P.model.userData = P.body.userData;
   if (typeof Ride !== 'undefined') Ride.attach(P.body, charId);   // 滑铲坐骑（rides.js）
   Game.scene.add(P.model);
-  P.anim = { t: 0, run: 0, phase: 0, air: 0, vy: 0, slide: 0, flex: 0, land: 0, airT: 0 };
+  P.anim = { t: 0, run: 0, phase: 0, air: 0, vy: 0, slide: 0, land: 0, airT: 0 };
   P.facing = P.yaw;
   P.camSnap = true;
   P.camLift = 0;
@@ -146,6 +183,7 @@ P.gainXp = function (v) {
 
 P.heal = function (v, quiet) {
   if (!P.alive) return;
+  v *= 1 + (P.st.heal || 0);                     // 治疗效果（百合纹章）
   var before = P.hp;
   P.hp = Math.min(P.st.maxHp, P.hp + v);
   if (!quiet && P.hp - before >= 1) FX.text(P.pos.x, P.pos.y + 2.2, P.pos.z, '+' + Math.round(P.hp - before), '#5dff6a', 0.8);
@@ -160,10 +198,12 @@ P.hurt = function (dmg, src) {
     return;
   }
   if (Passive.blocks(src)) { P.invuln = 0.3; return; }
-  dmg = dmg * (1 - P.armorPct());
+  dmg = dmg * (1 - P.armorPct()) * Passive.dmgTakenMult(src);
+  dmg = Relic.hurtCap(dmg);   // 第 6 块：圣剑鞘（护甲之后、护盾之前）
   if (P.shield > 0) {
     var a = Math.min(P.shield, dmg);
     P.shield -= a; dmg -= a;
+    P.shieldX = Math.max(0, P.shieldX - a);   // 被动的护盾层在上面，先扣
   }
   P.shieldDelay = 3;
   P.hp -= dmg;
@@ -171,17 +211,11 @@ P.hurt = function (dmg, src) {
   Game.shake(0.25);
   UI.flashHurt();
   if (src && P.st.thorns > 0 && src.alive) Enemies.damage(src, P.st.thorns * P.st.damage, 0, 0, 0);
-  Passive.onHurt();
+  Passive.onHurt(Math.max(0, dmg), src);          // 扣掉的生命（护盾挡掉的不算）
   if (P.hp <= 0) {
-    if (P.items.zawarudo > 0) {
-      // 时间停止：免于死亡一次，冻住周围所有敌人
-      P.items.zawarudo--;
-      P.hp = Math.max(1, P.st.maxHp * 0.3);
-      P.invuln = 2.5;
-      FX.text(P.pos.x, P.pos.y + 2.5, P.pos.z, '时间停止！', '#ffe14a', 1.6);
-      Enemies.list.forEach(function (e) { e.frozen = Math.max(e.frozen, 4); });
-      return;
-    }
+    // 死亡分支：先猫骑士的命（第 5 块），再宝物「平安符」（第 6 块：Passive.talisman）
+    if (Passive.cheatDeath(src)) return;
+    if (Passive.talisman(src)) return;
     P.hp = 0;
     P.alive = false;
     Game.onDeath();
@@ -248,9 +282,10 @@ P.drift = function (th, wl, rd, strength, ck, dt) {
   if (hs < 0.01) return;
   var f = P.driftF(th) * Math.min(1, wl), nh;
   if (f > 0) {
-    if (hs >= A.CAP) return;
-    var soft = hs > A.SOFT ? (A.SOFT / hs) * (A.SOFT / hs) : 1;
-    nh = Math.min(A.CAP, hs + A.GAIN * (rd.airGain || 1) * f * soft * strength * dt);
+    var cap = A.CAP * P.slideK, sf = A.SOFT * P.slideK;          // 滑行属性抬高上限和加速
+    if (hs >= cap) return;
+    var soft = hs > sf ? (sf / hs) * (sf / hs) : 1;
+    nh = Math.min(cap, hs + A.GAIN * P.slideK * (rd.airGain || 1) * f * soft * strength * dt);
   } else {
     nh = Math.max(0, hs - Math.min(A.BRAKE * ck, A.GAIN * -f) * strength * dt);
   }
@@ -280,15 +315,16 @@ P.slideMove = function (wx, wz, wl, maxSpeed, rd, dt) {
   P.slideT += dt;
   var n = P.slopeAt(P.pos.x, P.pos.z, P.pos.y), hs = Math.sqrt(v.x * v.x + v.z * v.z);
   if (n.g > 0.001) {
-    var a = P.GRAVITY * SL.SLOPE * dt, along = v.x * n.x + v.z * n.z;
-    if (along > 0 && hs > SL.SOFT) a *= (SL.SOFT / hs) * (SL.SOFT / hs);      // 下坡太快时加速变小（自然的极速）
+    var along = v.x * n.x + v.z * n.z, soft = SL.SOFT * P.slideK;
+    var a = P.GRAVITY * SL.SLOPE * dt * (along > 0 ? P.slopeK : 1);           // 滑雪蜡只帮下坡
+    if (along > 0 && hs > soft) a *= (soft / hs) * (soft / hs);               // 下坡太快时加速变小（自然的极速）
     else if (along < 0 && rd.uphill != null) a *= rd.uphill;                  // 悬浮板上坡减速更少
     v.x += n.x * a; v.z += n.z * a;
     hs = Math.sqrt(v.x * v.x + v.z * v.z);
   }
   // 摩擦：越快越大；滑板落地后一小会儿没有摩擦
   if (hs > 0 && !(board && P.graceT > 0)) {
-    var nh = Math.max(0, hs - (SL.FRIC + SL.DRAG * hs) * (rd.friction != null ? rd.friction : 1) * dt);
+    var nh = Math.max(0, hs - (SL.FRIC + SL.DRAG * hs) * (rd.friction != null ? rd.friction : 1) * P.fricK * dt);
     v.x *= nh / hs; v.z *= nh / hs; hs = nh;
   }
   if (wl > 0.1) {
@@ -319,7 +355,8 @@ P.slideMove = function (wx, wz, wl, maxSpeed, rd, dt) {
     }
   }
   hs = Math.sqrt(v.x * v.x + v.z * v.z);
-  if (hs > SL.CAP) { v.x *= SL.CAP / hs; v.z *= SL.CAP / hs; }
+  var cap = SL.CAP * P.slideK;
+  if (hs > cap) { v.x *= cap / hs; v.z *= cap / hs; }
 };
 
 // 空中“漂移加速”：没有输入时速度不变（没有空气阻力）；投石跳台飞行中由 MX.updateFlight 转向
@@ -365,6 +402,7 @@ P.updateFlip = function (dt, rd, g) {
 // 落地：impact 是落地时的下落速度（米/秒）
 P.land = function (impact, held, maxSpeed, rd) {
   var v = P.vel, board = rd.kind === 'board', safe = false;
+  var dive = P.diveT >= (rd.minDive || 0.25) && impact > 10, drop = Math.max(0, P.peakY - P.pos.y);
   if (impact > 14) FX.puff(P.pos.x, P.pos.y, P.pos.z, 8, 0xddd3b5);
   // 1. 按住滑铲落在斜坡上：下落速度转成沿坡的速度，不摔伤
   if (held && impact > 6) {
@@ -378,7 +416,7 @@ P.land = function (impact, held, maxSpeed, rd) {
     }
   }
   // 2. 俯冲落地：冲击的一部分变成往前冲的速度（最多到 1.8 倍最大速度）
-  if (P.diveT >= (rd.minDive || 0.25) && impact > 10) {
+  if (dive) {
     var hs = P.speed(), add = Math.min((rd.gain || 0.45) * impact, (rd.cap || 1.8) * maxSpeed - hs);
     if (add > 0) {
       var dx = hs > 0.5 ? v.x / hs : Math.sin(P.facing), dz = hs > 0.5 ? v.z / hs : Math.cos(P.facing);
@@ -400,9 +438,10 @@ P.land = function (impact, held, maxSpeed, rd) {
   if (P.sliding) bob *= 0.5;
   P.camBob = Math.max(P.camBob, bob);
   if (impact > 18) Game.shake(Math.min(0.35, (impact - 18) * 0.03));
+  var diveT0 = P.diveT;
   P.diveT = 0; P.diving = false; P.moonT = 0; P.flipDone = false; P.airTime = 0;
   var hc = P.speed();
-  if (hc > P.SL.CAP) { v.x *= P.SL.CAP / hc; v.z *= P.SL.CAP / hc; }
+  if (hc > P.SL.CAP * P.slideK) { v.x *= P.SL.CAP * P.slideK / hc; v.z *= P.SL.CAP * P.slideK / hc; }
   v.y = 0;
   P.groundY = P.pos.y; P.groundVy = 0;
   P.onGround = true;
@@ -410,16 +449,17 @@ P.land = function (impact, held, maxSpeed, rd) {
   P.riding = P.sliding;
   P.jumpsUsed = 0;
   P.landTime = 0;
+  Passive.onLand({ impact: impact, held: !!held, dive: dive, diveT: diveT0, drop: drop, safe: safe, sliding: P.sliding });
 };
 
-// 摔落伤害：不能闪避、无视护甲、先扣护盾、不会摔死，也不触发受伤效果（荆棘、电插头、骸骨骑士掉速）
+// 摔落伤害：不能闪避、无视护甲、先扣护盾、不会摔死，也不触发受伤效果（荆棘、被动的受伤事件）
 P.fallHurt = function (impact) {
   if (!P.alive || P.invuln > 0 || Game.state !== 'play') return 0;
   var k = P.char && P.char.fall != null ? P.char.fall : 1;
   var frac = Math.min(P.FALL.MAX, P.FALL.K * (impact - P.FALL.SAFE)) * k;
   if (!(frac > 0)) return 0;
   var dmg = frac * P.st.maxHp, total = dmg;
-  if (P.shield > 0) { var a = Math.min(P.shield, dmg); P.shield -= a; dmg -= a; }
+  if (P.shield > 0) { var a = Math.min(P.shield, dmg); P.shield -= a; dmg -= a; P.shieldX = Math.max(0, P.shieldX - a); }
   P.shieldDelay = 3;
   if (dmg > 0) P.hp = Math.max(Math.min(P.hp, 1), P.hp - dmg);
   FX.text(P.pos.x, P.pos.y + 2.2, P.pos.z, '摔伤 -' + Math.max(1, Math.round(total)), '#ff6b6b', 1.1);
@@ -481,7 +521,7 @@ P.update = function (dt) {
     P.airRide = held;
   }
   P.riding = P.sliding || P.airRide;
-  // 触屏“点一下保持滑铲”：在地上不再滑了（慢到蹲行）0.2 秒就自己松开；骸骨骑士的滑板一直保持，再点一下才收
+  // 触屏“点一下保持滑铲”：在地上不再滑了（慢到蹲行）0.2 秒就自己松开；滑板坐骑（board）一直保持，再点一下才收
   if (Input.touchSlideOn && !Input.slidePress && !board && P.onGround && (!P.sliding || hs < SL.CRAWL * maxSpeed + 0.5)) {
     P.latchT += dt;
     if (P.latchT > 0.2 && Input.setTouchSlide) Input.setTouchSlide(false);
@@ -500,14 +540,12 @@ P.update = function (dt) {
     }
   } else {
     P.airMove(wx, wz, wl, maxSpeed, rd, dt);
-    // 鹰骑士：空中按住跳跃可以滑翔（按住滑铲时改成俯冲）
-    if (Passive.id() === 'birdo' && Input.jumpHeld && !P.airRide && P.vel.y < -2) P.vel.y = -2;
   }
 
   // 跳跃
   var canJump = P.onGround || P.coyote > 0 || P.jumpsUsed < st.extraJumps;
   if (P.jumpBuffer > 0 && canJump) {
-    if (!P.onGround && P.coyote <= 0) P.jumpsUsed++;
+    if (!P.onGround && P.coyote <= 0) { P.jumpsUsed++; Relic.onAirJump(); }   // 第 6 块：空中再跳（云纹靴）
     P.vel.y = P.BASE_JUMP * Math.sqrt(st.jump);
     if (P.sliding) {
       // 滑铲起跳带着速度走：小加成（太快了就不加，免得连跳无限加速）；面朝下坡起跳再多加一点
@@ -539,10 +577,7 @@ P.update = function (dt) {
   if (hit) {
     P.vel.x = (P.pos.x - ox) / dt;
     P.vel.z = (P.pos.z - oz) / dt;
-    if (Passive.id() === 'monke' && Input.move.y > 0.3) {
-      // 蕉猴：贴着墙往前推就能往上爬（跑得越快爬得越快）
-      P.vel.y = Math.max(P.vel.y, clamp(hs0 * 0.55, 7, 20)); P.onGround = false;
-    } else if (!P.onGround && P.vel.y < -4 && wl > 0.1) {
+    if (!P.onGround && P.vel.y < -4 && wl > 0.1) {
       // 贴墙缓冲：往墙上推着往下掉，下落变慢，落地不摔伤
       P.vel.y = Math.max(P.vel.y, -12);
       if (P.wallHugT <= 0) FX.puff(P.pos.x, P.pos.y + 0.8, P.pos.z, 4, 0xcfc2a0);
@@ -576,13 +611,14 @@ P.update = function (dt) {
   P.diving = false;
   if (!P.onGround) {
     P.airTime += dt;
-    // 空中按住滑铲：鹰骑士俯冲（重力 ×2；P.diving 这一帧在俯冲，P.diveT 这次腾空俯冲了多久），星界骑士月面（下落时重力减半，每次腾空最多 1.5 秒）
+    // 空中按住滑铲：俯冲坐骑（dive）俯冲（重力 ×2；P.diving 这一帧在俯冲，P.diveT 这次腾空俯冲了多久），月面坐骑（moon）月面（下落时重力减半，每次腾空最多 1.5 秒）
     if (P.airRide) {
       if (rd.kind === 'dive' && P.vel.y < 3) { grav *= rd.gravity || 2; P.diveT += dt; P.diving = true; }
       else if (rd.kind === 'moon' && P.vel.y < 0 && P.moonT < (rd.time || 1.5)) { grav *= rd.gravity || 0.5; P.moonT += dt; }
     }
     P.vel.y -= grav * dt;
     P.pos.y += P.vel.y * dt;
+    if (P.pos.y > P.peakY) P.peakY = P.pos.y;                 // 这次腾空的最高点（Passive.onLand 算落差）
     var ceil = W.ceilingAt(P.pos.x, P.pos.z, P.pos.y + P.height);
     if (P.vel.y > 0 && ceil < Infinity) { P.pos.y = ceil - P.height; P.vel.y = 0; }
     ground = W.groundAt(P.pos.x, P.pos.z, P.pos.y - P.vel.y * dt);
@@ -600,12 +636,15 @@ P.update = function (dt) {
   if (P.pos.y < W.terrainH(P.pos.x, P.pos.z) - 2) P.pos.y = W.terrainH(P.pos.x, P.pos.z);
 
   // 生命回复（每分钟）与护盾
-  P.regenAcc += st.regen / 60 * dt;
+  P.regenAcc += st.regen / 60 * dt * (1 + (st.heal || 0));   // 治疗效果也算生命回复
   if (P.regenAcc >= 1) { var r = Math.floor(P.regenAcc); P.regenAcc -= r; P.hp = Math.min(st.maxHp, P.hp + r); }
   P.shieldDelay -= dt;
-  if (P.shieldDelay <= 0 && P.shield < st.shield) P.shield = Math.min(st.shield, P.shield + st.shield * 0.2 * dt);
-  if (P.shield > st.shield) P.shield = st.shield;
+  // 回护盾只补普通护盾（被动的那一层 shieldX 不回）；shieldX = 0 时和原来一样
+  if (P.shieldDelay <= 0 && P.shield - P.shieldX < st.shield) P.shield = Math.min(st.shield + P.shieldX, P.shield + st.shield * 0.2 * dt);
+  if (P.shield > st.shield + P.shieldX) P.shield = st.shield + P.shieldX;
 
+  if (P.onGround) P.peakY = P.pos.y;
+  P.updateTemp(dt);
   Passive.update(dt);
   P.animate(dt);
 };
@@ -615,7 +654,7 @@ P.speed = function () { return Math.sqrt(P.vel.x * P.vel.x + P.vel.z * P.vel.z);
 // 按时间平滑地靠近目标值（和帧率无关）
 P.ease = function (cur, target, rate, dt) { return cur + (target - cur) * (1 - Math.exp(-dt * rate)); };
 
-// 平滑动作：跑步、待机呼吸、空中、滑铲、秀肌肉几种姿势按权重混合（姿势本身在 CHAR_MODELS.pose 里）
+// 平滑动作：跑步、待机呼吸、空中、滑铲几种姿势按权重混合（姿势本身在 CHAR_MODELS.pose 里）
 P.animate = function (dt) {
   var m = P.model, body = P.body, a = P.anim;
   if (!m || !body || !a) return;
@@ -632,7 +671,6 @@ P.animate = function (dt) {
   a.run = ease(a.run, P.onGround && !P.sliding ? Math.min(1, hs / 7) : 0, 10, dt);
   a.air = ease(a.air, P.onGround ? 0 : 1, P.onGround ? 16 : 9, dt);
   a.slide = ease(a.slide, P.riding ? 1 : 0, 14, dt);
-  a.flex = ease(a.flex, Passive.flexBlock > 0 ? 1 : 0, 12, dt);
   // 落地下蹲：在空中待得越久，落地蹲得越深
   if (!P.onGround) a.airT += dt;
   else {
@@ -642,6 +680,7 @@ P.animate = function (dt) {
   a.land = Math.max(0, a.land - dt * 5);
   CHAR_MODELS.pose(body, a);
   if (typeof Ride !== 'undefined') Ride.update(dt);   // 滑铲坐骑：冒出来、跟着坡倾斜、拖尾（rides.js）
+  Passive.pose(body, dt);                              // 被动改模型（发条钥匙转速、暴怒变大）
   // 受伤无敌时闪烁（血条不闪）
   body.visible = !(P.invuln > 0 && Math.floor(P.invuln * 20) % 2 === 0 && P.alive);
 };

@@ -15,8 +15,8 @@ var FeelFX = {
   rings: [], beams: [],
   pal: {},
   chest: null,
-  // 稀有度颜色（和 RARITY 一致）
-  RCOL: [0x5ee35e, 0x4ea8ff, 0xc46bff, 0xff4b5a, 0xffc928]
+  // 稀有度的 3D 颜色：从 RARITY 来（有 world 用 world——普通是灰色，不发白光；没有就用 color）
+  RCOL: RARITY.map(function (r) { return r.world != null ? r.world : parseInt(String(r.color).slice(1), 16); })
 };
 
 // 宝箱盖：半个圆柱（拱顶朝上，转 90° 之后）
@@ -479,7 +479,7 @@ FeelFX.chestModel = function (free) {
   return C;
 };
 
-// 打开宝箱：o 是被打开的宝箱（位置、朝向），rarity 物品稀有度，wait 开盖前的抖动时间（秒）
+// 打开宝箱：o 是被打开的宝箱（位置、朝向），rarity 宝物稀有度，wait 开盖前的抖动时间（秒）
 FeelFX.openChest = function (o, rarity, wait) {
   if (!FeelFX.ready || !o) return null;
   var C = FeelFX.chestModel(!!o.free);

@@ -1,12 +1,13 @@
 'use strict';
 // ============================================================
-//  界面：HUD、小地图、升级/神龛/摩艾/微波炉三选一、宝箱、商人、暂停、结算、角色选择
+//  界面：HUD、小地图、升级三选一、宝箱、行商驴车、暂停、结算、角色选择（互动点自己的弹窗在 interact_guild.js）
 // ============================================================
 var $ = function (id) { return document.getElementById(id); };
 var UI = { cache: {}, toasts: [] };
 // 其他文件可以注册弹窗选项的处理：UI.modeHandlers[mode] = function (option, index) {}；返回 'keep' 时不关闭弹窗
 UI.modeHandlers = {};
 
+// 第 13 块（T2）：狂暴那一行是 #rageText（index.html 里在 #passiveText 上面），样子和被动那一行一样，规则在 style.css
 UI.set = function (id, v) {
   if (UI.cache[id] === v) return;
   UI.cache[id] = v;
@@ -27,6 +28,7 @@ UI.init = function () {
   $('btnPause').addEventListener('touchstart', function (e) { e.preventDefault(); e.stopPropagation(); Game.pause(true); }, { passive: false });
   UI.mm = $('minimap').getContext('2d');
   UI.watchTopCenter();
+  UI.watchTopLeft();
   UI.loadSettings();
   UI.buildMenu();
 };
@@ -38,7 +40,21 @@ UI.watchTopCenter = function () {
     var r = tc.getBoundingClientRect();
     if (r.height > 0) hud.style.setProperty('--tcBottom', Math.round(r.bottom) + 'px');
   };
+  UI.fitTopCenter = fit;   // 窄屏这一列跟着左上列往下挪时（大小没变，ResizeObserver 不报），UI.watchTopLeft 再量一次
   if (window.ResizeObserver) new ResizeObserver(fit).observe(tc);
+  window.addEventListener('resize', fit);
+};
+// 窄屏（≤ 560 px 宽）倒计时那一列挪到两个角下面，还要躲开左上那一列：量出左上列的下沿写进 --tlBottom（变了才写）
+UI.watchTopLeft = function () {
+  var tl = $('topLeft'), hud = $('hud');
+  if (!tl || !hud) return;
+  var fit = function () {
+    var r = tl.getBoundingClientRect();
+    if (!(r.height > 0)) return;
+    var v = Math.round(r.bottom) + 'px';
+    if (UI.tlBottom !== v) { UI.tlBottom = v; hud.style.setProperty('--tlBottom', v); if (UI.fitTopCenter) UI.fitTopCenter(); }
+  };
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(tl);
   window.addEventListener('resize', fit);
 };
 
@@ -123,9 +139,10 @@ UI.fillIcons();
   } catch (e) { show(); }
 })();
 
-// ---------------- 物品图标（icons.js：用游戏里同一套低多边形模型拍成的像素小图） ----------------
-// 图标第一次用到时用游戏的渲染器画一次（ICONS 会缓存成图片地址）；渲染器还没建好就不要它
-UI.iconsOn = function () { return typeof ICONS !== 'undefined' && typeof Game !== 'undefined' && !!Game.renderer; };
+// ---------------- 图标（icons.js：用游戏里同一套低多边形模型拍成的像素小图） ----------------
+// 图标第一次用到时用游戏的渲染器画一次（ICONS 会缓存成图片地址）；渲染器还没建好、WebGL 画布丢了就不要它
+// （画布恢复后 iconsOn 又是 true，HUD 的格子会因为这个变化重画成图标）
+UI.iconsOn = function () { return typeof ICONS !== 'undefined' && typeof Game !== 'undefined' && !!Game.renderer && !(ICONS.lost && ICONS.lost()); };
 UI.iconBad = {};
 // 返回 <i class="pxicon">；没有图标、还不能画、画失败都返回 null（界面照旧显示汉字）
 UI.iconEl = function (kind, id) {
@@ -144,14 +161,39 @@ UI.fillTile = function (el, kind, id, glyph, color) {
   var ic = UI.iconEl(kind, id);
   el.textContent = '';
   el.classList.toggle('hasIcon', !!ic);
+  // 画布丢了才显示的汉字砖：记下要的是哪个图标（.kmIcoWait），画布恢复后 UI.iconsRestored 原地换成图标
+  var wait = !ic && kind && id != null && !UI.iconsOn() && typeof ICONS !== 'undefined' && !!ICONS.nameFor(kind, id);
+  el.__wait = wait ? { kind: kind, id: id } : null;
+  el.classList.toggle('kmIcoWait', wait);
   if (ic) { el.classList.remove('kmGlyph'); el.style.removeProperty('--gc'); el.style.backgroundColor = ''; el.appendChild(ic); }
   else if (typeof Kit !== 'undefined') Kit.glyphTile(el, glyph || '', color != null ? color : 0x888888);
   else { el.textContent = glyph || ''; el.style.backgroundColor = UI.hex(color != null ? color : 0x888888); }
   return !!ic;
 };
-// 武器栏、魔典栏用哪个图标：觉醒成超武的武器用超武图标
+// 画布恢复了（icons.js ICONS.hookContext，恢复后的下一帧、着色器编好以后）：丢的时候打开的升级卡、宝箱、商店、暂停页……
+// 里的汉字砖原地换成图标；砖里别的东西（.slotLv、数量、Lv 角标）留着。主菜单的骑士格子整个重排一次（它的缓存键带 iconsOn）
+UI.iconsRestored = function () {
+  if (!UI.iconsOn()) return 0;
+  var els = document.querySelectorAll('.kmIcoWait'), n = 0;
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i], w = el.__wait;
+    if (!el.isConnected || !w) continue;
+    var ic = UI.iconEl(w.kind, w.id);
+    if (!ic) continue;
+    for (var c = el.firstChild; c;) { var nx = c.nextSibling; if (c.nodeType === 3) el.removeChild(c); c = nx; }
+    el.classList.remove('kmGlyph', 'kmIcoWait');
+    el.style.removeProperty('--gc'); el.style.backgroundColor = '';
+    el.classList.add('hasIcon');
+    el.insertBefore(ic, el.firstChild);
+    el.__wait = null;
+    n++;
+  }
+  if (typeof Game !== 'undefined' && Game.state === 'menu' && UI.buildMenu) UI.buildMenu();
+  return n;
+};
+// 武器栏、纹章栏用哪个图标：觉醒成超武的武器用超武图标
 UI.weaponIcon = function (w) { return { kind: w.evo ? 'evo' : 'weapon', id: w.id }; };
-// 选项卡片用哪个图标：o.iconKind / o.iconId（别的文件可以直接指定）> 物品卡的 itemId > 升级卡的 kind + id
+// 选项卡片用哪个图标：o.iconKind / o.iconId（别的文件可以直接指定）> 宝物卡的 itemId > 升级卡的 kind + id
 UI.optionIcon = function (o) {
   if (!o) return null;
   if (o.iconKind) return { kind: o.iconKind, id: o.iconId != null ? o.iconId : o.id };
@@ -168,7 +210,7 @@ UI.optionIcon = function (o) {
 };
 
 // ---------------- 主菜单 ----------------
-UI.selected = 'fox';
+UI.selected = 'squire';
 UI.buildMenu = function () {
   var g = $('charGrid'), ids = Object.keys(CHARACTERS);
   // 头像是用角色模型拍的半身像（ICONS 'char'）：角色表没变就不重建，只换选中的高亮（头像不重画、不闪）
@@ -196,12 +238,21 @@ UI.buildMenu = function () {
   box.innerHTML = '';
   var t = document.createElement('div'); t.className = 'cdTitle'; t.textContent = c.name + ' · ' + c.title;
   var w = UI.descRow('初始武器', WEAPONS[c.weapon].name + ' · ' + WEAPONS[c.weapon].desc, 'cdWeapon');
-  var p = UI.descRow('被动', c.passive, 'cdPassive');
+  var p = UI.descRow('被动', UI.passiveLine(UI.selected), 'cdPassive');   // 这一行只在这里写（ui_pages.js 只加金色标签、箭头和点开）
   var parts = [];
   if (c.stats) Object.keys(c.stats).forEach(function (k) { parts.push(LevelUp.statText(k, c.stats[k])); });
   // 没有属性加成时这一行先藏着（movement_ui.js 可能往里加摔落伤害）
   var s = UI.descRow('属性', parts.join('，'), 'cdStats' + (parts.length ? '' : ' hidden'));
   box.appendChild(t); box.appendChild(w); box.appendChild(p); box.appendChild(s);
+};
+// 骑士卡上的被动一行：第 5 块的 Passive.cardText（带当前数值的一句话）；没有就用 summary / passive / 被动名
+UI.passiveLine = function (id) {
+  var c = CHARACTERS[id];
+  if (!c) return '';
+  try { if (typeof Passive !== 'undefined' && Passive.cardText) { var t = Passive.cardText(id); if (t) return t; } } catch (e) { /* 用下面的 */ }
+  var name = c.passiveName || String(c.passive || '').split('：')[0] || '被动';
+  if (c.summary) return name + '：' + c.summary;
+  return c.passive || name;
 };
 // 骑士介绍的一行：左边固定 4 个字宽的灰色标签（初始武器 / 被动 / 滑铲 / 坐骑特性 / 属性），右边内容（折行挂在内容下面，kit.css 的 .kmL）；
 // 内容按短语排（UI.descText → Kit.phrase：不会折成「移 / 动速度」「滑 / 铲」），改内容也用 UI.descText
@@ -262,7 +313,7 @@ window.addEventListener('resize', function () { UI.hpFs = 0; UI.hpEvenT = null; 
 UI.update = function () {
   var st = P.st;
   // 生命条：红色是生命，琥珀色是护盾（接在生命后面）
-  var maxSh = st.shield > 0 ? st.shield : 0, tot = st.maxHp + maxSh;
+  var maxSh = (st.shield > 0 ? st.shield : 0) + (P.shieldX || 0), tot = st.maxHp + maxSh;   // 加上被动的护盾层（修女）
   var hpPct = clamp(P.hp / tot, 0, 1) * 100;
   UI.setPct('hpFill', hpPct);
   UI.setPct('shieldFill', hpPct, 'left');
@@ -280,12 +331,13 @@ UI.update = function () {
   if (Director.swarm) UI.set('timer', '+' + fmtTime(Director.swarmT));
   else UI.set('timer', fmtTime(Math.ceil(rem)));
   UI.setClass('timer', 'red', Director.swarm || rem < 60);
-  UI.set('stageName', '第 ' + Game.stage + ' 关 · ' + Game.stageDef.name + (Director.swarm ? ' · 最终虫潮' : ''));
+  UI.set('stageName', '第 ' + Game.stage + ' 关 · ' + Game.stageDef.name + (Director.swarm ? ' · 午夜钟声' : ''));
   UI.set('runTime', fmtTime(Game.totalTime));
   UI.set('goldText', fmtNum(P.gold));
   UI.set('killText', fmtNum(P.kills));
-  var ptxt = Passive.hudText() + (P.rage > 0 ? '  狂暴 ' + Math.ceil(P.rage) + 's' : '');
-  UI.set('passiveText', ptxt);
+  UI.set('passiveText', Passive.hudText());
+  // 狂暴（拾取的药水）单独一行，在被动那一行上面：接在被动后面时窄屏（Split View）放不下
+  UI.set('rageText', P.rage > 0 ? '狂暴 ' + Math.ceil(P.rage) + ' 秒' : '');
   var b = Enemies.boss;
   UI.show('bossBar', !!b);
   if (b) {
@@ -297,8 +349,11 @@ UI.update = function () {
   if (UI.cache.slots !== key) {
     UI.cache.slots = key;
     UI.renderSlots('weaponSlots', P.weapons.map(function (w) { var k = UI.weaponIcon(w); return { kind: k.kind, id: k.id, icon: w.def.icon, color: w.def.color, lv: w.level }; }), st.weaponSlots);
-    UI.renderSlots('tomeSlots', P.tomes.map(function (t) { return { kind: 'tome', id: t.id, icon: TOMES[t.id].icon, color: TOMES[t.id].color, lv: t.level }; }), st.tomeSlots);
+    UI.renderShield(P.tomes.map(function (t) { return { kind: 'tome', id: t.id, icon: TOMES[t.id].icon, color: TOMES[t.id].color, lv: t.level }; }), st.tomeSlots);
   }
+  // 增益栏（interact_more.js 建在 #topLeft 里）、速度读数（movement_ui.js 插在任务框后面）挪到纹章盾右边那一列
+  var qs = $('questSide');
+  if (qs) ['mxBuffs', 'speedText'].forEach(function (id) { var e = $(id); if (e && e.parentNode !== qs) qs.appendChild(e); });
   var ik = UI.iconsOn() ? '+' : '';
   for (var id in P.items) if (P.items[id] > 0) ik += id + P.items[id] + ',';
   if (UI.cache.items !== ik) { UI.cache.items = ik; UI.renderItems(); }
@@ -307,7 +362,155 @@ UI.update = function () {
   for (var i = UI.toasts.length - 1; i >= 0; i--) {
     if (now - UI.toasts[i].t > 2.8) { UI.toasts[i].el.remove(); UI.toasts.splice(i, 1); }
   }
+  UI.updateBeaconEdge();
   UI.drawMinimap();
+};
+
+// ---------------- 屏幕边上的烽火台圈：找到了、还没点燃、又不在屏幕里时，在它那个方向的屏幕边上闪一个关卡颜色的像素圈 ----------------
+// 9×9 像素（每格 3 px = 27 px），k 黑描边、c 关卡颜色，中间空着；style.css 的 #beaconEdge 让它 1 秒一闪（steps(2)，减弱动态效果时不闪）
+UI.BEACON_RING = ['..kkkkk..', '.kccccck.', 'kcckkkcck', 'kck...kck', 'kck...kck', 'kck...kck', 'kcckkkcck', '.kccccck.', '..kkkkk..'];
+UI.beaconEdgeEl = function () {
+  if (UI.bEdge) return UI.bEdge;
+  var hud = $('hud');
+  if (!hud) return null;
+  var el = document.createElement('div');
+  el.id = 'beaconEdge';
+  el.className = 'hidden';
+  el.setAttribute('aria-hidden', 'true');
+  var d = { k: '', c: '' }, rows = UI.BEACON_RING;
+  for (var y = 0; y < rows.length; y++) for (var x = 0; x < rows[y].length; x++) if (d[rows[y][x]] != null) d[rows[y][x]] += 'M' + x + ' ' + y + 'h1v1h-1z';
+  el.innerHTML = '<svg viewBox="0 0 9 9" shape-rendering="crispEdges" aria-hidden="true"><path fill="#000" d="' + d.k + '"/><path class="bc" d="' + d.c + '"/></svg>';
+  hud.appendChild(el);
+  UI.bEdge = el;
+  UI.bEdgePath = el.querySelector('.bc');
+  UI.bEdgeV = new THREE.Vector3();
+  return el;
+};
+// 底部安全区的高度（env(safe-area-inset-bottom)，换了窗口大小才重新量）
+UI.safeBottom = function () {
+  var key = window.innerWidth + 'x' + window.innerHeight;
+  if (UI.sbKey === key) return UI.sbVal;
+  if (!UI.sbProbe) {
+    UI.sbProbe = document.createElement('div');
+    UI.sbProbe.style.cssText = 'position:fixed;left:0;bottom:0;width:0;height:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none';
+    document.body.appendChild(UI.sbProbe);
+  }
+  UI.sbKey = key;
+  UI.sbVal = UI.sbProbe.offsetHeight || 0;
+  return UI.sbVal;
+};
+// 屏幕边的圈要躲开的 HUD：lb / rb = 左上 / 右上列底下再留 22 px，lr / rl = 顶边上能放的 x 范围，
+// ub = 右边那一列触屏按钮（互动、跳跃）顶上再留 22 px，yT = 顶边那条线（不进屏幕中间 60 % 的框），
+// top = 顶边那条线上不能放的 x 段（正上方那一列：倒计时、Boss 血条、誓言 / 比武进度条，还有提示文字、公告；左右各留 22 px）；
+// 半秒量一次，提示牌出现 / 消失（互动按钮跟着变）、多了 / 少了提示文字、进度条出现 / 消失时马上重量
+UI.hudCols = function () {
+  var pr = $('mxProgress'), prOn = pr && pr.style.display !== 'none' ? 1 : 0, ann = $('annLayer');
+  // 左下角被动那一行和狂暴那一行有没有字也算进去（有字时它们的上沿是屏幕左边那条侧边的下限，blT）
+  var blOn = (($('passiveText') || {}).textContent ? 1 : 0) + (($('rageText') || {}).textContent ? 2 : 0);
+  var now = Game.realTime || 0, c = UI.hcVal, key = window.innerWidth + 'x' + window.innerHeight + '|' + UI.cache.prompt + '|' + document.body.className + '|' + UI.toasts.length + '|' + prOn + '|' + (ann ? ann.children.length : 0) + '|' + blOn;
+  if (c && UI.hcKey === key && now - UI.hcT < 0.5 && now >= UI.hcT) return c;
+  var W2 = window.innerWidth, H2 = window.innerHeight, l = $('topLeft'), r = $('topRight'), lr = l ? l.getBoundingClientRect() : null, rr = r ? r.getBoundingClientRect() : null, ub = Infinity;
+  var tb = $('touchBtns'), i, q;
+  if (tb) for (i = 0; i < tb.children.length; i++) {
+    q = tb.children[i].getBoundingClientRect();
+    if (q.width > 0 && q.height > 0 && q.right > W2 - 50) ub = Math.min(ub, q.top - 22);
+  }
+  var yT = Math.min(150, Math.floor(H2 * 0.2 - 15)), top = [];
+  var avoid = function (e) {
+    if (!e) return;
+    var b = e.getBoundingClientRect();
+    // 圈是 27 px，上下各 13.5 px 再留 8 px：和顶边那条线隔得够远的不用躲
+    if (b.width > 0 && b.height > 0 && b.top < yT + 22 && b.bottom > yT - 22) top.push([b.left - 22, b.right + 22]);
+  };
+  avoid($('topCenter'));
+  if (prOn) avoid(pr);
+  for (i = 0; i < UI.toasts.length; i++) avoid(UI.toasts[i].el);
+  if (ann && getComputedStyle(ann).visibility !== 'hidden') for (i = 0; i < ann.children.length; i++) avoid(ann.children[i]);   // 公告（Kit.announce）
+  // 左下角被动那一行（第 5 块，触屏时在提示牌上面 196 px）：左边那条侧边最低只到它上面再留 22 px
+  var bl = $('bottomLeft'), blr = bl ? bl.getBoundingClientRect() : null, blT = blr && blr.width > 0 && blr.height > 0 && blr.left < 60 ? blr.top - 22 : Infinity;
+  c = UI.hcVal = { lb: lr ? lr.bottom + 22 : 150, rb: rr ? rr.bottom + 22 : 150, lr: lr ? lr.right + 22 : 28, rl: rr && rr.width > 0 ? rr.left - 22 : W2 - 28, ub: ub, yT: yT, top: top, blT: blT };
+  UI.hcT = now; UI.hcKey = key;
+  return c;
+};
+// 顶边那条线上离 x 最近、能放圈的地方（两列 HUD 中间，躲开 cols.top 的每一段）；哪儿都放不下给 null
+UI.topSpot = function (x, cols) {
+  var a = cols.lr, b = Math.max(cols.lr, cols.rl), segs = [[a, b]], i, j, out = [];
+  if (cols.rl < cols.lr) return null;
+  for (i = 0; i < cols.top.length; i++) {
+    var t = cols.top[i];
+    out = [];
+    for (j = 0; j < segs.length; j++) {
+      var s = segs[j];
+      if (t[1] <= s[0] || t[0] >= s[1]) { out.push(s); continue; }
+      if (t[0] > s[0]) out.push([s[0], t[0]]);
+      if (t[1] < s[1]) out.push([t[1], s[1]]);
+    }
+    segs = out;
+  }
+  var best = null, bd = Infinity;
+  for (j = 0; j < segs.length; j++) {
+    var v = clamp(x, Math.ceil(segs[j][0]), Math.floor(segs[j][1]));
+    if (v < segs[j][0] || v > segs[j][1]) continue;
+    if (Math.abs(v - x) < bd) { bd = Math.abs(v - x); best = v; }
+  }
+  return best;
+};
+UI.updateBeaconEdge = function () {
+  var el = UI.beaconEdgeEl(), o = Interact.portal, cam = Game.camera;
+  if (!el) return;
+  var show = false, px = 0, py = 0;
+  if (Game.state === 'play' && o && o.found && !o.used && cam) {
+    var v = UI.bEdgeV.set(o.x, o.y + 4, o.z).applyMatrix4(cam.matrixWorldInverse);
+    var pm = cam.projectionMatrix.elements, sx = v.x * pm[0], sy = v.y * pm[5], w = -v.z;
+    // 在镜头前面而且在屏幕里（±0.92）就不用提示
+    var inView = w > 0.1 && Math.abs(sx / w) <= 0.92 && Math.abs(sy / w) <= 0.92;
+    if (!inView) {
+      // 方向：屏幕中心指向它（在镜头后面时不除以 w，方向就不会反过来）；正后方正中间时放到下边
+      if (Math.abs(sx) < 1e-6 && Math.abs(sy) < 1e-6) sy = -1;
+      var behind = w <= 0.1;
+      if (!behind) { sx /= w; sy /= w; }
+      var W2 = window.innerWidth, H2 = window.innerHeight, cx = W2 / 2, cy = H2 / 2;
+      var dx = sx * cx, dy = -sy * cy, t = Infinity, tb = Infinity;
+      // 夹在 x 28…W−28、y yT…yB 的框上（yT：顶边那条线，矮的横屏上也在屏幕中间 60 % 的框外面；
+      // yB = 提示牌顶上再留 8 px，多行的提示牌也压不到）
+      var cols = UI.hudCols(), yT = cols.yT, yB = Math.max(yT, H2 - UI.safeBottom() - (H2 > 560 ? 210 : 170));
+      if (dx > 0) t = Math.min(t, (W2 - 28 - cx) / dx); else if (dx < 0) t = Math.min(t, (28 - cx) / dx);
+      if (dy > 0) tb = (yB - cy) / dy; else if (dy < 0) t = Math.min(t, (yT - cy) / dy);
+      var side = function (left, high) {
+        // 离它近的那条侧边：最低处（左边：提示牌上面；右边：触屏按钮上面），high = 最高处（HUD 列的下面）
+        px = left ? 28 : W2 - 28;
+        if (high) py = Math.min(yB, left ? cols.lb : cols.rb);
+        else py = left ? Math.max(cols.lb, Math.min(yB, cols.blT)) : Math.max(cols.rb, Math.min(yB, cols.ub));
+      };
+      if (behind || tb < t) {
+        // 在镜头后面（刚走过去）、碰到底边：不放在上下正中间（进度条、提示牌、屏幕中间），放到侧边
+        side(dx < 0);
+      } else {
+        if (!isFinite(t)) t = 0;
+        px = Math.round(clamp(cx + dx * t, 28, W2 - 28));
+        py = Math.round(clamp(cy + dy * t, yT, yB));
+        // 左上、右上两列 HUD（生命、武器栏、任务；小地图）的地方不放：侧边上挪到列的下面；
+        // 顶边上挪到两列中间、正上方那一列（进度条）和提示文字的旁边，放不下就去侧边
+        if (px <= 28 && py < cols.lb) py = Math.min(yB, cols.lb);
+        else if (px <= 28 && py > cols.blT) py = Math.max(cols.lb, Math.min(yB, cols.blT));
+        else if (px >= W2 - 28) py = clamp(py, Math.min(yB, cols.rb), Math.max(cols.rb, Math.min(yB, cols.ub)));
+        else if (py <= yT) {
+          var tx = UI.topSpot(px, cols);
+          if (tx == null) side(px < cx, true); else px = Math.round(tx);
+        }
+      }
+      show = true;
+    }
+  }
+  if (!show) {
+    if (UI.bEdgeOn) { UI.bEdgeOn = false; el.classList.add('hidden'); el.classList.remove('on'); }
+    return;
+  }
+  var col = Interact.beaconCss();
+  if (UI.bEdgeCol !== col) { UI.bEdgeCol = col; UI.bEdgePath.setAttribute('fill', col); }
+  var pos = px + ',' + py;
+  if (UI.bEdgePos !== pos) { UI.bEdgePos = pos; el.style.transform = 'translate3d(' + px + 'px,' + py + 'px,0)'; }
+  if (!UI.bEdgeOn) { UI.bEdgeOn = true; el.classList.remove('hidden'); el.classList.add('on'); }
 };
 
 // #weaponSlots / #tomeSlots 的每个子元素就是一个栏位（按 P.weapons / P.tomes 的顺序）
@@ -337,8 +540,90 @@ UI.renderSlots = function (id, items, slots) {
   }
 };
 
-// 下方的被动物品栏：只在物品变化时更新；已经有的物品格子留着（图标不重画、不闪），只改数量
-UI.itemEls = {};   // 物品 id -> 物品栏里的格子
+// ---------------- 纹章盾：纹章栏画成一面分四格的小盾（第 5、6 格是盾上沿的两块图块） ----------------
+// 形状照 tools/mock12.py 的 halfw()：两边直的，下面一段圆弧收成尖，一行一行按整像素画（crispEdges）。
+// q = 每格多大（iPad 36，窄屏 28）；b = 黑边 2 + 斜面（36：2 像素，28：1 像素）；四格之间、往下到尖是 2 像素黑十字。
+// 返回 { bg, rim, W, H }：bg 是图标后面的整面盾（黑边、斜面、四格底色、十字），rim 只有黑边和斜面，盖在图标上面
+// （图标超出圆弧的那几个像素被边盖住，不用 clip-path）。miss = 缺的那几格（信使骑士少一格：涂成平的暗色、没有点）
+UI.shieldSvg = function (q, miss) {
+  var key = q + ':' + (miss || ''), c = UI.shCache || (UI.shCache = {});
+  if (c[key]) return c[key];
+  var b = q >= 36 ? 4 : 3, W = 2 * b + 2 * q + 2, flat = b + q + 2 + Math.floor(q * 0.55), H = b + 2 * q + 2 + Math.floor(q * 0.4);
+  var R = ((W / 2) * (W / 2) + (H - flat) * (H - flat)) / (2 * (H - flat)), cy = H - R, m = W / 2, x0q = b + q, QS = [[b, b], [b + q + 2, b], [b, b + q + 2], [b + q + 2, b + q + 2]];
+  var hw = function (y) { if (y < flat) return m; var v = R * R - (y - cy) * (y - cy); return v > 0 ? Math.floor(Math.sqrt(v)) : 0; };
+  var COL = { k: '#000', h: '#3a4e80', t: '#1c2846', a: '#1c2744', d: '#141b30', x: '#0e1322' };
+  var bg = {}, rim = {}, y, x;
+  var run = function (o, ch, xa, xb, yy) { if (ch && xb > xa) o[ch] = (o[ch] || '') + 'M' + xa + ' ' + yy + 'h' + (xb - xa) + 'v1h-' + (xb - xa) + 'z'; };
+  for (y = 0; y < H; y++) {
+    var h0 = hw(y);
+    if (h0 <= 0) continue;
+    var h2 = y >= 2 ? hw(y - 2) - 2 : -1, h3 = y >= b && y < H - b + 1 ? hw(y - b) - b : -1;
+    var cb = null, cr = null, sb = 0, sr = 0;
+    for (x = m - h0; x <= m + h0; x++) {
+      var ib = null, ir = null;
+      if (x < m + h0) {
+        var inner = h3 > 0 && x >= m - h3 && x < m + h3, inRim = h2 > 0 && x >= m - h2 && x < m + h2;
+        if (!inner) { ib = ir = inRim ? 'h' : 'k'; }
+        else if ((x >= x0q && x < x0q + 2) || (y >= x0q && y < x0q + 2)) ib = 'k';
+        else {
+          ib = 't';
+          for (var i = 0; i < 4; i++) {
+            if (x >= QS[i][0] && x < QS[i][0] + q && y >= QS[i][1] && y < QS[i][1] + q) ib = miss && miss.indexOf(String(i)) >= 0 ? 'x' : (i === 0 || i === 3 ? 'a' : 'd');
+          }
+        }
+      }
+      if (ib !== cb) { run(bg, cb, sb, x, y); cb = ib; sb = x; }
+      if (ir !== cr) { run(rim, cr, sr, x, y); cr = ir; sr = x; }
+    }
+  }
+  var svg = function (o, cls) {
+    var t = '<svg class="' + cls + '" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" shape-rendering="crispEdges" aria-hidden="true">';
+    for (var k in o) t += '<path fill="' + COL[k] + '" d="' + o[k] + '"/>';
+    return t + '</svg>';
+  };
+  c[key] = { bg: svg(bg, 'shBg s' + q), rim: svg(rim, 'shRim s' + q), W: W, H: H };
+  return c[key];
+};
+// #tomeSlots 里的 .slot 还是按 P.tomes 的顺序（前 4 个是四格，第 5、6 个是盾上沿的图块）；每格记住自己的图标（__icon），
+// 图标没变只改等级数字。两种大小的盾都放着，style.css 按窗口宽度显示一种（窄屏换小一号不用重画）
+UI.renderShield = function (items, slots) {
+  var el = $('tomeSlots'), on = UI.iconsOn(), cap = typeof LEVEL_CAP !== 'undefined' ? LEVEL_CAP.crest : 10;
+  var nq = Math.min(slots, 4), nc = Math.max(0, slots - 4), miss = '';
+  for (var m = nq; m < 4; m++) miss += m;
+  var shape = nq + ':' + nc;
+  if (el.__shape !== shape) {
+    // 栏位数变了：盾重新搭（很少：开局、捡到纹章画笔）
+    el.__shape = shape;
+    // （栏位最多 6 个：画盾骑士 +1、纹章画笔 +1；盾上沿那一排最多两块）
+    el.className = 'kmShield n' + slots + (nc ? ' chief' + Math.min(nc, 2) : '');
+    el.innerHTML = UI.shieldSvg(36, miss).bg + UI.shieldSvg(28, miss).bg + UI.shieldSvg(36, miss).rim + UI.shieldSvg(28, miss).rim;
+  }
+  var cells = el.querySelectorAll('.slot');
+  for (var i = 0; i < slots; i++) {
+    var it = items[i], old = cells[i] || null, chief = i >= 4;
+    var ik = it ? it.kind + ':' + it.id + ':' + it.icon + (on ? '+' : '') : '-';
+    if (old && old.__icon === ik) {
+      if (it && old.__lv !== it.lv) { old.__lv = it.lv; old.__lvEl.textContent = String(it.lv); old.__lvEl.classList.toggle('max', it.lv >= cap); }
+      continue;
+    }
+    var s = document.createElement('div');
+    s.className = 'slot ' + (chief ? 'shC c' + (i - 4) : 'shQ q' + i);
+    s.__icon = ik;
+    if (it) {
+      UI.fillTile(s, it.kind, it.id, it.icon, it.color);
+      var lv = document.createElement('b');
+      lv.className = 'shLv' + (it.lv >= cap ? ' max' : '');
+      lv.textContent = String(it.lv);
+      s.appendChild(lv);
+      s.__lv = it.lv; s.__lvEl = lv;
+    } else s.classList.add('empty');
+    if (old) el.replaceChild(s, old); else el.appendChild(s);
+  }
+  for (i = cells.length - 1; i >= slots; i--) el.removeChild(cells[i]);
+};
+
+// 下方的宝物栏：只在宝物变化时更新；已经有的宝物格子留着（图标不重画、不闪），只改数量
+UI.itemEls = {};   // 宝物 id -> 宝物栏里的格子
 UI.renderItems = function () {
   var bar = $('itemBar'), on = UI.iconsOn(), els = {}, prev = null;
   for (var id in P.items) {
@@ -367,41 +652,77 @@ UI.renderItems = function () {
     prev = d;
   }
   UI.itemEls = els;
-  // 排好的格子后面剩下的（没有了的物品、换下来的旧格子）都去掉
+  // 排好的格子后面剩下的（没有了的宝物、换下来的旧格子）都去掉
   while (prev ? prev.nextSibling : bar.firstChild) bar.removeChild(prev ? prev.nextSibling : bar.firstChild);
 };
 
-// ---------------- 任务框：找传送门 → 召唤 Boss → 击败 Boss → 进入传送门；虫潮时“活下去！” ----------------
+// ---------------- 任务框：一行「当前目标」（找到烽火台 → 点燃烽火台 → 击败首领（Boss）→ 进入传送门），完成一步盖一个火漆章 ----------------
+// 第几步（0–3）：和以前任务框看的是同一些东西
+UI.questStep = function () {
+  var portal = Interact.portal, exit = Interact.exit;
+  if (exit && !exit.used) return 3;
+  if (Game.bossAlive) return 2;
+  if (portal && portal.found && !portal.used) return 1;
+  return 0;
+};
+UI.QUEST = [['找到烽火台', ''], ['点燃烽火台', 'boss'], ['击败首领（Boss）', 'boss'], ['进入传送门', 'go']];
 UI.updateQuest = function () {
-  var portal = Interact.portal, exit = Interact.exit, key = Director.swarm ? 'S' : '';
-  if (exit && !exit.used) key += 'E';
-  else if (Game.bossAlive) key += 'B' + Game.bossesLeft;
-  else if (portal && portal.found && !portal.used) key += 'F';
-  else key += 'P';
+  var step = UI.questStep(), main = step + (step === 2 && Game.bossesLeft > 1 ? 'x' : '');
+  // 右边那一列：午夜钟声（钟 + 红字）、护卫冠军、挑战精英
+  var side = Director.swarm ? 'S' : '';
+  var champ = typeof Guild !== 'undefined' && Guild.champion && Guild.champion.alive;
+  if (champ) side += 'C';
   for (var i = 0; i < Game.challenges.length; i++) {
     var list = Game.challenges[i].list, dead = 0;
     for (var j = 0; j < list.length; j++) if (!list[j].alive) dead++;
-    key += '|' + dead + '/' + list.length;
+    side += '|' + dead + '/' + list.length;
   }
-  if (UI.cache.quest === key) return;
-  UI.cache.quest = key;
-  var box = $('quest');
-  box.innerHTML = '';
-  var add = function (text, cls) {
-    var r = document.createElement('div');
-    r.className = 'questRow' + (cls ? ' ' + cls : '');
-    var cb = document.createElement('span');
-    cb.className = 'questBox';
+  var row = function (cls) { var r = document.createElement('div'); r.className = 'questRow' + (cls ? ' ' + cls : ''); return r; };
+  if (UI.cache.quest !== main) {
+    UI.cache.quest = main;
+    // 新的一步：同一关里步数变多时，新盖的章落下来（0.18 秒，steps(3)）；开局、换关、第一次画、减弱动态效果时不动
+    // （减弱动态效果：系统设置或者游戏里的开关，settings.js 给 body 加 .kmRM）
+    var rm = document.body.classList.contains('kmRM') || !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    var prev = UI.questPrev, stamp = !!prev && prev.stage === Game.stage && step > prev.step && !rm;
+    UI.questPrev = { stage: Game.stage, step: step };
+    var box = $('quest'), r = row('qMain' + (UI.QUEST[step][1] ? ' ' + UI.QUEST[step][1] : ''));
+    var tab = typeof Kit !== 'undefined' ? Kit.tag('当前目标', 'gold') : document.createElement('span');
+    tab.classList.add('qTab');
+    if (!tab.textContent) tab.textContent = '当前目标';
+    var seals = document.createElement('span');
+    seals.className = 'qSeals';
+    for (i = 0; i <= step; i++) {
+      var ic = typeof Kit !== 'undefined' ? Kit.icon(i < step ? 'seal' : 'sealRing') : null;
+      if (!ic) continue;
+      ic.classList.add(i < step ? 'qSeal' : 'qRing');
+      if (stamp && i === step - 1) ic.classList.add('kmStamp');
+      seals.appendChild(ic);
+    }
     var t = document.createElement('span');
-    t.textContent = text;
-    r.appendChild(cb); r.appendChild(t);
+    t.className = 'qText';
+    t.textContent = UI.QUEST[step][0] + (main.slice(-1) === 'x' ? '×' + Game.bossesLeft : '');
+    r.appendChild(tab); r.appendChild(seals); r.appendChild(t);
+    box.innerHTML = '';
     box.appendChild(r);
+  }
+  if (UI.cache.questSide === side) return;
+  UI.cache.questSide = side;
+  var qs = $('questSide');
+  if (!qs) return;
+  qs.querySelectorAll('.questRow').forEach(function (e) { e.remove(); });
+  var first = qs.firstChild;
+  var add = function (text, cls, icon) {
+    var r2 = row(cls);
+    var ic2 = icon && typeof Kit !== 'undefined' ? Kit.icon(icon) : null;
+    if (ic2) r2.appendChild(ic2);
+    var t2 = document.createElement('span');
+    t2.textContent = text;
+    r2.appendChild(t2);
+    qs.insertBefore(r2, first);
   };
-  if (Director.swarm) add('活下去！', 'red');
-  if (exit && !exit.used) add('进入传送门', 'go');
-  else if (Game.bossAlive) add('击败 Boss' + (Game.bossesLeft > 1 ? ' ×' + Game.bossesLeft : ''), 'boss');
-  else if (portal && portal.found && !portal.used) add('召唤 Boss', 'boss');
-  else add('找到 Boss 传送门');
+  // 加时不换掉主线（出去的路还是烽火台）：右边一行红字 + 钟
+  if (Director.swarm) add('撑过午夜钟声', 'red', 'bell');
+  if (champ) add('击败护卫冠军', 'purple');
   for (i = 0; i < Game.challenges.length; i++) {
     var l = Game.challenges[i].list, d = 0;
     for (j = 0; j < l.length; j++) if (!l[j].alive) d++;
@@ -410,7 +731,7 @@ UI.updateQuest = function () {
 };
 
 // ---------------- 小地图（北朝上，半径 60 米；深蓝底 + 白色圆环） ----------------
-// 图标形状：dot 圆点、square 方块、diamond 菱形、triangle 三角、star 星星、ring 圆环、cross 十字（不认识的画成圆点）
+// 图标形状：dot 圆点、square 方块、diamond 菱形、triangle 三角、star 星星、ring 圆环、cross 十字、beacon 火苗、envelope 信封（不认识的画成圆点）
 // s 是半径（图标大约占 2s × 2s），都带黑描边
 UI.mmIcon = function (c, x, y, color, shape, s) {
   var k, a, r;
@@ -433,6 +754,23 @@ UI.mmIcon = function (c, x, y, color, shape, s) {
       c.moveTo(x - a, y - r); c.lineTo(x + a, y - r); c.lineTo(x + a, y - a); c.lineTo(x + r, y - a); c.lineTo(x + r, y + a); c.lineTo(x + a, y + a);
       c.lineTo(x + a, y + r); c.lineTo(x - a, y + r); c.lineTo(x - a, y + a); c.lineTo(x - r, y + a); c.lineTo(x - r, y - a); c.lineTo(x - a, y - a);
       c.closePath(); break;
+    case 'beacon':
+      // 火苗（烽火台）：尖头朝上的水滴，里面一团淡黄的火芯（半大、偏下，不描边）
+      UI.mmFlame(c, x, y, s);
+      c.fill(); c.stroke();
+      c.fillStyle = '#fff2a8';
+      c.beginPath();
+      UI.mmFlame(c, x, y + s * 0.3, s * 0.5);
+      c.fill();
+      return;
+    case 'envelope':
+      // 信封（信使骑士的急件）：横的长方形 + 封口的 V 线（线用描边色，所以金色 / 白色闪的时候都看得出是信封）
+      a = s * 1.25; r = s * 0.85;
+      c.rect(x - a, y - r, a * 2, r * 2);
+      c.fill(); c.stroke();
+      c.lineWidth = 1.2;
+      c.beginPath(); c.moveTo(x - a, y - r); c.lineTo(x, y + r * 0.25); c.lineTo(x + a, y - r); c.stroke();
+      return;
     case 'ring':
       // 空心圆环（比实心图标稍大一点，中间的洞才看得清）：先画粗黑环当描边，再画彩色环
       r = Math.max(1.5, s * 0.45);
@@ -443,6 +781,24 @@ UI.mmIcon = function (c, x, y, color, shape, s) {
     default: c.arc(x, y, s, 0, TAU);
   }
   c.fill(); c.stroke();
+};
+
+// 小地图边上的箭头（范围外的标记，Content.drawMinimap 用）：细长的三角，尖朝外；斜着的时候也看得出朝外
+// (x, y) 是箭头中心，ang 是朝外的方向
+UI.mmArrow = function (c, x, y, ang, color) {
+  c.save(); c.translate(x, y); c.rotate(ang);
+  c.fillStyle = color; c.strokeStyle = '#000'; c.lineWidth = 1.5; c.lineJoin = 'miter';
+  c.beginPath(); c.moveTo(7, 0); c.lineTo(-5, -3.5); c.lineTo(-5, 3.5); c.closePath(); c.fill(); c.stroke();
+  c.restore();
+};
+
+// 火苗的路径（s 是半宽：尖头在 y − 1.55s，底大约在 y + 0.9s）
+UI.mmFlame = function (c, x, y, s) {
+  c.moveTo(x, y - 1.55 * s);
+  c.quadraticCurveTo(x + 1.15 * s, y - 0.2 * s, x + 0.8 * s, y + 0.55 * s);
+  c.quadraticCurveTo(x, y + 1.25 * s, x - 0.8 * s, y + 0.55 * s);
+  c.quadraticCurveTo(x - 1.15 * s, y - 0.2 * s, x, y - 1.55 * s);
+  c.closePath();
 };
 
 UI.resetMinimap = function () { UI.mmT = 0; };
@@ -487,30 +843,18 @@ UI.drawMinimap = function (force) {
     }
     switch (o.kind) {
       case 'chest': icon(o, o.free ? '#fff2a8' : '#ffc928', 'square', 3); break;
-      case 'shrine': icon(o, o.golden ? '#ffe14a' : '#7ef0ff', 'dot', 3); break;
-      case 'greed': icon(o, '#ffd23a', 'dot', 2.5); break;
-      case 'curse': icon(o, '#ff2a2a', 'dot', 3); break;
-      case 'merchant': icon(o, RARITY[o.rarity].color, 'diamond', 3.5); break;
-      case 'microwave': icon(o, '#ffffff', 'square', 2.5); break;
-      case 'moai': icon(o, '#9a9ca4', 'square', 2.5); break;
-      case 'challenge': icon(o, '#c46bff', 'diamond', 3); break;
-      case 'succ': icon(o, '#3fa9ff', 'dot', 3); break;
-      case 'exitportal': icon(o, '#b05aff', 'diamond', 5); break;
-      case 'bossportal': if (o.found) icon(o, '#ff2a4a', 'diamond', 5); break;
+      case 'exitportal': icon(o, '#9fd8ff', 'diamond', 5); break;
+      case 'bossportal': if (o.found) icon(o, Interact.beaconCss(), 'beacon', 5); break;
     }
   });
   c.restore();
-  // 屏幕外的传送门：边缘箭头
+  // 范围外的烽火台（找到了、还没点燃）和出口传送门：同样的图标小一号，钉在小地图边上（在裁剪外面画，不会被切掉）
   [Interact.portal && Interact.portal.found && !Interact.portal.used ? Interact.portal : null, Interact.exit && !Interact.exit.used ? Interact.exit : null].forEach(function (o) {
     if (!o) return;
     var p = toMap(o.x, o.z), dx = p.x - R, dy = p.y - R, d = Math.sqrt(dx * dx + dy * dy);
     if (d <= RI - 3) return;
-    var ax = R + dx / d * (RI - 8), ay = R + dy / d * (RI - 8), ang = Math.atan2(dy, dx);
-    c.save(); c.translate(ax, ay); c.rotate(ang);
-    c.fillStyle = o.kind === 'exitportal' ? '#b05aff' : '#ff2a4a';
-    c.strokeStyle = '#000'; c.lineWidth = 1.5;
-    c.beginPath(); c.moveTo(6, 0); c.lineTo(-4, -5); c.lineTo(-4, 5); c.closePath(); c.fill(); c.stroke();
-    c.restore();
+    if (o.kind === 'exitportal') UI.mmIcon(c, R + dx / d * (RI - 7), R + dy / d * (RI - 7), '#9fd8ff', 'diamond', 4);
+    else UI.mmIcon(c, R + dx / d * (RI - 7), R + dy / d * (RI - 7), Interact.beaconCss(), 'beacon', 4);
   });
   // 玩家箭头（朝向镜头方向）
   c.save(); c.translate(R, R); c.rotate(-P.yaw + Math.PI);
@@ -524,15 +868,14 @@ UI.drawMinimap = function (force) {
   c.beginPath(); c.arc(R, R, R - 3.5, 0, TAU); c.stroke();
 };
 
-// 提示文字：9 个字以内 24 号，长的 18 号（.kmLong）；返回这条提示的元素。颜色用用途色（Kit.toast 可以直接写 'gold' / 'red'……）
-// 还写着旧颜色的几处提示（那几行原创替换分支也在改，留到合并以后再改调用处）：换成用途色（UI_STYLE §2.4、§4.3），其余颜色原样用。
-// 神龛祝福、罗伯托囤宝箱 = 奖励（金）；弩车停火 = 帮手结束（浅金）；没东西可复制 = 拒绝（红）
-UI.TOAST_ROLE = { '#7ef0ff': 'gold', '#ff6b6b': 'red', '#7ab8ff': 'goldL', '#d8e8ff': 'gold' };
+// 提示文字：9 个字以内 24 号，长的 18 号（.kmLong）；返回这条提示的元素。颜色用用途色（Kit.color('gold') / Kit.color('red')……，UI_STYLE §4.3）
 UI.toast = function (text, color) {
   var d = document.createElement('div');
   d.className = String(text).length > 9 ? 'toast kmLong' : 'toast';
-  d.textContent = text;
-  d.style.color = UI.TOAST_ROLE[color] ? Kit.color(UI.TOAST_ROLE[color]) : color || '#fff';
+  // 长的按短语排（窄屏上折成两行时只在「：」「 · 」、汉字和数字之间折，不会剩下「220 / 米」、行末的「·」）
+  if (String(text).length > 9 && String(text).indexOf('\n') < 0 && typeof Kit !== 'undefined' && Kit.phrase) Kit.phrase(d, text);
+  else d.textContent = text;
+  d.style.color = color || '#fff';
   $('toasts').appendChild(d);
   // 18 号居中：奇数个字体像素宽的一行会落在半个设备像素上，补成偶数个（24 号一个字体像素 2 像素，总是整的）。
   // 看算出来的字号，不看 class：窄屏（分屏、侧拉，≤ 700 像素）上短提示也是 18 号
@@ -563,8 +906,9 @@ UI.goldPop = function () {
 UI.promptEven = function (el, sp, k, text) {
   var fs = parseFloat(getComputedStyle(el).fontSize) || 18, lines = String(text).split('\n');
   el.style.paddingRight = '';
-  if (lines.length < 2) { UI.evenFp(sp, text, fs); return; }
   sp.style.paddingRight = '';
+  if (el.classList.contains('kmLeft')) return;   // 靠左的提示（UI.promptFit）：左边对齐在整像素上，不用补
+  if (lines.length < 2) { UI.evenFp(sp, text, fs); return; }
   var kw = k ? k.getBoundingClientRect().width + (parseFloat(getComputedStyle(k).marginRight) || 0) : 0, best = -1, odd = false;
   for (var i = 0; i < lines.length; i++) {
     var t = lines[i].replace(/\s+/g, ' ').trim(), fp = UI.fpw(t), w = fp * fs / 12 + (i === 0 ? kw : 0);
@@ -573,23 +917,110 @@ UI.promptEven = function (el, sp, k, text) {
   if (odd) el.style.paddingRight = (parseFloat(getComputedStyle(el).paddingRight) || 0) + fs / 12 + 'px';
 };
 
-UI.setPrompt = function (text, ok) {
-  if (UI.cache.prompt === text + ok) return;
-  UI.cache.prompt = text + ok;
+// busy = 正在进行（立了誓的石碑、比武中的木人、在滚的滚石）：提示是进度的金色（.busy），不是拒绝的红色，
+// 也没什么可按的（互动按钮藏起来，Interact.use 不报错）
+UI.setPrompt = function (text, ok, busy) {
+  busy = !!text && !!busy;
+  var key = text + ok + (busy ? '|busy' : '');
+  if (UI.cache.prompt === key) { if (text) UI.promptFit(); return; }
+  UI.cache.prompt = key;
   UI.show('prompt', !!text);
-  UI.show('btnUse', !!text && Input.isTouch);
+  UI.show('btnUse', !!text && Input.isTouch && !busy);
   if (text) {
     var el = $('prompt');
     el.innerHTML = '';
-    // 键盘玩家显示 E 键帽
+    // 键盘玩家显示 E 键帽（进行中的没有键可按）
     var k = null;
-    if (!Input.isTouch) { k = document.createElement('span'); k.className = 'key'; k.textContent = 'E'; el.appendChild(k); }
+    if (!Input.isTouch && !busy) { k = document.createElement('span'); k.className = 'key'; k.textContent = 'E'; el.appendChild(k); }
     var sp = document.createElement('span');
-    sp.textContent = text;
+    UI.promptBody(sp, text, false);
     el.appendChild(sp);
-    el.classList.toggle('bad', !ok);
-    UI.promptEven(el, sp, k, text);
+    el.classList.toggle('bad', !ok && !busy);
+    el.classList.toggle('busy', busy);
+    UI.promptRef = { el: el, sp: sp, k: k, text: text };
+    UI.promptFit(true);
   }
+};
+// 触屏：居中的提示牌压到右边的圆形互动按钮（Split View 593 / 504 / 375 / 320 宽）时改成靠左（.kmLeft）：左边 16 像素，
+// 右边离按钮 9 像素，在短语之间折行。字、窗口大小、提示牌的样式（圣锻炉的几行）变了才重新量
+UI.promptFit = function (force) {
+  var r = UI.promptRef, el = r && r.el;
+  if (!el) return;
+  var key = UI.cache.prompt + '|' + window.innerWidth + 'x' + window.innerHeight + '|' + el.className.replace(/\s*kmLeft|\s*kmSmall/g, '') + '|' + Input.isTouch;
+  if (!force && UI.pfKey === key) return;
+  UI.pfKey = key;
+  var b = $('btnUse'), left = false, multi = String(r.text).indexOf('\n') >= 0;
+  if (el.classList.contains('kmLeft')) { el.classList.remove('kmLeft', 'kmSmall'); if (multi || r.short) UI.promptBody(r.sp, r.text, false); r.short = null; }
+  UI.promptEven(el, r.sp, r.k, r.text);
+  if (Input.isTouch && b && !b.classList.contains('hidden')) {
+    var pr = el.getBoundingClientRect(), br = b.getBoundingClientRect();
+    left = br.width > 0 && pr.width > 0 && pr.right > br.left && pr.left < br.right && pr.bottom > br.top && pr.top < br.bottom;
+  }
+  if (left) { el.classList.add('kmLeft'); if (multi) UI.promptBody(r.sp, r.text, true); UI.promptCap(el, r); UI.promptEven(el, r.sp, r.k, r.short || r.text); }
+};
+// 靠左的提示牌在人物脚下的血条和摇杆之间，最多 2 行 18 号（3 行会盖住血条）：长了先换成短的说法
+// （「炼金坩埚 · 还能炼 2 次」，按下去以后弹窗的标题还是整句）；还放不下就用 12 号字（UI_STYLE 窄窗口的 HUD 字号，最多 3 行）：
+// 整句放得下用整句，放不下用短的
+UI.PROMPT_LINES = 2;
+UI.PROMPT_LINES_S = 3;
+UI.promptLines = function (el) {
+  var cs = getComputedStyle(el), lh = parseFloat(cs.lineHeight) || 24;
+  return Math.round((el.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0)) / lh);
+};
+UI.promptCap = function (el, r) {
+  if (UI.promptLines(el) <= UI.PROMPT_LINES) return;
+  var sh = UI.promptShort(r.text);
+  if (sh === r.text) sh = null;
+  if (sh) { r.short = sh; UI.promptBody(r.sp, sh, true); if (UI.promptLines(el) <= UI.PROMPT_LINES) return; }
+  // 还要更短的说法（互动点自己给的 short，第 13 块 O1：320 宽也是 18 号两行，「铁匠铺 · 剩 3 次 / 花 1,400 金币锻造」）
+  var tiny = UI.promptTiny(r.text);
+  if (tiny && tiny !== r.text && tiny !== sh) { r.short = tiny; UI.promptBody(r.sp, tiny, true); if (UI.promptLines(el) <= UI.PROMPT_LINES) return; }
+  el.classList.add('kmSmall');
+  r.short = null; UI.promptBody(r.sp, r.text, true);
+  if (UI.promptLines(el) <= UI.PROMPT_LINES_S) return;
+  // 12 号的短说法还超过 3 行（圣锻炉好几把武器没到条件）：再试更短的（UI.promptAlts），最后一种不管多少行都用
+  var alts = (sh ? [sh] : []).concat(UI.promptAlts(r.text) || []);
+  for (var i = 0; i < alts.length; i++) {
+    r.short = alts[i]; UI.promptBody(r.sp, alts[i], true);
+    if (UI.promptLines(el) <= UI.PROMPT_LINES_S) return;
+  }
+};
+// 互动点自己的最短说法（Interact.KINDS[kind].short(o)）：只给正在提示的那一个（Interact.near，提示的字就是它的 label）
+UI.promptTiny = function (text) {
+  var o = typeof Interact !== 'undefined' ? Interact.near : null, k = o && Interact.KINDS && Interact.KINDS[o.kind];
+  if (!k || typeof k.short !== 'function') return null;
+  try { return Interact.label(o) === text ? k.short(o) || null : null; } catch (e) { return null; }
+};
+// 更短的说法，从长到短（只有圣锻炉有：Evo.forgeShort）
+UI.promptAlts = function (text) {
+  return typeof Evo !== 'undefined' && Evo.forgeShort ? Evo.forgeShort(text) : null;
+};
+// 短的说法：「名字：说明 · 最后一段」→「名字 · 最后一段」；说明里有价钱（「1,400 金币」）而最后一段没有时把价钱留着。
+// 几行的（圣锻炉：第一行是条件的说明，下面每把武器一行）：第一行只留名字
+UI.promptShort = function (text) {
+  text = String(text);
+  var c = text.indexOf('：'), nl = text.indexOf('\n');
+  if (nl > c && c > 0) return text.slice(0, c) + text.slice(nl);
+  if (nl >= 0 || c < 1) return null;
+  var seg = text.slice(c + 1).split(' · ');
+  if (seg.length < 2) return null;
+  var last = seg[seg.length - 1], price = seg.slice(0, -1).join(' ').match(/[0-9][0-9,]* 金币/);
+  return text.slice(0, c) + (price && last.indexOf('金币') < 0 ? ' · ' + price[0] : '') + ' · ' + last;
+};
+// 提示的字：一行的放不下时只在短语之间折（Kit.phrase：「：」「 · 」后面，行末的「·」藏起来）；几行的（圣锻炉，pre-line）居中时照旧。
+// 靠左的窄提示牌里几行的：每行一块，并排的两条（「　　」隔开）各是一段，放不下时第二条换到下一行，每段在短语之间折（不会折成「向 / 日葵纹章」）
+UI.promptBody = function (sp, text, left) {
+  text = String(text);
+  var K = typeof Kit !== 'undefined' && Kit.phrase ? Kit : null;
+  if (text.indexOf('\n') < 0) { if (K) K.phrase(sp, text); else sp.textContent = text; return; }
+  if (!left || !K) { sp.textContent = text; return; }
+  sp.textContent = '';
+  text.split('\n').forEach(function (line) {
+    var d = document.createElement('div');
+    d.className = 'kmPl';
+    line.split('　　').forEach(function (part) { var q = document.createElement('span'); q.className = 'kmPq'; K.phrase(q, part.trim()); d.appendChild(q); });
+    sp.appendChild(d);
+  });
 };
 
 // ---------------- 弹窗 ----------------
@@ -597,6 +1028,8 @@ var MODALS = ['levelModal', 'itemModal', 'shopModal', 'pauseModal', 'endModal'];
 UI.openModal = function (id) {
   MODALS.forEach(function (m) { UI.show(m, m === id); });
   UI.show('modalBg', true);
+  // 关卡卡片（「迷雾森林 / 雾气缭绕的古老林地」）还在时打开弹窗（开局就点行商驴车）：卡片收起来，不被弹窗切成两半（第 13 块 G6）
+  if (typeof Kit !== 'undefined' && Kit.annDrop) Kit.annDrop('stageCard');
   // 弹窗后面的 HUD 整体变暗；小地图也马上画一次（和指南针字母一致，不会只剩字母）
   if (Game.state !== 'menu' && UI.mm && P.pos) UI.drawMinimap(true);
   if (document.pointerLockElement) { Input.selfRelease = true; document.exitPointerLock(); }
@@ -625,7 +1058,7 @@ UI.closeModal = function () {
   if (Game.state === 'modal' || Game.state === 'pause') Input.lock();
 };
 
-// 卡片：foot（参数或 o.foot）是右下角的文字，没有就写稀有度；能用数字键选的卡片（act 为 pick 的前三张）显示键位
+// 卡片：foot（参数或 o.foot）是右下角的文字，没有就写稀有度；能用数字键选的卡片（act 为 pick 的前四张）显示键位
 // 图标见 UI.optionIcon（别的文件可以传 o.iconKind / o.iconId 指定，比如超武卡传 iconKind: 'evo'）；没有图标显示 o.icon 汉字
 UI.card = function (o, i, act, foot) {
   var r = RARITY[o.rarity] || RARITY[0];
@@ -645,11 +1078,18 @@ UI.card = function (o, i, act, foot) {
   // 每一行说明按短语排（kit.js 的 Kit.phrase：只在标点后面、数字前面换行，太长的一段只在词和词之间折，不会折成「龙卷 / 风」「生 / 命回复」）
   var lines = b.querySelector('.cardLines');
   (o.lines || []).forEach(function (l) { var d = document.createElement('div'); if (typeof Kit !== 'undefined' && Kit.phrase) Kit.phrase(d, l); else d.textContent = l; lines.appendChild(d); });
+  // 下一个目标（「Lv8 可觉醒（需要 雄狮纹章 Lv2）」「再来一枚：百兽之王」）：在 .cardLines 外面，同样按短语排
+  if (o.goal) {
+    var g = document.createElement('div'); g.className = 'cardGoal';
+    if (typeof Kit !== 'undefined' && Kit.phrase) Kit.phrase(g, o.goal); else g.textContent = o.goal;
+    lines.parentNode.insertBefore(g, lines.nextSibling);
+  }
   var fe = b.querySelector('.cardRarity');
   fe.textContent = foot || r.name;
-  // 价格（「160 金币」）用金币的金色，不用稀有度的颜色（史诗是红色，看起来像买不起）
+  // 稀有度颜色只给稀有度那个字（UI_STYLE §2.4 R1）：价格（「160 金币」）用金币的金色，别的动作字（「离开」「复制」）用普通的字色
   if (foot && /\d 金币/.test(foot)) fe.classList.add('cardPrice');
-  if (i < 3 && act === 'pick') {
+  else if (foot && foot !== r.name) fe.classList.add('cardAct');
+  if (i < 4 && act === 'pick') {
     var k = document.createElement('span'); k.className = 'cardKey'; k.textContent = String(i + 1);
     b.appendChild(k);
   }
@@ -658,7 +1098,7 @@ UI.card = function (o, i, act, foot) {
 
 UI.itemCard = function (id, i, act, foot) {
   var it = ITEMS[id];
-  return UI.card({ itemId: id, title: it.name, icon: it.icon, color: it.color, rarity: it.rarity, sub: P.items[id] ? '已拥有 ×' + P.items[id] : RARITY[it.rarity].name + '物品', lines: [it.desc] }, i, act, foot);
+  return UI.card({ itemId: id, title: it.name, icon: it.icon, color: it.color, rarity: it.rarity, sub: P.items[id] ? '已拥有 ×' + P.items[id] : RARITY[it.rarity].name + '宝物', lines: [Relic.cardText(id, foot === '放进去' ? 0 : 1)] }, i, act, foot);   // 第 6 块：炼金坩埚第一、二步「放进去」的是已经有的宝物，按现有件数写；别的卡都是要拿的那一件
 };
 
 // 升级三选一（重抽时保留模式）
@@ -699,7 +1139,7 @@ UI.pickOption = function (i) {
   var o = UI.options && UI.options[i];
   if (!o) return;
   if (UI.mode === 'level' && UI.banishMode) {
-    // 放逐：这件武器/魔典本局不再出现
+    // 放逐：这件武器/纹章本局不再出现
     LevelUp.banned[o.id] = true;
     LevelUp.banishes--;
     UI.banishMode = false;
@@ -713,16 +1153,12 @@ UI.pickOption = function (i) {
     Game.afterModal();
     return;
   }
-  if (UI.mode === 'shrine') { P.addMod(o.stat, o.value); UI.toast('神龛祝福：' + o.lines[0], '#7ef0ff'); }
-  else if (UI.mode === 'moai') { Items.give(o.itemId); UI.toast('获得 ' + ITEMS[o.itemId].name, RARITY[ITEMS[o.itemId].rarity].color); }
-  else if (UI.mode === 'microwave') {
-    var mw = UI.shopRef;
-    P.gold -= Interact.microwaveCost(mw);
-    Items.give(o.itemId);
-    mw.uses--;
-    UI.toast('叮！复制了 ' + ITEMS[o.itemId].name, Kit.color('gold'));
-    if (mw.uses <= 0) { Interact.consume(mw); FX.boom(mw.x, mw.y + 1, mw.z, 3, 0xff7a2a); UI.toast('微波炉爆炸了！', Kit.color('red')); }
-  } else LevelUp.apply(o);
+  if (UI.mode === 'pick') {
+    // 通用的“选一个”：选项要么是一件宝物（itemId），要么自己带 onPick
+    if (o.itemId) { Items.give(o.itemId); UI.toast('获得 ' + ITEMS[o.itemId].name, '#ffd84a'); }   // 奖励 = 金色（不用稀有度颜色）
+    else if (typeof o.onPick === 'function') o.onPick(o, i);
+  }
+  else LevelUp.apply(o);
   UI.closeModal();
   Game.afterModal();
 };
@@ -737,27 +1173,6 @@ UI.choiceModal = function (mode, title, options) {
   UI.renderCards();
 };
 
-UI.shrineChoice = function (golden) {
-  Game.openModal(function () { UI.choiceModal('shrine', golden ? '金色神龛 · 全是传说' : '神龛充能完毕 · 选择一项祝福', LevelUp.shrineOptions(golden)); });
-};
-
-UI.moai = function () {
-  Game.openModal(function () {
-    var ids = [], tries = 0;
-    while (ids.length < 3 && tries++ < 30) { var id = Items.roll(); if (ids.indexOf(id) < 0) ids.push(id); }
-    UI.choiceModal('moai', '摩艾像 · 选一件物品', ids.map(function (id) { return { itemId: id, rarity: ITEMS[id].rarity }; }));
-  });
-};
-
-UI.microwave = function (o) {
-  var owned = Object.keys(P.items).filter(function (id) { return P.items[id] > 0 && ITEMS[id] && ITEMS[id].rarity === o.rarity; });
-  if (!owned.length) { UI.toast('你没有' + RARITY[o.rarity].name + '物品可以复制', '#ff6b6b'); return; }
-  Game.openModal(function () {
-    UI.shopRef = o;
-    UI.choiceModal('microwave', ['微波炉', '复制一件物品', Interact.microwaveCost(o) + ' 金币 · 剩 ' + o.uses + ' 次'], owned.slice(0, 6).map(function (id) { return { itemId: id, rarity: ITEMS[id].rarity, foot: '复制' }; }));
-  });
-};
-
 UI.chestReward = function (id) {
   Game.openModal(function () {
     UI.pendingItem = id;
@@ -765,20 +1180,16 @@ UI.chestReward = function (id) {
     var box = $('itemCard');
     box.innerHTML = '';
     var it = ITEMS[id];
-    $('itemTitle').textContent = RARITY[it.rarity].name + '物品！';
+    $('itemTitle').textContent = RARITY[it.rarity].name + '宝物！';
     $('itemTitle').style.color = RARITY[it.rarity].color;
     box.appendChild(UI.itemCard(id, 0, 'takeItem', '收下'));
   });
 };
 
-// 可疑商人：三件同稀有度物品，买一件就走
-UI.merchant = function (o) {
+// 行商驴车：四件不同稀有度的宝物，可以一件件买（每买一件，剩下的涨价 30%），买完行商就走；货是 interact_guild.js 进的
+UI.pedlar = function (o) {
   Game.openModal(function () {
-    if (!o.stock) {
-      var ids = [], tries = 0;
-      while (ids.length < 3 && tries++ < 40) { var id = Items.rollOfRarity(o.rarity); if (ids.indexOf(id) < 0) ids.push(id); }
-      o.stock = ids.map(function (id) { return { id: id, price: Math.round([25, 0, 70, 160, 380][o.rarity] * (1 + (Game.stage - 1) * 0.5)) }; });
-    }
+    if (!o.stock) Guild.pedlarStock(o);
     UI.shopRef = o;
     UI.openModal('shopModal');
     UI.renderShop();
@@ -789,27 +1200,33 @@ UI.renderShop = function () {
   var box = $('shopCards');
   box.innerHTML = '';
   UI.shopRef.stock.forEach(function (s, i) {
+    if (s.sold) {
+      // 卖掉的：写「已售出」，卡片变暗、点不了
+      var sc = UI.itemCard(s.id, i, 'buy', '已售出');
+      sc.disabled = true;
+      sc.classList.add('sold');
+      box.appendChild(sc);
+      return;
+    }
     // 价格用金币的金色（不用稀有度的颜色：史诗是红色，看起来像买不起）；钱不够时后面写「还差 N」，卡片变暗
     var short = s.price - P.gold;
-    var c = UI.itemCard(s.id, i, 'buy', s.price + ' 金币' + (short > 0 ? ' · 还差 ' + short : ''));
+    var c = UI.itemCard(s.id, i, 'buy', Kit.num(s.price) + ' 金币' + (short > 0 ? ' · 还差 ' + Kit.num(short) : ''));
     c.disabled = short > 0;
     box.appendChild(c);
   });
-  $('shopGold').textContent = '金币 ' + P.gold + ' · 只能买一件';
+  // 按短语排（Kit.phrase）：窄屏（320）在「 · 」后面折行，不会把「涨价」拆成「涨 / 价 30%」，行末的「·」也藏起来（Kit.sepFix）
+  Kit.phrase($('shopGold'), '金币 ' + Kit.num(P.gold) + ' · 每买一件，剩下的涨价 30%');
 };
 
+// 买一件：商店不关，接着买；四件都卖完了行商就走（Guild.pedlarBuy 里 Interact.consume），这时关掉
 UI.buy = function (i) {
-  var o = UI.shopRef, s = o.stock[i];
-  if (P.gold < s.price) return;
-  P.gold -= s.price;
-  Items.give(s.id);
-  UI.toast('获得 ' + ITEMS[s.id].name, RARITY[ITEMS[s.id].rarity].color);
-  Interact.consume(o);
-  UI.closeModal();
-  Game.afterModal();
+  var o = UI.shopRef;
+  if (!o || !Guild.pedlarBuy(o, i)) return;
+  if (o.used) { UI.closeModal(); Game.afterModal(); }
+  else UI.renderShop();
 };
 
-UI.STAT_ROWS = ['maxHp', 'regen', 'shield', 'armor', 'evasion', 'lifesteal', 'thorns', 'damage', 'critChance', 'critDmg', 'atkSpeed', 'quantity', 'size', 'duration', 'projSpeed', 'knockback', 'moveSpeed', 'jump', 'extraJumps', 'pickup', 'luck', 'xpGain', 'goldGain', 'difficulty', 'eliteDmg'];
+UI.STAT_ROWS = ['maxHp', 'regen', 'shield', 'armor', 'evasion', 'heal', 'damage', 'critChance', 'critDmg', 'atkSpeed', 'quantity', 'size', 'duration', 'projSpeed', 'knockback', 'moveSpeed', 'slide', 'jump', 'extraJumps', 'pickup', 'luck', 'xpGain', 'goldGain', 'chestDisc', 'difficulty', 'eliteDmg'];
 
 UI.statValue = function (k) {
   var s = STATS[k], v = P.st[k];
@@ -839,15 +1256,15 @@ UI.showPause = function () {
     var d = document.createElement('div');
     d.className = 'invItem';
     d.style.borderColor = RARITY[it.rarity].color;
-    d.title = it.name + '：' + it.desc;
+    d.title = it.name + '：' + Relic.cardText(id, 0);
     UI.fillTile(d, 'item', id, it.icon, it.color);
     if (P.items[id] > 1) { var n = document.createElement('span'); n.textContent = '×' + P.items[id]; d.appendChild(n); }
     inv.appendChild(d);
   });
-  if (!inv.children.length) inv.textContent = '还没有物品——打开宝箱试试';
+  if (!inv.children.length) inv.textContent = '还没有宝物——打开宝箱试试';
 };
 
-// 暂停界面右栏最上面：武器和魔典（图标 + 等级，和 HUD 一样），在“物品”标题前面
+// 暂停界面右栏最上面：武器和纹章（图标 + 等级，和 HUD 一样），在“宝物”标题前面
 UI.renderGear = function () {
   var inv = $('itemList');
   if (!inv || !inv.parentNode) return;
@@ -860,8 +1277,8 @@ UI.renderGear = function () {
   }
   box.innerHTML = '';
   var t = document.createElement('h3');
-  t.textContent = '武器 · 魔典';
-  // 武器一组、魔典一组：一行放不下时魔典整组换到下一行
+  t.textContent = '武器 · 纹章';
+  // 武器一组、纹章一组：一行放不下时纹章整组换到下一行
   var row = document.createElement('div');
   row.className = 'gearRow';
   var grp = function () { var g = document.createElement('div'); g.className = 'gearGrp'; return g; };
@@ -907,6 +1324,8 @@ UI.showEnd = function (won) {
     ['角色', P.char.name], ['游戏时间', fmtTime(Game.totalTime)], ['到达关卡', '第 ' + Game.stage + ' 关 · ' + Game.stageDef.name], ['等级', String(P.level)],
     ['击杀', fmtNum(P.kills)], ['总伤害', fmtNum(P.damageDealt)], ['打开的宝箱', String(Interact.chestsOpened)]
   ];
+  // 在午夜钟声里倒下：接在「游戏时间」后面写撑了多久（Director.swarmT 到下一局开始才清零）
+  if (!won && Director.swarm) rows.splice(2, 0, ['午夜钟声里撑了', fmtTime(Director.swarmT)]);
   var box = $('endStats');
   box.innerHTML = '';
   rows.forEach(function (r) {
@@ -928,7 +1347,46 @@ UI.showEnd = function (won) {
     a.className = 'wName';
     a.appendChild(ic);
     a.appendChild(document.createTextNode(w.def.name + ' Lv' + w.level));
-    var b = document.createElement('span'); b.textContent = fmtNum(w.dmg) + ' 伤害 · ' + fmtNum(w.kills) + ' 击杀';
+    // 窄窗口（320 宽）：名字一行不折（以前会折成「信 / 鸽 / Lv1」），右边的数字在「 · 」后面折成两行（第 13 块）
+    a.style.whiteSpace = 'nowrap'; a.style.flex = 'none';
+    var b = document.createElement('span');
+    b.style.minWidth = '0'; b.style.textAlign = 'right'; b.style.whiteSpace = 'normal';
+    Kit.phrase(b, fmtNum(w.dmg) + ' 伤害 · ' + fmtNum(w.kills) + ' 击杀');
     d.appendChild(a); d.appendChild(b); wl.appendChild(d);
   });
+  UI.endItems();
+};
+// 结算界面：这一局拿到的宝物（和暂停界面一样的图块 + ×件数，稀有的在前），接在武器下面；没有宝物就不写这一段（第 13 块）
+UI.endItems = function () {
+  var wl = $('endWeapons');
+  if (!wl || !wl.parentNode) return;
+  var box = $('endItems');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'endItems';
+    wl.parentNode.insertBefore(box, wl.nextSibling);
+  }
+  box.innerHTML = '';
+  var ids = Object.keys(P.items || {}).filter(function (id) { return P.items[id] > 0 && ITEMS[id]; });
+  if (!ids.length) return;
+  ids.sort(function (x, y) { return ITEMS[y].rarity - ITEMS[x].rarity; });
+  var n = ids.reduce(function (a, id) { return a + P.items[id]; }, 0);
+  var h = document.createElement('h3');
+  h.textContent = '宝物 · ' + n + ' 件';
+  // 和武器那几行一样宽、居中（.statList：最宽 440 像素）；图块一行排不下就换行，每行居中
+  var row = document.createElement('div'), g = document.createElement('div');
+  row.className = 'statList'; g.className = 'gearGrp';
+  g.style.justifyContent = 'center'; g.style.padding = '6px 6px 8px';
+  ids.forEach(function (id) {
+    var it = ITEMS[id], d = document.createElement('div');
+    d.className = 'invItem';
+    d.style.borderColor = RARITY[it.rarity].color;
+    d.title = it.name;
+    UI.fillTile(d, 'item', id, it.icon, it.color);
+    if (P.items[id] > 1) { var c = document.createElement('span'); c.textContent = '×' + P.items[id]; d.appendChild(c); }
+    g.appendChild(d);
+  });
+  row.appendChild(g);
+  box.appendChild(h);
+  box.appendChild(row);
 };

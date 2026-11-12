@@ -47,6 +47,10 @@ Kit.ICONS = {
   trophy: ['kkkkkkkkk', 'kYyyyyyok', 'kYyyyyyok', '.kyyyyok.', '..kyyok..', '...kyk...', '..kkykk..', '.kyyyyok.', '.kkkkkkk.'],
   // 跳台（木头斜坡 + 冲过去的风线）：成就「坡道飞驰」
   ramp: ['.........', '.......kk', 'CC...kkbk', '...kkbbbk', 'CCkbbbbbk', '.kbbbbbBk', 'kkkkkkkkk', '.........', '.........'],
+  // 火漆章（任务框完成一步盖一个；红是火漆自己的颜色，不给字用）、还没完成那一步的空章圈、午夜钟声的钟（铜色）
+  seal: ['..kkkkk..', '.kqqrrrk.', 'kqrRRRrRk', 'kqRrrrRRk', 'krRrYrRRk', 'krRrrrRRk', 'krrRRRRRk', '.kRRRRRkk', '..kkkkkRk'],
+  sealRing: ['..kkkkk..', '.kg...gk.', 'kg.....gk', 'k.......k', 'k.......k', 'k.......k', 'kg.....gk', '.kg...gk.', '..kkkkk..'],
+  bell: ['...kkk...', '...kok...', '..kYyok..', '.kYyyyok.', '.kYyyyok.', '.kYyyyok.', 'kYyyyyyok', 'kkkkkkkkk', '...kbk...'],
   // 魔晶（只给魔晶用）：价格按钮、魔晶小签、菜单和结算里的魔晶。11×10（不是 9×9）：就是 META 原来那颗带白色高光面的魔晶，
   // 框的大小由 .kmGem 给（11 × --ip 宽、10 × --ip 高）
   gem: ['...kkkkk...', '..kwwPPpk..', '.kwPPPpppk.', 'kpppppppppk', 'kPPPPpppvvk', '.kPPPppvvk.', '..kPPpvvk..', '...kPpvk...', '....kvk....', '.....k.....']
@@ -133,11 +137,17 @@ Kit.ribbon = function (o) {
   w.appendChild(rib);
   w.insertAdjacentHTML('beforeend', Kit.cap(n, 'r'));
   a.appendChild(w);
-  if (o.sub) a.appendChild(Kit.el('div', 'kmSub', o.sub));
+  if (o.sub) {
+    // 下面一行：一行放不下时（320 宽的「树冠烧成了秋天的颜色 · 新招式：落叶旋风」）在「 · 」后面折行，不出屏幕（第 13 块）
+    var sb = Kit.el('div', 'kmSub');
+    sb.style.whiteSpace = 'normal'; sb.style.maxWidth = 'calc(100vw - 32px)';
+    Kit.phrase(sb, o.sub);
+    a.appendChild(sb);
+  }
   return a;
 };
-// 过场的大横幅（Boss 出场、阵亡、通关）：屏幕够大用 xl，小屏用 l
-Kit.heroSize = function () { return Math.min(window.innerWidth, window.innerHeight) >= 700 ? 'xl' : 'l'; };
+// 过场的大横幅（Boss 出场、阵亡、通关）：屏幕够大用 xl，小屏用 l，最窄的 Split View（< 400 宽）用 m（l 的「你被打倒了」有 352 像素宽）
+Kit.heroSize = function () { var w = window.innerWidth; return Math.min(w, window.innerHeight) >= 700 ? 'xl' : w < 400 ? 'm' : 'l'; };
 
 // ---------------- 局内公告：一次一条 ----------------
 // cur：正在显示的 { el, prio, key, out, h }；q：排队的 { o, prio, h }；gen：Kit.annClear 一次加 1（之前的定时任务都作废）
@@ -167,7 +177,7 @@ Kit.layer = function () {
   }
   return L;
 };
-// o = { look: 'call'|'rib', role, big, size, kick, tab, title, sub, icon, life（秒，默认 2.4）, prio（1 小事，2 关卡，3 Boss / 虫潮 / 关卡完成）, key（同一件事不重复） }
+// o = { look: 'call'|'rib', role, big, size, kick, tab, title, sub, icon, life（秒，默认 2.4）, prio（1 小事，2 关卡，3 Boss / 午夜钟声 / 关卡完成）, key（同一件事不重复） }
 // 返回显示出来的元素；排队了或者重复了返回 null
 Kit.announce = function (o) {
   o = o || {};
@@ -183,7 +193,7 @@ Kit.announce = function (o) {
   if (cur && prio < cur.prio) { Kit.annQueue(o, prio); return null; }
   if (cur) {
     // 两条差不多同时来（FEEL 的和 CONTENT 的在同一刻，前一条才出来、还没看清）：前一条回到队里，等新的这条放完再出来。
-    // 大时刻（3：Boss 第二阶段、关卡完成、最终虫潮）被另一个大时刻顶掉就不回来了：新的已经盖过它（比如 Boss 刚暴怒就被打倒）
+    // 大时刻（3：Boss 第二阶段、关卡完成、午夜钟声）被另一个大时刻顶掉就不回来了：新的已经盖过它（比如 Boss 刚暴怒就被打倒）
     if (cur.prio < 3 && Kit.annAge(cur) < Kit.ANN_JOIN) Kit.annQueue(cur.o, cur.prio, true);
     Kit.annOut(cur, true);
   }
@@ -219,7 +229,7 @@ Kit.annShow = function (o, prio) {
   rec.h = Kit.after(rec.life, function () { Kit.annOut(rec); });
   return a;
 };
-// 一件事已经不成立了（比如随机事件被 Boss 战、虫潮打断）：它的公告从队里拿掉，正在显示的也收起来
+// 一件事已经不成立了（比如随机事件被 Boss 战、午夜钟声打断）：它的公告从队里拿掉，正在显示的也收起来
 Kit.annDrop = function (key) {
   var A = Kit.ann;
   if (key == null) return;
@@ -288,10 +298,15 @@ Kit.toast = function (text, c) { return UI.toast(text, Kit.color(c)); };
 // 单字形容词（Kit.LEAD）粘在后一个词上，括号里不超过 6 个字的整个不折；段里的空格只在「汉字 + 空格 + 数字」「→ / · 后面」能断
 // （「+50 生命」「120% 伤害」不分开）。
 // 没有 Intl.Segmenter 时照旧（段里随便折）。字不变（textContent 一样）。外面的 text-wrap: balance 只在整段之间匀开几行
-// 不能从中间折开的游戏用词（ICU 会把「滑 / 铲」「哥 / 布 / 林」「暴 / 击」拆开）；武器、魔典、物品、属性、骑士、超武、坐骑、敌人的名字
+// 不能从中间折开的游戏用词（ICU 会把「滑 / 铲」「哥 / 布 / 林」「暴 / 击」拆开）；武器、纹章、宝物、属性、骑士、超武、坐骑、敌人的名字
 // （2~6 个字）用到时自动加进来（Kit.wordList），改名以后不用改这里
-Kit.WORDS = ['滑铲', '魔典', '魔晶', '圣锻炉', '哥布林', '暴击', '龙卷风', '移动速度', '跳跃高度', '铁匠铺', '许愿井', '传送门', '宝箱怪', '超武', '圣光', '挥砍', '弹射', '重弩箭'];
-Kit.WORD_TABLES = ['WEAPONS', 'TOMES', 'ITEMS', 'STATS', 'CHARACTERS', 'EVO', 'RIDES', 'ENEMIES'];
+Kit.WORDS = ['滑铲', '纹章', '宝物', '魔晶', '圣锻炉', '哥布林', '暴击', '移动速度', '跳跃高度', '铁匠铺', '许愿井', '传送门', '宝箱怪', '超武', '圣光', '挥砍', '弹射', '重弩箭', '弹跳', '套装', '专属', '觉醒',
+  '烽火台', '誓言石碑', '比武木人', '补给马车', '炼金坩埚', '行商驴车', '决斗旗', '护卫冠军', '宝物箱', '军饷箱',
+  // 骑士详情页的被动全文里分词会拆开的词（第 12 块）
+  '扑向', '彩带', '小弩车', '弩车', '天马座', '狮子座', '巨蟹座', '天秤座', '大邮包', '收信点', '吓得', '许个愿', '许愿',
+  // 圣锻炉提示牌（第 13 块 O4）、骑士卡（T9：驯鹰骑士的「最强」在 320 px 不拆成「最 / 强」）
+  '不能觉醒', '还差等级', '最强', '击晕'];
+Kit.WORD_TABLES = ['WEAPONS', 'TOMES', 'ITEMS', 'STATS', 'CHARACTERS', 'EVO', 'RIDES', 'ENEMIES', 'CREST_FAMILIES', 'CREST_SETS'];
 Kit.wordsCache = null;
 Kit.wordList = function () {
   if (Kit.wordsCache) return Kit.wordsCache;
@@ -323,7 +338,16 @@ Kit.WORD_MIN = 8;     // 短于 8 个字的一段放得下任何一栏（最窄�
 // 第 s 个字是空格：它后面能不能折行（汉字 + 空格 + 数字 / 正负号数字，或者跟在 → · 后面）
 Kit.spaceBreak = function (t, s) {
   var a = t.charAt(s - 1), b = t.charAt(s + 1);
-  return a === '→' || a === '·' || (/[㐀-鿿]/.test(a) && (/[0-9]/.test(b) || ('+-−×'.indexOf(b) >= 0 && /[0-9]/.test(t.charAt(s + 2)))));
+  if (a === '→' || a === '·') return true;
+  return /[㐀-鿿]/.test(a) && Kit.NUMPRE.indexOf(a) < 0 && (/[0-9]/.test(b) || ('+-−×'.indexOf(b) >= 0 && /[0-9]/.test(t.charAt(s + 2)))) && Kit.restLen(t, s + 1) > 3;
+};
+// 数字前面的字（「每 / 2 秒」「第 / 3 关」不分开）
+Kit.NUMPRE = '每第约共满近再';
+// 从第 i 个字到下一个标点（或者结尾）有几个字（空格不算）：「5 次」「1 只」「20 秒」只有 2~3 个，不单独放到下一行
+Kit.restLen = function (t, i) {
+  var k = 0;
+  for (; i < t.length; i++) { var c = t.charAt(i); if ('，；：。、！？）」』》…—·'.indexOf(c) >= 0) break; if (c !== ' ') k++; }
+  return k;
 };
 // 一段字 → 不折行的小块（词 + 粘上去的标点；能断的空格留在前一块的末尾）；没有 Intl.Segmenter 时返回 null
 Kit.chunks = function (t) {
@@ -385,23 +409,36 @@ Kit.fontArrived = function () {
   if (Kit.fontReady) for (var i = 0; i < w.length; i++) Kit.exact(w[i][0], w[i][1]);
 };
 // 一段（.kmNb）：长的拆成词（.kmW）；u 末尾可以带一个空格（段和段之间的空格放在前一段里，也算进宽度）
+// 不再拆开的一小块（一段 .kmNb 或一个词 .kmW）里的字靠左（第 13 块 T10）：宽度按「字 + 末尾的空格」写死，居中的提示牌里
+// 末尾的空格被吞掉以后，字会在写死的宽度里往右挪半个空格（「锻造武器 ·还能…」「许个 愿」那样的缝）
+Kit.leaf = function (e) { e.style.textAlign = 'left'; return e; };
 Kit.piece = function (u) {
   var sp = Kit.el('span', 'kmNb'), ch = u.length >= Kit.WORD_MIN ? Kit.chunks(u) : null;
-  if (!ch || ch.length < 2) sp.textContent = u;
-  else for (var i = 0; i < ch.length; i++) sp.appendChild(Kit.exact(Kit.el('span', 'kmW', ch[i]), ch[i]));
+  if (!ch || ch.length < 2) { sp.textContent = u; Kit.leaf(sp); }
+  else for (var i = 0; i < ch.length; i++) sp.appendChild(Kit.exact(Kit.leaf(Kit.el('span', 'kmW', ch[i])), ch[i]));
   return Kit.exact(sp, u);
 };
-// 一串并列的东西（奖励「武器「…」、魔典「…」」）：每一项是一段（.kmNb），只在「、」后面换行
-// （不会折成「…、魔 / 典「…」」）；一项比一行还长时才在它里面按词折行。sep 接在每一项后面（最后一项不接）
+// 一串并列的东西（奖励「武器「…」、纹章「…」」）：每一项是一段（.kmNb），只在「、」后面换行
+// （不会折成「…、纹 / 章「…」」）；一项比一行还长时才在它里面按词折行。sep 接在每一项后面（最后一项不接）
 Kit.parts = function (el, list, sep) {
   for (var i = 0; i < list.length; i++) el.appendChild(Kit.piece(list[i] + (i < list.length - 1 ? sep : '')));
   return el;
 };
+// 第 i 个字是空格：汉字 + 空格 + 数字处能不能断。前面的字是「每 第 约 …」（Kit.NUMPRE）不断；这一段从开头（或者段里最后一个「（」）
+// 算起不到 3 个字不断（「（每 / 2 秒」「（立 / 15 秒」）；后面到下一个标点只有 3 个字以内也不断（「还能许 / 5 次」「多 / 1 只」）
+// 第 13 块 O7：整段的头 4 个字以内不断（「身边有 / 3 只护卫蜂…」「暴击时 / 15% 几率…」第一行只剩三个字）
+Kit.numCut = function (t, i, u) {
+  var pv = t.charAt(i - 1), q = u.lastIndexOf('（');
+  if (!/[㐀-鿿]/.test(pv) || Kit.NUMPRE.indexOf(pv) >= 0 || !/[0-9]/.test(t.charAt(i + 1))) return false;
+  if (t.slice(0, i).replace(/\s/g, '').length <= 4) return false;
+  return (q >= 0 ? u.slice(q + 1) : u).replace(/\s/g, '').length >= 3 && Kit.restLen(t, i + 1) > 3;
+};
 // 一行说明按短语排（窄卡片里不会折成「…剑 / 气」「5 / 米」「攻速 / +25%」「… / · 范围」）：只在「，；：。、！？」、「——」「……」后面、
-// 「 · 」后面、汉字和后面的数字之间（前面至少 3 个字：不会剩下「掷出 /」「每 /」）、英文词和后面的汉字之间换行，每一段是一个 .kmNb；
+// 「 · 」后面、汉字和后面的数字之间（Kit.numCut：前面至少 3 个字、整段的头 4 个字以内不断、不是「每 第 …」，后面多于 3 个字：不会剩下「掷出 /」「每 /」「/ 5 次」）、英文词和后面的汉字之间换行，每一段是一个 .kmNb；
 // 一段比一行还长时才在它里面按词折行（Kit.piece）。
 // 「 · 」：点和后面的空格是前一段末尾的 .kmSep（算进这一段的宽度，换行的位置和以前一样）；这一段正好在行末时把点藏起来
 // （Kit.sepFix，排好版以后量；只改 visibility，不重新排版），一行不会以「·」结尾（「攻速 +25% · / 范围 +25%」）
+// 结尾的长括号（7 个字以上，「弹丸数量 +0.5（攒满 1 就多一发）」）整个是一段：在「（」前面换行，括号里面不按数字断
 Kit.phrase = function (el, t) {
   t = t == null ? '' : String(t);
   el.textContent = '';
@@ -411,8 +448,12 @@ Kit.phrase = function (el, t) {
     else if (sep) el.appendChild(document.createTextNode(sep));
     u = '';
   };
+  var tail = t.charAt(t.length - 1) === '）' ? t.lastIndexOf('（') : -1;
+  if (tail < 0 || t.length - tail - 2 <= 6 || t.indexOf('）', tail) !== t.length - 1) tail = -1;
   for (i = 0; i < t.length; i++) {
     c = t.charAt(i); n = t.charAt(i + 1); pv = t.charAt(i - 1);
+    if (i === tail && u.replace(/\s/g, '').length >= 3) cut('');
+    if (tail >= 0 && i > tail) { u += c; continue; }
     if (c === '·' && pv === ' ' && n === ' ' && u) {
       var sp = Kit.piece(u);
       sp.appendChild(Kit.el('span', 'kmSep', '· '));
@@ -420,9 +461,10 @@ Kit.phrase = function (el, t) {
       u = ''; seps = true; i++;
       continue;
     }
-    if (c === ' ' && (pv === '·' || (/[㐀-鿿]/.test(pv) && /[0-9]/.test(n) && u.length >= 3) || (/[A-Za-z]/.test(pv) && /[㐀-鿿]/.test(n)))) { cut(' '); continue; }
+    if (c === ' ' && (pv === '·' || Kit.numCut(t, i, u) || (/[A-Za-z]/.test(pv) && /[㐀-鿿]/.test(n)))) { cut(' '); continue; }
     u += c;
-    if (n && ('，；：。、！？'.indexOf(c) >= 0 || ((c === '—' || c === '…') && n !== c && Kit.CLOSE.indexOf(n) < 0))) cut('');
+    // ——、…… 后面只剩一两个字（「12…… / 级，」）时不断
+    if (n && ('，；：。、！？'.indexOf(c) >= 0 || ((c === '—' || c === '…') && n !== c && Kit.CLOSE.indexOf(n) < 0 && Kit.restLen(t, i + 1) > 2))) cut('');
   }
   cut('');
   if (seps) Kit.sepWatch(el);
@@ -446,7 +488,7 @@ Kit.sepWatch = function (el) {
     Kit.sepRO.observe(el);
   } else if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { Kit.sepFix(el); });
 };
-// 居中的标题（弹窗标题「微波炉 · 复制一件物品 · …」）：几段用「 · 」连起来，每一段不在中间折行（Kit.piece）；一行放不下时只在「 · 」处换行，
+// 居中的标题（弹窗标题「圣锻炉 · 选择要觉醒的武器」）：几段用「 · 」连起来，每一段不在中间折行（Kit.piece）；一行放不下时只在「 · 」处换行，
 // 而且行末不留点、行首也没有点。先算好在哪儿换行：每一段的宽度是它整数个字体像素（Kit.exact 写死的那个），一段一段往一行里放，
 // 这一段（不带末尾的「 · 」）放不下就在前一段后面换行；行末那一段不带「 · 」、后面放一个 <br>，别的段带着「 · 」。
 // 点是真的没了（不像 Kit.sepFix 只藏起来、还占着宽度），居中的那一行不往左偏；只按标题的宽度算一次，不量排好的版、不来回改。
@@ -499,7 +541,8 @@ Kit.slip = function (o) {
   if (ic) d.appendChild(ic);
   var tx = Kit.el('div', 'kmSlipTx'), tab = o.tab != null ? o.tab : (note ? '' : '成就达成');
   if (tab) tx.appendChild(Kit.el('div', 'kmSlipTab', tab));
-  if (o.name) tx.appendChild(Kit.el('div', 'kmSlipN', o.name));
+  // 名字 / 提示的一句话按短语排（Kit.phrase）：窄屏上不在词中间断开（「已按退 / 出结算」「难度 II 征服 / 者」，第 13 块 fix）
+  if (o.name) tx.appendChild(Kit.phrase(Kit.el('div', 'kmSlipN'), o.name));
   if (o.reward && o.reward.length) tx.appendChild(Array.isArray(o.reward) ? Kit.parts(Kit.el('div', 'kmSlipR'), o.reward, '、') : Kit.el('div', 'kmSlipR', o.reward));
   d.appendChild(tx);
   return d;

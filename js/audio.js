@@ -801,7 +801,7 @@ SFX.mtof = function (m) { return 440 * Math.pow(2, (m - 69) / 12); };
     var g = S.adsr(t, v, 0.06, 0.25, 0.85, dur, 0.14);
     a.connect(lp); b.connect(lp); lp.connect(g); g.connect(OUT);
   };
-  // 锯齿主音（虫潮的警报旋律）：滑音 + 颤音
+  // 锯齿主音（午夜钟声的警报旋律）：滑音 + 颤音
   I.lead = function (t, f, dur, v, o) {
     var end = t + dur + 0.15, gl = o.pf ? { from: o.pf, gl: 0.045 } : null;
     var a = S.osc(t, 'sawtooth', f, end, gl), b = S.osc(t, 'square', f, end, gl ? { from: o.pf, gl: 0.045 } : { det: 10 });
@@ -1537,7 +1537,7 @@ SFX.CSS = [
   '  #menu .menuHead.metaHead ~ #sfxMenuBtn { top: 12px; width: 36px; height: 36px; }',
   '  #sfxPop { top: 44px; }',
   '}',
-  // 暂停界面：放在右栏（武器魔典 / 物品 / 超武）最下面，那里有空，不会把弹窗撑高
+  // 暂停界面：放在右栏（武器纹章 / 宝物 / 超武）最下面，那里有空，不会把弹窗撑高
   '.sfxPause { margin-top: 12px; }',
   '@media (prefers-reduced-motion: reduce) { #sfxPop { animation: none; } }'
 ].join('\n');
@@ -1681,7 +1681,7 @@ SFX.injectMenu = function () {
   SFX.syncUI();
 };
 
-// 暂停界面：放在右栏（武器魔典、物品、超武）最下面；找不到右栏就接在「设置」那一栏后面
+// 暂停界面：放在右栏（武器纹章、宝物、超武）最下面；找不到右栏就接在「设置」那一栏后面
 SFX.injectPause = function () {
   if (document.querySelector('#pauseModal .sfxSet')) return;
   var host = document.querySelector('#pauseModal .pcInv');

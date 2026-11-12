@@ -1,11 +1,18 @@
 'use strict';
 // ============================================================
-//  敌人：实例化绘制、追踪玩家、分离、接触伤害、远程/冲锋/滚动/自爆、
-//  小 Boss 与关卡 Boss 的攻击（尖刺、红球、激光、砸地、冲锋、召唤）、刷怪导演
+//  敌人：实例化绘制、追踪玩家、分离、接触伤害、远程/冲锋/自爆、
+//  小 Boss 与关卡 Boss 的攻击（尖刺、红球、激光、砸地、冲锋、召唤）、刷怪导演（含午夜钟声）
 // ============================================================
 var Enemies = {
   list: [], hash: new SpatialHash(3.5), meshes: {}, shots: [], hazards: [], nextId: 1,
-  boss: null, MAX: 330, firstElite: true,
+  boss: null, MAX: 330,
+  // 精英宝箱：每关第 3 只精英必掉，其余 ELITE_CHEST 的几率（stageElites 在 Director.reset 里清零）
+  stageElites: 0, ELITE_CHEST: 0.2,
+  // 能被武器打到的道具（不进 list）：只有 active 的进空间哈希；没有敌人时自动瞄准才会选它，最远 PROP_AIM 米
+  props: [], PROP_AIM: 12,
+  MIDNIGHT: [0.62, 0.5, 1.35],      // 午夜紫：午夜钟声里的普通敌人（Enemies.spawn 的 opts.col）
+  NIGHTSHADE: [1, 1, 1],            // 夜魇的底色（精英分支会乘上它）：模型自己就是黑紫色、橙眼睛，不再染色
+  SMOKE_RATE: 15,                   // 夜魇身上飘的黑烟：每只 0.25 秒一缕，所有夜魇加起来每秒最多 SMOKE_RATE + 1 缕
   // 其他文件注册的新行为和新招式（content.js）：BEHAVIORS[def.behavior](e, dt, nx, nz, d, spd, frozen) 返回 true 表示移动和碰撞自己处理；
   // ATTACKS[招式名] = { start(e, nx, nz, d), update(e, dt, nx, nz, d) }；def.look(e, L, dt) 改这一帧的姿态（L 见 render）
   BEHAVIORS: {}, ATTACKS: {}, LOOK: {}
@@ -44,6 +51,32 @@ Enemies.init = function (scene) {
     m.frustumCulled = false;
     scene.add(m);
   });
+  // 有自己模型的子弹（def.shotModel）：投矛手的短矛、甩石手的石子；各带一个小红光晕（同一个红色光晕材质），
+  // 光晕放在子弹后面一点（沿飞行方向往回 back 米），迎面飞来时子弹的前半截露在光晕外面、四周一圈红：看得出是什么，也看得出危险
+  Enemies.shotKinds = {};
+  for (var k in Enemies.SHOT_MODELS) {
+    var sm = MODEL.instanced(MODEL.build(Enemies.SHOT_MODELS[k]), 120, scene);
+    var sg = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.3, 1), Enemies.shotGlow.material, 120);
+    sg.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    sg.frustumCulled = false; sg.count = 0; sm.visible = sg.visible = false;
+    scene.add(sg);
+    Enemies.shotKinds[k] = { mesh: sm, glow: sg, n: 0, back: Enemies.SHOT_BACK[k] || 0.3 };
+  }
+};
+
+Enemies.SHOT_BACK = { spear: 0.4, stone: 0.28 };
+// 子弹模型（MODEL.build 的零件，朝 +z 飞）：短矛的矛尖在原点前面一点（碰到玩家的是矛尖），石子在原点
+Enemies.SHOT_MODELS = {
+  spear: [
+    ['cyl', [0.03, 0.03, 1.1, 5], [0, 0, -0.4], 0x8a5a2e, [Math.PI / 2, 0, 0], null, 'wood'],
+    ['oct', [0.13], [0, 0, 0.3], 0xd8dde4, null, [0.55, 0.34, 1.6], 'metal'],
+    ['cyl', [0.045, 0.04, 0.06, 5], [0, 0, 0.12], 0x6a6f78, [Math.PI / 2, 0, 0], null, 'metal'],
+    ['cone', [0.09, 0.18, 4], [0, 0, 0.03], 0xc8302a, [-Math.PI / 2, 0, 0], null, 'cloth']
+  ],
+  stone: [
+    ['dodec', [0.22], [0, 0, 0], 0x9a958a, null, [1, 0.85, 1.1], 'en_rock'],
+    ['dodec', [0.1], [0.12, 0.1, 0.05], 0xc8c2b4, null, null, 'en_rock']
+  ]
 };
 
 // ---------------- 模型：按零件合并，顶点里记下关节支点与动画通道 ----------------
@@ -188,9 +221,11 @@ Enemies.clear = function () {
   Enemies.hazards.forEach(function (h) { if (h.mesh) Enemies.scene.remove(h.mesh); });
   Enemies.hazards = [];
   Enemies.boss = null;
+  Enemies.props = [];
   for (var id in Enemies.meshes) { Enemies.meshes[id].count = 0; Enemies.meshes[id].visible = false; }
   Enemies.shotMesh.count = 0;
   Enemies.shotGlow.count = 0;
+  for (var k in Enemies.shotKinds) { var sk = Enemies.shotKinds[k]; sk.mesh.count = sk.glow.count = 0; sk.mesh.visible = sk.glow.visible = false; }
   if (Enemies.crownMesh) Enemies.crownMesh.count = 0;
 };
 
@@ -207,19 +242,27 @@ Enemies.spawn = function (id, x, z, opts) {
     dmg: def.dmg * ENEMY_DMG * (opts.dmgMult || 1),
     r: def.radius * scale, scale: scale, elite: !!opts.elite, boss: !!def.boss, mini: !!def.miniboss,
     flash: 0, frozen: 0, dot: 0, dotT: 0, dotLeft: 0, touchCd: 0, phase: Math.random() * TAU, atk: rand(1, 3), state: 'chase', st: 0,
-    alive: true, grounded: !opts.drop, marked: 0, poisoned: 0, poisonStacks: 0,
-    wp: 0, wa: 0, rl: 0           // 只给动画用：步态相位、步幅、滚动角
+    alive: true, grounded: !opts.drop, marked: 0, poisoned: 0, slowK: 1, slowT: 0,
+    wp: 0, wa: 0                  // 只给动画用：步态相位、步幅
   };
+  if (opts.col) e.col = new THREE.Color(opts.col[0], opts.col[1], opts.col[2]);   // 出生时定好的底色（午夜紫等）
   e.wp = e.phase;
-  if (def.behavior === 'roll') { var a = Math.atan2(P.pos.x - x, P.pos.z - z); e.dx = Math.sin(a); e.dz = Math.cos(a); }
   Enemies.list.push(e);
   if (e.boss) Enemies.boss = e;
   return e;
 };
 
 // ---------------- 伤害 ----------------
-// crit: 0 普通 1 暴击 2 超大暴击
+// crit: 0 普通 1 暴击
 Enemies.damage = function (e, dmg, crit, kx, kz, opts) {
+  if (e.prop) {
+    // 道具：只记伤害，不扣血、不会死（不算击杀、不掉东西、不吸血、不进 P.damageDealt）
+    if (!e.active) return 0;
+    e.taken += dmg; e.hits++; e.flash = 0.1;
+    if (!(opts && opts.quiet)) FX.damage(e.x, e.y + e.r * 1.6 + 0.6, e.z, dmg, crit || 0);
+    if (e.onHit) e.onHit(e, dmg, crit || 0);
+    return dmg;
+  }
   if (!e.alive) return 0;
   if ((e.boss || e.mini) && e.state === 'intro') return 0;
   e.hp -= dmg;
@@ -238,6 +281,7 @@ Enemies.damage = function (e, dmg, crit, kx, kz, opts) {
 
 // 持续伤害（燃烧/中毒）
 Enemies.applyDot = function (e, dps, dur) {
+  if (e.prop) return;
   e.dot = Math.max(e.dot, dps);
   e.dotLeft = Math.max(e.dotLeft || 0, dur);
   e.poisoned = Math.max(e.poisoned, dur);
@@ -252,20 +296,14 @@ Enemies.kill = function (e) {
   FX.burst(e.x, e.y + e.r, e.z, e.boss ? 40 : (e.elite || e.mini) ? 18 : 6, def.color || 0x9be35a, e.boss ? 12 : 6, e.boss ? 0.6 : 0.3);
   var xp = def.xp * (e.elite ? 10 : 1);
   if (xp > 0) Pickups.xp(e.x, e.y + 0.5, e.z, xp);
-  if (P.items.echo && Math.random() < 1 - Math.pow(0.88, P.items.echo)) Pickups.xp(e.x + 0.5, e.y + 0.5, e.z, Math.max(1, xp));
   if (Math.random() < 0.3 || e.elite || e.mini) Pickups.gold(e.x, e.y + 0.5, e.z, Math.ceil(Game.stage * (e.elite ? 8 : e.mini ? 20 : 1) * P.st.goldGain));
-  // 精英：第一个必掉宝箱，之后 25%
-  if (e.elite && (Enemies.firstElite || Math.random() < 0.25)) { Enemies.firstElite = false; Interact.spawnChest(e.x, e.z, true); }
-  if (e.mini) { Interact.spawnChest(e.x, e.z, true); Pickups.xp(e.x, e.y + 1, e.z, 40 * Game.stage); }
-  if (!e.boss && !e.mini && Math.random() < 0.004 * P.st.powerupChance) Pickups.drop(Pickups.randomPowerup(), e.x, e.y + 0.5, e.z);
-  if (P.items.borgar && Math.random() < 1 - Math.pow(0.98, P.items.borgar)) Pickups.drop('heal', e.x, e.y + 0.5, e.z);
-  if (P.items.harvester) Weapons.spawnSouls(e.x, e.y, e.z, 2 * P.items.harvester);
-  // 瘟疫（阿莫格）：中毒的敌人死亡时爆炸
-  if (P.char && P.char.id === 'amog' && e.poisoned > 0) {
-    FX.boom(e.x, e.y + 0.8, e.z, 2.5, 0x7dff4a);
-    var pw = Weapons.find('poison');
-    Enemies.inRadius(e.x, e.z, 3, function (o) { Enemies.applyDot(o, Math.max(3, (pw ? pw.s.damage : 3) * P.st.damage * 2), 3); });
+  // 精英：每关第 3 只必掉宝箱（它不再判定），其余 20%
+  if (e.elite) {
+    Enemies.stageElites = (Enemies.stageElites || 0) + 1;
+    if (Enemies.stageElites === 3 || Math.random() < Enemies.ELITE_CHEST) Interact.spawnChest(e.x, e.z, true);
   }
+  if (e.mini) { Interact.spawnChest(e.x, e.z, true); Pickups.xp(e.x, e.y + 1, e.z, 40 * Game.stage); }
+  if (!e.boss && !e.mini && Math.random() < 0.004) Pickups.drop(Pickups.randomPowerup(), e.x, e.y + 0.5, e.z);
   Passive.onKill(e);
   if (e.boss) Game.onBossKilled(e);
 };
@@ -277,6 +315,16 @@ Enemies.nearest = function (x, z, maxR, skip) {
     if (!e.alive || (skip && skip.has(e.id))) continue;
     var d = dist2(x, z, e.x, e.z);
     if (d < bd) { bd = d; best = e; }
+  }
+  if (best || !Enemies.props.length) return best;
+  // 附近没有敌人：才瞄准能打的道具（最远 PROP_AIM 米）
+  var pr = Math.min(maxR, Enemies.PROP_AIM);
+  bd = pr * pr;
+  for (i = 0; i < Enemies.props.length; i++) {
+    var p = Enemies.props[i];
+    if (!p.active || (skip && skip.has(p.id))) continue;
+    d = dist2(x, z, p.x, p.z);
+    if (d < bd) { bd = d; best = p; }
   }
   return best;
 };
@@ -290,8 +338,43 @@ Enemies.nearestN = function (x, z, maxR, n) {
     if (d < r2) arr.push({ e: e, d: d });
   }
   arr.sort(function (a, b) { return a.d - b.d; });
-  return arr.slice(0, n).map(function (a) { return a.e; });
+  var out = arr.slice(0, n).map(function (a) { return a.e; });
+  if (out.length < n && Enemies.props.length) {
+    // 敌人不够：排在后面补上附近能打的道具
+    var pr = Math.min(maxR, Enemies.PROP_AIM), pa = [];
+    for (i = 0; i < Enemies.props.length; i++) {
+      var p = Enemies.props[i];
+      if (!p.active) continue;
+      d = dist2(x, z, p.x, p.z);
+      if (d < pr * pr) pa.push({ e: p, d: d });
+    }
+    pa.sort(function (a, b) { return a.d - b.d; });
+    for (i = 0; i < pa.length && out.length < n; i++) out.push(pa[i].e);
+  }
+  return out;
 };
+
+// 减速：k 是速度倍率（0.7 = 慢 30%），t 秒；同时有几个减速时最小的 k 生效，到时间恢复；Boss / 小 Boss 不受影响
+Enemies.slow = function (e, k, t) {
+  if (!e || !e.alive || e.prop || e.boss || e.mini || !(t > 0)) return;
+  k = clamp(k, 0, 1);
+  if (e.slowT > 0 && e.slowK < k) return;                    // 已经有更强的减速：弱的不覆盖
+  e.slowT = e.slowT > 0 && e.slowK === k ? Math.max(e.slowT, t) : t;
+  e.slowK = k;
+};
+
+// ---------------- 能被武器打到的道具（木人桩等） ----------------
+// opts: { x, z, y?, r, tag, onHit(prop, dmg, crit) }；返回道具。active 为假时打不到、也不会被瞄准
+Enemies.addProp = function (opts) {
+  var y = opts.y != null ? opts.y : W.groundAt(opts.x, opts.z, 999);
+  var p = { id: Enemies.nextId++, prop: true, tag: opts.tag || 'prop', active: false, alive: true,
+    def: { id: '_prop', name: opts.tag || '道具', radius: opts.r || 1, color: 0xc8a060, xp: 0, hp: 1e9, flyer: true, headTop: 1.8 },
+    x: opts.x, y: y, z: opts.z, r: opts.r || 1, scale: 1, hp: 1e9, maxHp: 1e9, taken: 0, hits: 0,
+    vx: 0, vz: 0, vy: 0, kx: 0, kz: 0, flash: 0, frozen: 0, dot: 0, dotT: 0, dotLeft: 0, poisoned: 0, marked: 0, slowK: 1, slowT: 0,
+    elite: false, boss: false, mini: false, grounded: false, onHit: opts.onHit || null };
+  Enemies.props.push(p); return p;
+};
+Enemies.removeProp = function (p) { var i = Enemies.props.indexOf(p); if (i >= 0) Enemies.props.splice(i, 1); p.alive = false; p.active = false; };
 
 Enemies.inRadius = function (x, z, r, fn) {
   Enemies.hash.query(x, z, r + 3, function (e) {
@@ -314,14 +397,16 @@ Enemies.update = function (dt) {
   var list = Enemies.list, h = Enemies.hash;
   h.clear();
   for (var i = 0; i < list.length; i++) if (list[i].alive) h.insert(list[i], list[i].x, list[i].z);
+  for (i = 0; i < Enemies.props.length; i++) { var pr = Enemies.props[i]; if (pr.active) { h.insert(pr, pr.x, pr.z); pr.flash -= dt; pr.frozen -= dt; pr.marked -= dt; } }   // 道具的状态计时也要走
 
   var px = P.pos.x, py = P.pos.y, pz = P.pos.z;
-  var frozenNear = 0;
+  Enemies.smokeTok = Math.min(1, (Enemies.smokeTok || 0) + dt * Enemies.SMOKE_RATE);
   for (i = 0; i < list.length; i++) {
     var e = list[i];
     if (!e.alive) continue;
     var def = e.def;
     e.flash -= dt; e.touchCd -= dt; e.frozen -= dt; e.phase += dt; e.marked -= dt; e.poisoned -= dt;
+    e.slowT -= dt; if (e.slowT <= 0) e.slowK = 1;
     if (e.dot > 0) {
       e.dotT -= dt;
       if (e.dotT <= 0) {
@@ -336,21 +421,24 @@ Enemies.update = function (dt) {
     var d = Math.sqrt(dx * dx + dz * dz) || 0.001;
     var nx = dx / d, nz = dz / d;
     var frozen = e.frozen > 0 && !e.boss && !e.mini;
-    if (frozen && d < 12) frozenNear++;
-    var spd = frozen ? 0 : e.speed * Game.enemySpeedMult * (e.frozen > 0 ? 0.5 : 1);
+    var spd = frozen ? 0 : e.speed * Game.enemySpeedMult * (e.frozen > 0 ? 0.5 : 1) * e.slowK;
 
     if (e.boss || e.mini) Enemies.bossAI(e, dt, nx, nz, d);
     else if (def.behavior && Enemies.BEHAVIORS[def.behavior]) { if (Enemies.BEHAVIORS[def.behavior](e, dt, nx, nz, d, spd, frozen)) continue; }
-    else if (def.behavior === 'roll') {
-      // 风滚骨：沿直线滚动，偶尔转向玩家
-      e.st -= dt;
-      if (e.st <= 0) { e.st = rand(1.5, 3); var a = Math.atan2(dx, dz) + rand(-0.6, 0.6); e.dx = Math.sin(a); e.dz = Math.cos(a); }
-      e.vx = e.dx * spd; e.vz = e.dz * spd;
-    } else if (def.behavior === 'shoot' && d < 28) {
-      var want = def.slowMove ? 0.15 : (d < 12 ? -0.6 : d > 18 ? 1 : 0.15);
+    else if (def.behavior === 'shoot' && d < 28) {
+      var want;
+      if (def.stopThrow) {
+        // 停下投矛：16 米外走过来、以内慢慢逼近（从不后退）；出手前 stopThrow 秒站定、手上一闪，再投
+        if (e.atk <= def.stopThrow) {
+          want = 0;
+          // 手上一闪：举过肩头的那只右手（模型里在 −x 0.43、高 1.27 米、缩放 1 时 e.r = 0.55）
+          if (!e.windup && !frozen) { e.windup = true; FX.flash(e.x - nz * e.r * 0.78 - nx * e.r * 0.1, e.y + e.r * 2.3, e.z + nx * e.r * 0.78 - nz * e.r * 0.1, 0.9, 0xfff0b0, def.stopThrow, 0); }
+        } else want = d > 16 ? 1 : 0.15;
+      } else want = def.slowMove ? 0.15 : (d < 12 ? -0.6 : d > 18 ? 1 : 0.15);
       e.vx = nx * spd * want; e.vz = nz * spd * want;
       e.atk -= dt;
-      if (e.atk <= 0 && !frozen) { e.atk = def.shootCd || 2.5; Enemies.shoot(e, px, py + 1, pz, def.shotSpeed || 12, e.dmg * 0.8); }
+      if (e.atk <= 0 && !frozen) { e.atk = (def.shootCd || 2.5) * rand(0.85, 1.15); e.windup = false;   // ±15 %：一起刷出来的投矛手不会一直齐射
+        Enemies.shoot(e, px, py + 1, pz, def.shotSpeed || 12, e.dmg * 0.8); }
     } else {
       e.vx = nx * spd; e.vz = nz * spd;
     }
@@ -409,12 +497,20 @@ Enemies.update = function (dt) {
       if (def.poison) P.poison = Math.max(P.poison || 0, 3);
       e.touchCd = 0.8;
     }
+    // 夜魇：40 米以内往上飘黑紫色的烟（每只 0.25 秒一缕，总数按 SMOKE_RATE 限流）
+    if (def.id === 'nightshade' && d < 40) {
+      e.smk = (e.smk === undefined ? (e.phase % 0.25) : e.smk) - dt;
+      if (e.smk <= 0 && Enemies.smokeTok >= 1) {
+        Enemies.smokeTok -= 1; e.smk += 0.25; if (e.smk < 0) e.smk = 0;
+        var sj = Math.sin(e.phase * 7.3), sc = e.scale;
+        FX.part(e.x + sj * 0.3 * sc, e.y - 0.75 * sc, e.z + Math.cos(e.phase * 5.1) * 0.3 * sc, sj * 0.4, 0.9, 0, 0x2a1a3a, 0.32 * sc, 0.9, -0.6);
+      }
+    }
     if (d > 95 && !e.boss && !e.mini) {
       var sp = Director.spawnPoint();
       e.x = sp.x; e.z = sp.z; e.y = sp.y;
     }
   }
-  Passive.frozenNear = frozenNear;
   for (i = list.length - 1; i >= 0; i--) if (!list[i].alive) { list[i] = list[list.length - 1]; list.pop(); }
 
   Enemies.updateShots(dt);
@@ -504,8 +600,10 @@ Enemies.bossAI = function (e, dt, nx, nz, d) {
     case 'summon':
       e.vx = 0; e.vz = 0;
       if (e.st <= 0) {
-        var types = Director.currentPool().types;
-        for (var m = 0; m < 8; m++) Enemies.spawn(pick(types), e.x + rand(-6, 6), e.z + rand(-6, 6), { hpMult: Director.hpMult(), dmgMult: Director.dmgMult(), drop: true });
+        // 叫谁：def.summonId（一个 id、一组 id，或 'undead' = 本关刷怪池里的亡灵普通敌人）；叫几只：def.summonN（默认 8）
+        // solo：叫来的灰林狼不再带狼群
+        var types = Director.summonTypes(def), n = def.summonN || 8;
+        for (var m = 0; m < n; m++) Enemies.spawn(pick(types), e.x + rand(-6, 6), e.z + rand(-6, 6), { hpMult: Director.hpMult(), dmgMult: Director.dmgMult(), drop: true, solo: true });
         e.state = 'chase'; e.st = rand(3, 4);
       }
       return;
@@ -595,7 +693,7 @@ Enemies.shoot = function (e, tx, ty, tz, speed, dmg) {
   var sy = e.y + e.r * 1.4;
   var dx = tx - e.x, dy = ty - sy, dz = tz - e.z, d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
   if (Enemies.shots.length > 290) Enemies.shots.shift();
-  Enemies.shots.push({ x: e.x, y: sy, z: e.z, vx: dx / d * speed, vy: dy / d * speed, vz: dz / d * speed, dmg: dmg, life: 6 });
+  Enemies.shots.push({ x: e.x, y: sy, z: e.z, vx: dx / d * speed, vy: dy / d * speed, vz: dz / d * speed, dmg: dmg, life: 6, k: (e.def && e.def.shotModel) || null });
 };
 
 Enemies.updateShots = function (dt) {
@@ -612,6 +710,16 @@ Enemies.updateShots = function (dt) {
 
 // ---------------- 绘制 ----------------
 // 平滑动画：四肢的摆动交给着色器（每个实例只传相位和幅度），这里只算整体的朝向、起伏和挤压
+// 颜料染色：PAINT_C（models_proj.js）的第 ci 种颜色往白色（1, 1, 1）靠 60%，写进 out（颜色按 ci 缓存成 [r, g, b]，不在每帧里新建）
+Enemies.paintCol = function (ci, out) {
+  var C = Enemies._paintC || (Enemies._paintC = []), k = (ci | 0) % 7, c = C[k];
+  if (!c) {
+    var h = typeof PAINT_C !== 'undefined' && PAINT_C[k] != null ? PAINT_C[k] : 0xd85a8a;
+    c = C[k] = [((h >> 16) & 255) / 255 * 0.4 + 0.6, ((h >> 8) & 255) / 255 * 0.4 + 0.6, (h & 255) / 255 * 0.4 + 0.6];
+  }
+  return out.setRGB(c[0], c[1], c[2]);
+};
+
 var _em = null, _eq = null, _es = null, _ep = null, _ec = null, _ee = null;
 Enemies.render = function (dt) {
   if (!_em) { _em = new THREE.Matrix4(); _eq = new THREE.Quaternion(); _es = new THREE.Vector3(); _ep = new THREE.Vector3(); _ec = new THREE.Color(); _ee = new THREE.Euler(); }
@@ -635,6 +743,13 @@ Enemies.render = function (dt) {
     }
     var a = e.wa, p = e.wp, sw = Math.sin(p);
     var face = Math.atan2(px - e.x, pz - e.z);
+    if (e.boss) {
+      // 首领出场：转身对着出场镜头（正对玩家的角度常被烽火台挡住，镜头可能在首领背后）；出场完 0.3 秒转回来对着玩家
+      var fo = typeof Feel !== 'undefined' ? Feel.ov : null;
+      if (e.state === 'intro' && fo && fo.own === 'cine' && !fo.rel) { e.introFace = Math.atan2(fo.x - e.x, fo.z - e.z); e.introW = 1; }
+      else if (e.introW > 0) e.introW = Math.max(0, e.introW - dt / 0.3);
+      if (e.introW > 0) { var df = e.introFace - face, fw = e.introW * e.introW * (3 - 2 * e.introW); face += Math.atan2(Math.sin(df), Math.cos(df)) * fw; }
+    }
     var bob = 0, pitch = 0, roll = 0, sx = 1, sy = 1;
     if (def.flyer) {
       bob = Math.sin(e.phase * 2.2) * an.hover;
@@ -647,11 +762,6 @@ Enemies.render = function (dt) {
       roll = sw * an.roll * a;
     }
     if (an.spin) face += e.phase * an.spin;
-    if (def.behavior === 'roll') {
-      face = Math.atan2(e.dx || 0, e.dz || 1);
-      if (!(e.frozen > 0)) e.rl += spd * dt / (an.rollR * e.scale);
-      pitch = e.rl; roll = 0; bob = an.rollR * e.scale;   // 模型以球心为原点
-    }
     if (def.hop) {
       // 史莱姆：起跳拉长、落地压扁、平时果冻一样抖
       sy = e.grounded ? 1 + Math.sin(e.phase * 9) * 0.06 : 1 + clamp(e.vy * 0.035, -0.18, 0.22);
@@ -675,11 +785,14 @@ Enemies.render = function (dt) {
     var aa = mesh.geometry.attributes.aAnim.array;
     aa[n * 3] = p; aa[n * 3 + 1] = a; aa[n * 3 + 2] = e.phase * an.flap;
     if (e.flash > 0) _ec.setRGB(3, 3, 3);
-    else if (e.frozen > 0 && e.evoStun > 0) _ec.setRGB(2.2, 1.5, 0.35);   // 超武眩晕：暖金色（冰冻是青色）
+    else if (e.frozen > 0 && e.stunEnd > Game.time - 0.1) _ec.setRGB(2.2, 1.5, 0.35);   // 超武眩晕：暖金色（冰冻是青色）；按 stunEnd 算：名单满了、眩晕结束那一两帧都不闪青色
     else if (e.frozen > 0) _ec.setRGB(0.6, 1.0, 1.8);
     else if (e.marked > 0) _ec.setRGB(1.8, 0.5, 0.5);
-    else if (e.elite) _ec.setRGB(1.06, 1.0, 1.1);
+    else if (e.elite) { _ec.setRGB(1.06, 1.0, 1.1); if (e.col) _ec.multiply(e.col); }
+    else if (e.fireT > Game.time || (e.dot > 0 && e.fireT > Game.time - 0.6)) _ec.setRGB(1.6, 0.95, 0.5);   // 燃烧：橙色（锻锤、提灯、墓烛、鞭炮）；火刚灭、剩下那一点持续伤害还在的一两帧也是橙色（不闪绿）
+    else if (e.mk === 'paint' && e.mkT > Game.time) Enemies.paintCol(e.mkC, _ec);   // 踩过颜料：染成那一桶的颜色
     else if (e.dot > 0) _ec.setRGB(0.8, 1.4, 0.6);
+    else if (e.col) _ec.copy(e.col);                                   // 出生时的底色（午夜紫）
     else _ec.setRGB(1, 1, 1);
     if (e.tint && !(e.flash > 0)) _ec.multiply(e.tint);   // Boss 第二阶段等整体染色（content.js）
     mesh.setColorAt(n, _ec);
@@ -708,23 +821,49 @@ Enemies.render = function (dt) {
   crown.count = nc;
   crown.visible = nc > 0;
   if (nc) { crown.instanceMatrix.updateRange.count = nc * 16; crown.instanceMatrix.needsUpdate = true; }
-  var s = Enemies.shots, pulse = 1 + Math.sin(Game.realTime * 14) * 0.12;
+  // 敌方子弹：有 shotModel 的画成自己的模型（短矛顺着飞行方向、石子打着转），其余是红色光球
+  var s = Enemies.shots, pulse = 1 + Math.sin(Game.realTime * 14) * 0.12, no = 0, kinds = Enemies.shotKinds || {}, sk, b;
+  for (k in kinds) kinds[k].n = 0;
   for (i = 0; i < s.length; i++) {
-    _ep.set(s[i].x, s[i].y, s[i].z);
+    b = s[i];
+    sk = b.k ? kinds[b.k] : null;
+    _ep.set(b.x, b.y, b.z);
+    if (sk) {
+      if (sk.n >= 120) continue;
+      if (b.k === 'spear') _ee.set(-Math.atan2(b.vy, Math.sqrt(b.vx * b.vx + b.vz * b.vz)), Math.atan2(b.vx, b.vz), 0, 'YXZ');
+      else _ee.set(b.life * 11, b.life * 7, 0, 'YXZ');
+      _eq.setFromEuler(_ee);
+      _es.set(1, 1, 1);
+      _em.compose(_ep, _eq, _es);
+      sk.mesh.setMatrixAt(sk.n, _em);
+      var vl = Math.sqrt(b.vx * b.vx + b.vy * b.vy + b.vz * b.vz) || 1, bk = sk.back / vl;
+      _em.makeTranslation(b.x - b.vx * bk, b.y - b.vy * bk, b.z - b.vz * bk);
+      sk.glow.setMatrixAt(sk.n++, _em);
+      continue;
+    }
     _es.set(pulse, pulse, pulse);
     _eq.identity();
     _em.compose(_ep, _eq, _es);
-    Enemies.shotMesh.setMatrixAt(i, _em);
+    Enemies.shotMesh.setMatrixAt(no++, _em);
   }
-  Enemies.shotMesh.count = Enemies.shotGlow.count = s.length;
-  if (s.length) { Enemies.shotMesh.instanceMatrix.updateRange.count = s.length * 16; Enemies.shotMesh.instanceMatrix.needsUpdate = true; }
+  Enemies.shotMesh.count = Enemies.shotGlow.count = no;
+  if (no) { Enemies.shotMesh.instanceMatrix.updateRange.count = no * 16; Enemies.shotMesh.instanceMatrix.needsUpdate = true; }
+  for (k in kinds) {
+    sk = kinds[k];
+    sk.mesh.count = sk.glow.count = sk.n;
+    sk.mesh.visible = sk.glow.visible = sk.n > 0;
+    if (sk.n) {
+      sk.mesh.instanceMatrix.updateRange.count = sk.glow.instanceMatrix.updateRange.count = sk.n * 16;
+      sk.mesh.instanceMatrix.needsUpdate = sk.glow.instanceMatrix.needsUpdate = true;
+    }
+  }
 };
 
 // ============================================================
 //  刷怪导演：按关卡进度 p（0~1，关卡时长见 pace.js，默认 15 分钟）驱动
 //  最少存活 + 稳定细流；每 80~100 秒一波敌潮（×1.8）接 10 秒喘息（×0.6）；
 //  玩家清场太快时细流慢慢加快（最多 ×1.5），残血时悄悄少刷一会儿；
-//  p≈0.3 / 0.55 / 0.8 刷小 Boss；时间到进入最终虫潮
+//  p≈0.3 / 0.55 / 0.8 刷小 Boss；时间到敲响午夜钟声（加时，见下面 Director.MID_*）
 // ============================================================
 var Director = { acc: 0, eliteT: 0, STAGE_TIME: 900, NEAR: 60, lenK: 1 };
 
@@ -733,6 +872,7 @@ Director.reset = function () {
   // 关卡越短，捡宝箱、充神龛的时间越少，同样进度时玩家更弱：敌人强度按开局之后的时长缩放（15 分钟 = 1）
   Director.lenK = (T - Director.OPEN) / (900 - Director.OPEN);
   Director.acc = 0; Director.swarm = false; Director.swarmT = 0; Director.minisDone = 0;
+  Director.midTypes = null; Director.midEliteT = 0;
   Director.eliteT = clamp(T / 12, 60, 90);
   // 节奏：开局之后第一波敌潮
   Director.surgeAt = Director.OPEN + 10 + rand(0, 15);
@@ -740,6 +880,7 @@ Director.reset = function () {
   // 自适应
   Director.adapt = 1; Director.clearT = 0; Director.lowT = 0; Director.breathT = 0; Director.breathCd = 0;
   Director.near = 0; Director.minNow = 0; Director.rateNow = 0;
+  Enemies.stageElites = 0;
 };
 
 Director.remaining = function () { return Director.STAGE_TIME - Game.time; };
@@ -776,6 +917,18 @@ Director.currentPool = function () {
   var pool = Game.stageDef.pool, p = Director.progress(), cur = pool[0];
   for (var i = 0; i < pool.length; i++) if (pool[i].types && p >= pool[i].p) cur = pool[i];
   return cur;
+};
+
+// 首领 / 小 Boss 召唤谁（summonId）：没写 = 当前刷怪阶段的全部种类（旧规则）；'undead' = 当前阶段里的亡灵普通敌人（没有就僵尸 / 骷髅兵）
+Director.summonTypes = function (def) {
+  var s = def && def.summonId, cur = Director.currentPool().types;
+  if (!s) return cur;
+  if (s === 'undead') {
+    var u = cur.filter(function (id) { var d = ENEMIES[id]; return d && d.undead && d.role && !d.overtime; });
+    return u.length ? u : ['zombie', 'skeleton'];
+  }
+  var l = (Array.isArray(s) ? s : [s]).filter(function (id) { return !!ENEMIES[id]; });
+  return l.length ? l : cur;
 };
 
 // 按权重挑一种怪
@@ -831,15 +984,24 @@ Director.update = function (dt) {
   }
 
   if (Director.swarm) {
-    // 最终虫潮：无尽的幽灵，越来越强（血量以关卡末尾的强度为基准）
+    // 午夜钟声：本关最壮的三种普通敌人（午夜紫）源源不断，越来越强；每 30 秒一只精英夜魇
     Director.swarmT += dt;
-    Director.acc += 8 * dt;
-    var hpm = Director.hpMult(1) / 3 * Math.pow(1.8, Director.swarmT / 60);
+    var mn = Director.swarmT / 60;
+    var hpm = Director.hpMult(1) / 3 * Math.pow(1.7, mn), dmm = Game.stageDef.dmgMult * Math.pow(1.2, mn), spm = Math.min(1.6, 1 + 0.06 * mn);
+    if (!Director.midTypes) Director.midTypes = Director.midnightTypes(Game.stageDef);
+    Director.acc += Director.MID_RATE * dt;
     while (Director.acc >= 1) {
       Director.acc -= 1;
-      if (Enemies.list.length >= 400) { Director.acc = 0; break; }
+      if (Enemies.list.length >= Director.MID_CAP) { Director.acc = 0; break; }
       var sp0 = Director.spawnPoint();
-      Enemies.spawn('swarmghost', sp0.x, sp0.z, { hpMult: hpm, dmgMult: Game.stageDef.dmgMult * Math.pow(1.25, Director.swarmT / 60), speedMult: Director.swarmT > 1200 ? 1.5 : 1 });
+      Enemies.spawn(pick(Director.midTypes), sp0.x, sp0.z, { hpMult: hpm, dmgMult: dmm, speedMult: spm, col: Enemies.MIDNIGHT });
+    }
+    // 精英夜魇（第一只在 30 秒）：可以多出上限 MID_ELITE_ROOM 只，人满了也照样每 30 秒来一只
+    Director.midEliteT -= dt;
+    if (Director.midEliteT <= 0 && Enemies.list.length < Director.MID_CAP + Director.MID_ELITE_ROOM && ENEMIES.nightshade) {
+      Director.midEliteT = Director.MID_ELITE;
+      var ep0 = Director.spawnPoint();
+      Enemies.spawn('nightshade', ep0.x, ep0.z, { elite: true, hpMult: hpm, dmgMult: dmm * 1.3, speedMult: spm, col: Enemies.NIGHTSHADE });
     }
     return;
   }
@@ -887,7 +1049,7 @@ Director.update = function (dt) {
     Director.acc -= group;
   }
   // 精英：约每 T/16 一只，后期缩短到 T/40（最短 20 秒，10 分钟的关卡不会太密）
-  Director.eliteT -= dt * P.st.eliteSpawn;
+  Director.eliteT -= dt;
   if (Director.eliteT <= 0) {
     Director.eliteT = Math.max(20, lerp(T / 16, T / 40, p));
     var ep = Director.spawnPoint();
@@ -906,9 +1068,72 @@ Director.spawnMini = function (id) {
   UI.toast(ENEMIES[id].name + ' 出现了！', Kit.color('org'));
 };
 
+// ============================================================
+//  午夜钟声（关卡时间到以后的加时）：本关刷怪池里血最多的三种普通敌人（午夜紫），每 30 秒一只精英夜魇；
+//  同时最多 MID_CAP 只、每秒 MID_RATE 只；血量 = 关卡末尾 ÷ 3 × 1.7^分钟，伤害 × 1.2^分钟，速度每分钟 +6%（最多 +60%）
+//  内部名字还是 swarm / swarmT / startSwarm（音乐、成就、统计、公告都读它们）
+// ============================================================
+Director.MID_CAP = 300; Director.MID_RATE = 7; Director.MID_ELITE = 30; Director.MID_ELITE_ROOM = 20;
+// 钟声响时场上剩下的关卡怪最多留 MID_KEEP 只（只清看不见的或 35 米外的，冒一股烟，不算击杀、不掉东西），午夜紫的才有位置进来
+Director.MID_KEEP = 150; Director.MID_CULL_R = 35;
+// 天色：三关都往同一种深靛紫偏，迷雾森林、黄沙古道本来是白天，偏得多、灯光也调暗（沉钟古城本来就是夜里）
+Director.MIDNIGHT_SKY = 0x24105c; Director.MIDNIGHT_AMT = [0.78, 0.78, 0.42]; Director.MIDNIGHT_LIGHT = [0.65, 0.65, 1];
+
+// 午夜钟声刷哪三种：本关刷怪池里有定位（role）、不是加时专用（overtime）的种类，按血量取前三，一样多时先出现的在前
+// （CONTENT 的生物、首领、小 Boss、墓碑都没有 role，不算「普通敌人」）；数据里一个 role 都没有时：去掉首领、小 Boss、
+// 不碰人的、限量的、不会动的，同样取前三
+Director.midnightTypes = function (sd) {
+  sd = sd || Game.stageDef;
+  var all = [], seen = {};
+  (sd.pool || []).forEach(function (ph) {
+    (ph.types || []).forEach(function (id) { if (!seen[id] && ENEMIES[id]) { seen[id] = true; all.push(id); } });
+  });
+  var c = all.filter(function (id) { var d = ENEMIES[id]; return d.role && !d.overtime; });
+  if (!c.length) c = all.filter(function (id) { var d = ENEMIES[id]; return !d.boss && !d.miniboss && !d.noTouch && !d.limit && d.speed > 0 && !d.overtime; });
+  c = c.map(function (id, i) { return { id: id, i: i, hp: ENEMIES[id].hp }; });
+  c.sort(function (a, b) { return b.hp - a.hp || a.i - b.i; });
+  c = c.slice(0, 3).map(function (o) { return o.id; });
+  return c.length ? c : ['skeleton'];
+};
+
 Director.startSwarm = function () {
   if (Director.swarm) return;
   Director.swarm = true;
   Director.swarmT = 0;
-  UI.toast('最终虫潮来袭！', Kit.color('red'));
+  Director.midTypes = Director.midnightTypes(Game.stageDef);
+  Director.midEliteT = Director.MID_ELITE;
+  Director.midCull();
+  UI.toast('午夜钟声响了！', Kit.color('red'));
+};
+
+// 清掉一部分剩下的关卡怪：只动有 role 的普通敌人（不是精英、首领、小 Boss、不碰人的、挑战 / 墓穴里的），
+// 先清最远的；离玩家 MID_CULL_R 米以内、又在镜头里的不动。返回清掉几只
+Director.midCull = function () {
+  var list = Enemies.list, px = P.pos.x, pz = P.pos.z, keep = Director.MID_KEEP;
+  var alive = 0, i;
+  for (i = 0; i < list.length; i++) if (list[i].alive) alive++;
+  if (alive <= keep) return 0;
+  var held = [];
+  (Game.challenges || []).forEach(function (c) { (c.list || []).forEach(function (e) { held.push(e); }); });
+  var cam = Game.camera, fr = null;
+  if (cam) {
+    cam.updateMatrixWorld();
+    fr = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+  }
+  var v = new THREE.Vector3(), R2 = Director.MID_CULL_R * Director.MID_CULL_R, c = [];
+  for (i = 0; i < list.length; i++) {
+    var e = list[i], d = e.def;
+    if (!e.alive || !d.role || d.overtime || e.elite || e.boss || e.mini || d.noTouch || held.indexOf(e) >= 0) continue;
+    var dx = e.x - px, dz = e.z - pz, d2 = dx * dx + dz * dz;
+    if (d2 <= R2 && fr && fr.containsPoint(v.set(e.x, e.y + e.r, e.z))) continue;
+    c.push({ e: e, d2: d2 });
+  }
+  c.sort(function (a, b) { return b.d2 - a.d2; });
+  var n = Math.min(c.length, alive - keep);
+  for (i = 0; i < n; i++) {
+    var o = c[i].e;
+    o.alive = false;
+    if (c[i].d2 < 2500) FX.smoke(o.x, o.y + 0.4, o.z, 2, 0x2a2440);
+  }
+  return n;
 };

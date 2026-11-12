@@ -1,6 +1,6 @@
 'use strict';
 // ============================================================
-//  关卡：配色（天空、雾、灯光、远山）、树木岩石、刷怪池（按关卡进度分阶段）
+//  关卡：迷雾森林、黄沙古道、沉钟古城——配色（天空、雾、灯光、远山）、树木岩石、刷怪池（按关卡进度分阶段）
 // ============================================================
 
 // ---------------- 场景零件 ----------------
@@ -23,7 +23,7 @@ var ENV_PARTS = (function () {
     });
   };
   var P = {};
-  // ---- 森林 ----
+  // ---- 迷雾森林 ----
   // 大橡树：粗树干 + 两根枝 + 五团树冠
   P.oak = scaled([
     ['tube', [0.42, 0.62, 0.6, 7], [0, 0.3, 0], trunk, null, null, B],
@@ -91,7 +91,7 @@ var ENV_PARTS = (function () {
     ['dodec', [1.2], [0, 0.28, 0], 0x777670, [0.1, 0.4, 0.15], [1.25, 0.48, 1.05], K, 1],
     ['ball', [0.5, 0], [0.5, 0.45, -0.3], 0x6c6b65, [0.7, 0.3, 0.2], [1, 0.8, 1], K, 1]
   ];
-  // ---- 沙漠 ----
+  // ---- 黄沙古道 ----
   var cac = 0x4f8a3e, C = 'env_cactus', S = 'env_strata';
   // 树形仙人掌：主干 + 两只举起的手臂
   P.saguaro = [
@@ -140,7 +140,7 @@ var ENV_PARTS = (function () {
   P.sandC = [
     ['dodec', [1.25], [0, 0.25, 0], 0xc69460, [0.05, 0.9, 0.1], [1.2, 0.42, 1.1], S, 1]
   ];
-  // ---- 墓地 ----
+  // ---- 沉钟古城 ----
   var G = 'env_grave', stone = 0x6c7282, stoneD = 0x555a68;
   // 扭曲的枯树
   P.deadA = [
@@ -199,8 +199,11 @@ var ENV_PARTS = (function () {
 //   skyLight / groundLight / hemiInt：半球光（天光、地面反光）；sun / sunInt / sunDir：主光
 //   hills：远处几圈山影（从远到近）；clouds / cloudAlpha / cloudCount：云；moon、stars：月亮星星
 //   grass / grass2 / dirt / cliff：地面颜色；stone / stone2 / stoneTrim / wood / ivy：建筑
+//   cityWalls / bellTower：沉钟古城的塌城墙和倒了一半的钟楼（world.js W.buildCity）；beacon：烽火台光柱颜色（第 7 块用）
+// boss / minis：关卡首领和小 Boss（ENEMIES 里的 id，数值和招式表在 data_enemies*.js）
 STAGES = [
-  { name: '森林', boss: 'ent', minis: ['golemboss', 'chunkham'], hpMult: 1, hpGrow: 2.75, bossHp: 0.4, dmgMult: 1,
+  // 第 1 关 迷雾森林
+  { name: '迷雾森林', boss: 'oakking', minis: ['greenknight', 'shroomking'], beacon: 0x7affc0, hpMult: 1, hpGrow: 2.75, bossHp: 0.4, dmgMult: 1,
     palette: {
       skySeed: 11, skyTop: 0x04557f, skyMid: 0x118bbf, sky: 0x0b7cb0, fog: 0x14698c, fogNear: 5, fogFar: 70,
       skyLight: 0xa2cde6, groundLight: 0x6e6e52, hemiInt: 1.08, sun: 0xffe4b0, sunInt: 0.82, sunDir: [-0.5, 0.75, -0.45],
@@ -221,15 +224,16 @@ STAGES = [
       // p：关卡进度（0~1）；min：玩家附近保持的最少敌人数；rate：每秒稳定刷怪数；w：出现权重
       // （关卡的 hpMult / dmgMult 是起点倍率，关卡内血量按 e^(hpGrow·p) 成长；bossHp：Boss 血量相对小怪曲线的系数）
       { p: 0, min: 4, rate: 0.35, types: ['goblin', 'slime'], w: [3, 2] },
-      { p: 0.1, min: 10, rate: 0.7, types: ['goblin', 'slime', 'bee'], w: [3, 3, 1] },
-      { p: 0.2, min: 18, rate: 1.1, types: ['goblin', 'slime', 'bee', 'goblin2', 'wolf'], w: [3, 2, 2, 1, 0.4] },
-      { p: 0.32, min: 30, rate: 1.7, types: ['goblin', 'bee', 'goblin2', 'ghoul', 'golem', 'wolf', 'shroom'], w: [2, 2, 2, 1, 1, 0.45, 0.7] },
-      { p: 0.46, min: 45, rate: 2.4, types: ['goblin', 'goblin2', 'ghoul', 'golem', 'skeleton', 'bee', 'wolf', 'shroom', 'drummer'], w: [1, 3, 2, 2, 2, 1, 0.5, 0.8, 0.5] },
-      { p: 0.62, min: 65, rate: 3.3, types: ['goblin2', 'skeleton', 'boomer', 'ghoul', 'golem', 'goblintank', 'wolf', 'shroom', 'drummer'], w: [2, 3, 1, 2, 1, 1, 0.5, 0.8, 0.7] },
-      { p: 0.8, min: 90, rate: 4.4, types: ['goblin2', 'skeleton', 'skelarmor', 'goblintank', 'boomer', 'ghoul', 'wolf', 'shroom', 'drummer'], w: [2, 2, 2, 2, 1, 2, 0.6, 0.9, 0.9] },
+      { p: 0.1, min: 10, rate: 0.7, types: ['goblin', 'slime', 'wasp'], w: [3, 2, 1] },
+      { p: 0.2, min: 18, rate: 1.1, types: ['goblin', 'wasp', 'gobspear', 'wolf'], w: [3, 2, 1, 0.4] },
+      { p: 0.32, min: 30, rate: 1.7, types: ['goblin', 'wasp', 'gobspear', 'boar', 'wolf', 'shroom'], w: [2, 2, 2, 1, 0.45, 0.7] },
+      { p: 0.46, min: 45, rate: 2.4, types: ['goblin', 'gobspear', 'boar', 'kegimp', 'wolf', 'shroom', 'drummer'], w: [1, 2, 2, 1, 0.5, 0.8, 0.5] },
+      { p: 0.62, min: 65, rate: 3.3, types: ['gobspear', 'boar', 'kegimp', 'wolf', 'shroom', 'drummer'], w: [2, 3, 1, 0.5, 0.8, 0.7] },
+      { p: 0.8, min: 90, rate: 4.4, types: ['gobspear', 'boar', 'kegimp', 'wolf', 'shroom', 'drummer'], w: [3, 3, 1, 0.6, 0.9, 0.9] },
       { p: 1, min: 115, rate: 5.5 }
     ] },
-  { name: '沙漠', boss: 'pharaoh', minis: ['sandgolem', 'scorpboss'], hpMult: 40, hpGrow: 2.9, bossHp: 0.25, dmgMult: 2.3,
+  // 第 2 关 黄沙古道
+  { name: '黄沙古道', boss: 'hourglass', minis: ['wormqueen', 'lizardlord'], beacon: 0xffb84a, hpMult: 40, hpGrow: 2.9, bossHp: 0.25, dmgMult: 2.3,
     palette: {
       skySeed: 23, skyTop: 0x2a74c0, skyMid: 0x4f98d4, sky: 0xe4cb98, fog: 0xd9bd8a, fogNear: 18, fogFar: 128,
       skyLight: 0xfff1da, groundLight: 0x9a7a4c, hemiInt: 0.95, sun: 0xfff2d6, sunInt: 0.85, sunDir: [0.55, 0.72, -0.4],
@@ -248,17 +252,19 @@ STAGES = [
       rocks: [ENV_PARTS.sandA, ENV_PARTS.sandB, ENV_PARTS.sandC]
     },
     pool: [
-      { p: 0, min: 48, rate: 2.4, types: ['mummy', 'scorpion'], w: [3, 1] },
-      { p: 0.1, min: 54, rate: 2.7, types: ['mummy', 'scorpion', 'wisp', 'tumble'], w: [3, 2, 1, 1] },
-      { p: 0.22, min: 60, rate: 3, types: ['mummy', 'scorpion', 'wisp', 'tumble', 'dustyskel', 'worm'], w: [2, 2, 2, 2, 1, 0.7] },
-      { p: 0.36, min: 62, rate: 3.3, types: ['mummy', 'dustyskel', 'wisp', 'tumble', 'cactus', 'scorpion', 'worm', 'vulture'], w: [1, 2, 2, 2, 1, 1, 0.8, 0.8] },
-      { p: 0.5, min: 76, rate: 4, types: ['dustyskel', 'scorpion', 'cactus', 'wisp', 'tumble', 'mummytank', 'worm', 'vulture', 'lizard'], w: [3, 2, 1, 1, 1, 1, 0.8, 0.8, 0.7] },
-      { p: 0.66, min: 92, rate: 4.8, types: ['dustyskel', 'mummytank', 'scorpion', 'cactus', 'tumble', 'dustyarmor', 'worm', 'vulture', 'lizard'], w: [2, 2, 2, 1, 1, 1, 0.8, 0.9, 0.9] },
-      { p: 0.82, min: 110, rate: 5.6, types: ['mummytank', 'ancient', 'dustyarmor', 'scorpion', 'cactus', 'tumble', 'worm', 'vulture', 'lizard'], w: [2, 1, 2, 2, 1, 1, 0.9, 0.9, 1] },
+      { p: 0, min: 48, rate: 2.4, types: ['mummy', 'scarab'], w: [3, 2] },
+      { p: 0.1, min: 54, rate: 2.7, types: ['mummy', 'scarab', 'bat'], w: [3, 3, 1] },
+      { p: 0.22, min: 60, rate: 3, types: ['mummy', 'scarab', 'bat', 'lizardsling', 'worm'], w: [2, 2, 2, 1, 0.7] },
+      { p: 0.36, min: 62, rate: 3.3, types: ['mummy', 'bat', 'lizardsling', 'scarab', 'worm', 'vulture'], w: [2, 2, 2, 2, 0.8, 0.8] },
+      { p: 0.5, min: 76, rate: 4, types: ['lizardsling', 'bat', 'pallbearer', 'scarab', 'worm', 'vulture', 'lizard'], w: [2, 2, 1, 2, 0.8, 0.8, 0.7] },
+      { p: 0.66, min: 92, rate: 4.8, types: ['pallbearer', 'lizardsling', 'bat', 'scarab', 'worm', 'vulture', 'lizard'], w: [2, 2, 2, 2, 0.8, 0.9, 0.9] },
+      { p: 0.82, min: 110, rate: 5.6, types: ['pallbearer', 'lizardsling', 'bat', 'worm', 'vulture', 'lizard'], w: [3, 2, 2, 0.9, 0.9, 1] },
       { p: 1, min: 130, rate: 6.4 }
     ] },
-  { name: '墓地', boss: 'bigbob', minis: ['ghostham', 'skelking'], hpMult: 500, hpGrow: 2.6, bossHp: 0.15, dmgMult: 5,
+  // 第 3 关 沉钟古城（第 13 块 D-C13-10：dmgMult 5 → 3.5，第 3 关普通机器人撑的时间只有发布版的 0.22 倍）
+  { name: '沉钟古城', boss: 'sunkenbell', minis: ['ghostchamp', 'gravehound'], beacon: 0xb48cff, hpMult: 500, hpGrow: 2.6, bossHp: 0.15, dmgMult: 3.5,
     palette: {
+      cityWalls: true, bellTower: true,
       skySeed: 37, skyTop: 0x070a1c, skyMid: 0x111840, sky: 0x252f55, fog: 0x161d34, fogNear: 18, fogFar: 92,
       skyLight: 0x92a4c8, groundLight: 0x30364a, hemiInt: 1.05, sun: 0xbccaff, sunInt: 0.72, sunDir: [0.4, 0.62, -0.55],
       hills: [
@@ -276,13 +282,13 @@ STAGES = [
       rocks: [ENV_PARTS.graveRockA, ENV_PARTS.graveRockB]
     },
     pool: [
-      { p: 0, min: 52, rate: 2.6, types: ['ghost', 'zombie'], w: [3, 2] },
-      { p: 0.1, min: 58, rate: 2.9, types: ['ghost', 'zombie', 'head', 'skeleton'], w: [3, 2, 1, 1] },
-      { p: 0.22, min: 64, rate: 3.2, types: ['ghost', 'zombie', 'head', 'skeleton', 'ghost2', 'ecto', 'tomb'], w: [2, 2, 2, 2, 1, 0.7, 0.18] },
-      { p: 0.36, min: 70, rate: 3.6, types: ['ghost', 'ghost2', 'zombie', 'ghoul', 'head', 'skeleton', 'ecto', 'tomb'], w: [1, 2, 2, 1, 2, 1, 0.8, 0.2] },
-      { p: 0.5, min: 85, rate: 4.3, types: ['ghost2', 'skeleton', 'skelarmor', 'ghoul', 'head', 'zombie', 'ecto', 'tomb', 'headless'], w: [3, 2, 1, 2, 1, 1, 0.8, 0.2, 0.7] },
-      { p: 0.66, min: 102, rate: 5.1, types: ['ghost2', 'skelarmor', 'ghoul', 'ghost3', 'zombie', 'head', 'ecto', 'tomb', 'headless'], w: [2, 2, 2, 1, 2, 1, 0.9, 0.22, 0.9] },
-      { p: 0.82, min: 120, rate: 6, types: ['ghost2', 'ghost3', 'skelarmor', 'ghoul', 'zombie', 'ecto', 'tomb', 'headless'], w: [2, 2, 2, 2, 1, 1, 0.25, 1] },
+      { p: 0, min: 52, rate: 2.6, types: ['skelguard', 'ghost', 'skeleton'], w: [2, 2, 1] },   // 第 13 块 P10：开场不再是白布幽魂 + 僵尸
+      { p: 0.1, min: 58, rate: 2.9, types: ['ghost', 'zombie', 'skeleton'], w: [3, 2, 1] },
+      { p: 0.22, min: 64, rate: 3.2, types: ['ghost', 'zombie', 'skeleton', 'gargoyle', 'ecto', 'tomb'], w: [2, 2, 2, 1, 0.7, 0.18] },
+      { p: 0.36, min: 70, rate: 3.6, types: ['ghost', 'zombie', 'skeleton', 'ghoul', 'gargoyle', 'ecto', 'tomb'], w: [2, 2, 2, 1, 1, 0.8, 0.2] },
+      { p: 0.5, min: 85, rate: 4.3, types: ['skeleton', 'skelguard', 'ghoul', 'gargoyle', 'zombie', 'ecto', 'tomb', 'headless'], w: [2, 1, 2, 2, 1, 0.8, 0.2, 0.7] },
+      { p: 0.66, min: 102, rate: 5.1, types: ['skelguard', 'ghoul', 'gargoyle', 'zombie', 'ecto', 'tomb', 'headless'], w: [2, 2, 2, 2, 0.9, 0.22, 0.9] },
+      { p: 0.82, min: 120, rate: 6, types: ['skelguard', 'gargoyle', 'ghoul', 'zombie', 'ecto', 'tomb', 'headless'], w: [2, 3, 2, 1, 1, 0.25, 1] },
       { p: 1, min: 145, rate: 7 }
     ] }
 ];

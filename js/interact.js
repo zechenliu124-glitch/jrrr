@@ -1,7 +1,6 @@
 'use strict';
 // ============================================================
-//  可互动物体：宝箱、充能神龛（含金色）、贪婪神龛、吸取神龛、Boss 诅咒神龛、
-//  挑战神龛、摩艾像、微波炉、可疑商人、陶罐、Boss 传送门
+//  可互动物体：宝箱、陶罐、烽火台（召唤首领）、下一关传送门；新的互动点在 interact_guild.js 和 interact_more.js
 // ============================================================
 var Interact = { list: [], near: null, chestsOpened: 0 };
 // 其他文件注册的新互动物体：Interact.KINDS[kind] = { model, label, canUse, use, update, ... }（见文件末尾说明）
@@ -43,7 +42,7 @@ Interact.models = function () {
   var m = {};
   // 用敌人的建模工具（贴图坐标正确、能发光）
   var B = function (parts) { return Enemies.buildGeo(parts, true); };
-  var bx = ENEMY_KIT.bx, cy = ENEMY_KIT.cy, sp = ENEMY_KIT.sp, cn = ENEMY_KIT.cn, ic = ENEMY_KIT.ic, oc = ENEMY_KIT.oc, lit = ENEMY_KIT.lit, sym = ENEMY_KIT.sym, sgB = ENEMY_KIT.sgB, sgC = ENEMY_KIT.sgC;
+  var bx = ENEMY_KIT.bx, cy = ENEMY_KIT.cy, sp = ENEMY_KIT.sp, lit = ENEMY_KIT.lit, sym = ENEMY_KIT.sym;
   var Q = Math.PI / 2;
   // 宝箱：木板箱身、圆拱箱盖、金色包边和锁（微微发光）
   var chest = function (body, trim, k) {
@@ -62,143 +61,153 @@ Interact.models = function () {
   };
   m.chest = chest(0x8a5a2e, 0xf2c14e, 1.25);
   m.chestFree = chest(0xc8922a, 0xfff0a0, 1.6);
-  // 充能神龛：阶梯石台、刻符文的石柱、四根爪托着一颗发光的水晶
-  var shrine = function (stone, trim, crystal, k) {
-    return B([
-      cy(1.25, 1.35, 0.28, [0, 0.14, 0], stone, 'brick', 10),
-      cy(0.95, 1.05, 0.26, [0, 0.41, 0], stone, 'brick', 10),
-      bx([0.62, 1.7, 0.62], [0, 1.39, 0], stone, 'it_rune'),
-      bx([0.84, 0.16, 0.84], [0, 2.3, 0], trim, 'metal'),
-      bx([0.7, 0.1, 0.7], [0, 0.6, 0], trim, 'metal')
-    ].concat([[1, 1], [1, -1], [-1, 1], [-1, -1]].map(function (c) { return cn(0.06, 0.5, [c[0] * 0.3, 2.6, c[1] * 0.3], trim, 'metal', 4, [c[1] * 0.35, 0, -c[0] * 0.35]); }))
-      .concat(lit(k, [oc(0.42, [0, 3.1, 0], crystal, 'plain', [1, 1.5, 1]), oc(0.1, [0.62, 2.7, 0.1], crystal, 'plain'), oc(0.08, [-0.55, 3.4, -0.2], crystal, 'plain')])));
-  };
-  m.shrine = shrine(0x8a8c96, 0x5a5c66, 0x5ae8ff, 2.2);
-  m.goldshrine = shrine(0xb8963a, 0xffd84a, 0xffe14a, 2.3);
-  // 贪婪神龛：石座上一堆金币，顶上立着一枚大金币
-  var coins = [];
-  for (var i = 0; i < 7; i++) { var a = i * 2.4; coins.push(cy(0.2, 0.2, 0.06, [Math.sin(a) * 0.35 * (i % 3) / 2, 2.02 + (i % 3) * 0.06, Math.cos(a) * 0.3 * (i % 3) / 2], 0xffd23a, 'gold', 10, [0.2 * (i % 2), 0, 0.15 * (i % 3)])); }
-  m.greed = B([
-    bx([1.6, 0.4, 1.6], [0, 0.2, 0], 0x4a4038, 'brick'),
-    cy(0.5, 0.65, 1.4, [0, 1.1, 0], 0x5a5048, 'it_rune', 8),
-    cy(0.75, 0.6, 0.18, [0, 1.88, 0], 0x4a4038, 'brick', 8)
-  ].concat(lit(1.35, coins)).concat(lit(1.5, [
-    cy(0.6, 0.6, 0.14, [0, 2.78, 0], 0xffd23a, 'gold', 14, [Q, 0, 0]),
-    cy(0.42, 0.42, 0.16, [0, 2.78, 0], 0xe8a020, 'gold', 14, [Q, 0, 0]),
-    bx([0.1, 0.42, 0.18], [0, 2.78, 0], 0xffe880, 'gold')
-  ])));
-  // 吸取神龛：紫色漏斗（中间是黑洞一样的漩涡），上面飘着蓝色光球
-  m.succ = B([
-    cy(1.0, 1.15, 0.4, [0, 0.2, 0], 0x4a3a5a, 'brick', 8),
-    cy(0.25, 0.35, 1.4, [0, 1.1, 0], 0x5a4a6a, 'it_rune', 6),
-    cn(1.0, 1.3, [0, 2.2, 0], 0x6a4a9a, 'en_stripe', 10, [Math.PI, 0, 0]),
-    cy(0.94, 0.94, 0.03, [0, 2.86, 0], 0x14081e, 'plain', 10)
-  ].concat(lit(2.3, [ic(0.32, [0, 3.35, 0], 0x3fa9ff, 'plain', null, null, 1)]))
-    .concat(lit(1.8, [0, 1, 2].map(function (j) { var t = j / 3 * TAU; return oc(0.09, [Math.sin(t) * 0.6, 3.25, Math.cos(t) * 0.6], 0x9fdcff, 'plain'); }))));
-  // Boss 诅咒神龛：黑曜石尖塔、弯角、骷髅、顶上一颗红光球
-  m.curse = B([
-    bx([1.8, 0.35, 1.8], [0, 0.17, 0], 0x2a1a24, 'brick'),
-    bx([1.3, 0.3, 1.3], [0, 0.5, 0], 0x341e2c, 'brick'),
-    cn(0.55, 2.7, [0, 2.0, 0], 0x2a1420, 'en_rock', 4),
-    sp(0.24, [0, 1.75, 0.28], 0xd8ccb0, 'en_bone', [1, 1, 1.05], [7, 5]),
-    bx([0.34, 0.27, 0.05], [0, 1.71, 0.5], 0xd8ccb0, 'en_skull')
-  ].concat(sym([cn(0.12, 0.7, [0.42, 2.45, 0], 0x1a0a12, 'bone', 4, [0, 0, -0.8])]))
-    .concat(lit(2.5, sym([bx([0.08, 0.06, 0.02], [0.08, 1.735, 0.53], 0xff2a2a, 'plain')])))
-    .concat(lit(2.4, [oc(0.3, [0, 3.55, 0], 0xff2a2a, 'plain', [1, 1.3, 1])])));
-  // 挑战神龛：石台上两把交叉的剑，顶上紫色火焰水晶
-  m.challenge = B([
-    bx([2.2, 0.45, 2.2], [0, 0.22, 0], 0x40343a, 'brick'),
-    bx([0.9, 1.3, 0.9], [0, 1.1, 0], 0x4a3a42, 'it_rune'),
-    bx([1.1, 0.15, 1.1], [0, 1.82, 0], 0x5a2d35, 'brick')
-  ].concat(sym([
-    sgB([0.75, 1.75, 0.0], [-0.55, 3.25, 0.0], 0.12, 0xd0d6de, 'metal', 0.04),
-    sgB([0.95, 1.55, 0.0], [0.75, 1.78, 0.0], 0.06, 0x3a2418, 'wood'),
-    bx([0.36, 0.08, 0.1], [0.72, 1.8, 0], 0xd9a520, 'gold', [0, 0, 0.85])
-  ])).concat(lit(2.2, [oc(0.34, [0, 3.45, 0], 0xb05aff, 'plain', [1, 1.6, 1])])));
-  // 摩艾像：长脸、高鼻梁、深眼窝、厚嘴唇
-  m.moai = B([
-    bx([1.5, 2.4, 1.2], [0, 1.2, 0], 0x7d7f86, 'en_rock'),
-    bx([1.62, 0.55, 1.3], [0, 2.62, -0.04], 0x6c6e75, 'en_rock'),
-    bx([1.62, 0.22, 0.4], [0, 2.3, 0.5], 0x6c6e75, 'en_rock'),
-    bx([0.42, 1.05, 0.42], [0, 1.6, 0.72], 0x74767d, 'en_rock'),
-    bx([0.9, 0.18, 0.2], [0, 0.78, 0.66], 0x55575d, 'en_rock'),
-    bx([1.1, 0.3, 0.3], [0, 0.42, 0.55], 0x6c6e75, 'en_rock')
-  ].concat(sym([bx([0.42, 0.3, 0.06], [0.4, 2.02, 0.6], 0x24252a, 'plain'), bx([0.22, 1.0, 0.3], [0.82, 1.6, 0.0], 0x6c6e75, 'en_rock')])));
-  // 微波炉：放在小木桌上，深色玻璃门、旋钮、绿色小屏幕
-  m.microwave = B([
-    bx([1.6, 0.1, 1.1], [0, 0.6, 0], 0x7a5030, 'it_plank'),
-    bx([1.4, 0.8, 0.95], [0, 1.05, 0], 0xe4e4e0, 'metal'),
-    bx([0.86, 0.56, 0.04], [-0.18, 1.05, 0.49], 0x1a2a30, 'plain'),
-    bx([0.32, 0.66, 0.04], [0.5, 1.05, 0.49], 0xb8b8b4, 'metal'),
-    cy(0.08, 0.08, 0.05, [0.5, 1.24, 0.52], 0x3a3a3a, 'metal', 8, [Q, 0, 0]),
-    bx([0.05, 0.42, 0.06], [0.27, 1.05, 0.52], 0x9a9a9a, 'metal')
-  ].concat([[1, 1], [1, -1], [-1, 1], [-1, -1]].map(function (c) { return bx([0.1, 0.56, 0.1], [c[0] * 0.7, 0.28, c[1] * 0.45], 0x6a4026, 'wood'); }))
-    .concat([0, 1, 2, 3].map(function (j) { return bx([0.07, 0.05, 0.03], [0.45 + (j % 2) * 0.1, 0.84 + (j >> 1) * 0.08, 0.52], 0x5a5a5a, 'plain'); }))
-    .concat(lit(1.8, [bx([0.6, 0.05, 0.02], [-0.24, 1.17, 0.515], 0x9fd8ff, 'plain', [0, 0, 0.45]), bx([0.18, 0.07, 0.02], [0.5, 1.02, 0.515], 0x5aff8a, 'plain')])));
-  // 可疑商人：深紫色兜帽长袍、看不清的脸上一对发光的眼睛、宽檐帽（帽带颜色 = 稀有度），地毯上摆着药水
-  // 每种帽带颜色只建一次
-  var merchants = m.merchants = {};
-  m.merchant = function (hat) {
-    if (!merchants[hat]) merchants[hat] = buildMerchant(hat);
-    return merchants[hat];
-  };
-  var buildMerchant = function (hat) {
-    return B([
-      bx([2.2, 0.04, 1.4], [0.6, 0.02, 0.4], 0x8a2a3a, 'cloth'),
-      cn(0.75, 1.9, [0, 0.95, 0], 0x3b2a52, 'cloth', 8),
-      sp(0.38, [0, 2.0, -0.08], 0x2e2042, 'cloth', [1, 1.05, 1.1], [8, 6]),
-      cn(0.22, 0.5, [0, 2.38, -0.22], 0x2e2042, 'cloth', 6, [-0.5, 0, 0]),
-      sp(0.25, [0, 1.95, 0.2], 0x0a0810, 'plain', [1, 1.1, 0.62], [7, 5]),
-      cy(0.75, 0.75, 0.05, [0, 2.36, 0], 0x2a2030, 'cloth', 12),
-      cy(0.33, 0.38, 0.45, [0, 2.6, 0], 0x2a2030, 'cloth', 10),
-      sgC([0.3, 1.6, 0.05], [0.42, 1.15, 0.35], 0.14, 0.11, 0x3b2a52, 'cloth', 6),
-      sgC([-0.3, 1.6, 0.05], [-0.42, 1.15, 0.35], 0.14, 0.11, 0x3b2a52, 'cloth', 6),
-      ic(0.1, [0.43, 1.08, 0.4], 0xc8a080, 'skin'), ic(0.1, [-0.43, 1.08, 0.4], 0xc8a080, 'skin'),
-      bx([0.45, 0.35, 0.3], [1.3, 0.2, 0.75], 0x7a5530, 'it_plank'),
-      sp(0.3, [-0.55, 0.32, -0.35], 0x8a6a40, 'cloth', [1, 1.1, 1], [7, 5])
-    ].concat(lit(1.4, [cy(0.39, 0.39, 0.1, [0, 2.44, 0], hat, 'cloth', 10)]))
-      .concat(lit(2.6, sym([bx([0.08, 0.045, 0.02], [0.085, 1.99, 0.36], 0xffd23a, 'plain')])))
-      .concat(lit(1.35, [
-        sp(0.14, [0.75, 0.18, 0.45], 0xff4f6d, 'plain', null, [7, 5]), cy(0.05, 0.05, 0.12, [0.75, 0.36, 0.45], 0xe0e0e0, 'plain', 5),
-        sp(0.13, [1.05, 0.17, 0.2], 0x5bd1ff, 'plain', null, [7, 5]), cy(0.05, 0.05, 0.12, [1.05, 0.34, 0.2], 0xe0e0e0, 'plain', 5),
-        sp(0.12, [0.45, 0.16, 0.8], 0x7dff4a, 'plain', null, [7, 5]), cy(0.045, 0.045, 0.1, [0.45, 0.32, 0.8], 0xe0e0e0, 'plain', 5)
-      ])));
-  };
   // 陶罐：压暗、降低饱和度的陶土色（新画风的地面是深橄榄绿，原来的亮橙色太扎眼）
   m.pot = B([sp(0.4, [0, 0.42, 0], 0x946446, 'it_clay', [1, 1.05, 1], [9, 7]), cy(0.2, 0.26, 0.2, [0, 0.86, 0], 0x84583e, 'it_clay', 9), cy(0.26, 0.22, 0.06, [0, 0.97, 0], 0x6c4632, 'it_clay', 9)]);
   m.bigpot = B([
     sp(0.65, [0, 0.72, 0], 0x8c5c42, 'it_clay', [1, 1.1, 1], [10, 8]), cy(0.32, 0.42, 0.3, [0, 1.48, 0], 0x7c5038, 'it_clay', 10), cy(0.42, 0.36, 0.08, [0, 1.65, 0], 0x64402c, 'it_clay', 10)
   ].concat(sym([['torus', [0.16, 0.04, 4, 8], [0.55, 1.1, 0], 0x6c4632, [0, Q, 0], null, 'it_clay']])));
-  // Boss 传送门：暗色石拱门、发光的红色符文、骷髅拱顶石、两只弯角
-  var portal = function (stone, rune, skull) {
-    var parts = [
-      cy(3.2, 3.5, 0.5, [0, 0.25, 0], stone, 'brick', 12),
-      bx([6.4, 0.8, 1.0], [0, 6.0, 0], stone, 'brick')
-    ].concat(sym([
-      bx([0.9, 5.4, 0.9], [2.6, 2.95, 0], stone, 'brick'),
-      bx([1.15, 0.3, 1.15], [2.6, 0.65, 0], stone, 'brick'),
-      cn(0.25, 1.2, [3.15, 6.75, 0], 0x1a1418, 'bone', 5, [0, 0, -0.55])
-    ])).concat(lit(2.3, sym([
-      bx([0.1, 1.2, 0.05], [2.6, 4.4, 0.46], rune, 'plain'), bx([0.36, 0.1, 0.05], [2.6, 4.75, 0.46], rune, 'plain'),
-      bx([0.1, 1.2, 0.05], [2.6, 2.6, 0.46], rune, 'plain'), bx([0.36, 0.1, 0.05], [2.6, 2.25, 0.46], rune, 'plain'),
-      bx([0.6, 0.08, 0.05], [1.2, 6.0, 0.51], rune, 'plain')
-    ])));
-    if (skull) {
-      parts = parts.concat([sp(0.55, [0, 6.15, 0.45], 0xd8ccb0, 'en_bone', [1, 1, 1.05], [8, 6]), bx([0.8, 0.62, 0.08], [0, 6.05, 0.95], 0xd8ccb0, 'en_skull')])
-        .concat(lit(2.6, sym([bx([0.16, 0.12, 0.02], [0.19, 6.1, 1.0], rune, 'plain')])));
-    } else {
-      parts = parts.concat(lit(2.3, [oc(0.55, [0, 6.6, 0], rune, 'plain', [1, 1.4, 1])]));
-    }
-    return B(parts);
-  };
-  m.bossportal = portal(0x2c2933, 0xff2a3a, true);
-  m.exitportal = portal(0x3a3050, 0xc070ff, false);
-  m.swirl = new THREE.CircleGeometry(2.3, 24);
+  // 烽火台和出口传送门（模型在下面的 beaconParts / gateParts）
+  m.bossportal = Interact.beaconModel();
+  m.exitportal = Interact.gateModel();
+  m.swirl = new THREE.CircleGeometry(2.1, 24);   // 漩涡在两根柱子之间（柱子内侧 ±2.15）
   m.swirlTex = Interact.swirlTexture();
   // 宝箱下面的柔光（所有宝箱共用一个实例网格）
   Interact.initGlow();
   Interact.MODELS = m;
   return m;
+};
+
+// 四棱尖顶（正方形底，边和坐标轴对齐）：s = [半边宽, 高]；誓言石碑的尖顶、盾徽和小旗的尖角也用它
+MODEL.extraGeo.c10Pyr = function (s) {
+  var g = new THREE.ConeGeometry(s[0] * Math.SQRT2, s[1], 4, 1, false, Math.PI / 4), uv = g.attributes.uv;
+  for (var i = 0; i < uv.count; i++) uv.setXY(i, clamp(uv.getX(i), 0, 0.999), clamp(uv.getY(i), 0, 0.999));
+  return g;
+};
+
+// 烽火台：毛石砌的圆形瞭望台（底座、往上收的塔身、两道石箍、前后两扇箭窗、塔顶一圈 8 个垛口），一架木梯斜靠在一边，
+// 塔顶的铁篮火盆（8 根铁肋、厚边、里面暗红的余烬）里交叉堆着两捆柴。石头顶在 3.5 米，火盆和柴不超过 4.1 米
+// （光柱从 y + 4.05 起，点燃后的火在 3.9）
+Interact.beaconParts = function () {
+  var bx = ENEMY_KIT.bx, cy = ENEMY_KIT.cy, sgB = ENEMY_KIT.sgB, lit = ENEMY_KIT.lit, Q = Math.PI / 2;
+  var st = 0x8e8678, st2 = 0x7d776c, dk = 0x6e695f, iron = 0x2e2c2a, wood = 0x6b4a2c;
+  // 塔身在高度 y 处的半径
+  var rAt = function (y) { return 1.72 - (y - 0.425) / 2.85 * 0.3; };
+  var parts = [
+    cy(1.95, 2.1, 0.45, [0, 0.225, 0], st2, 'brick', 12),
+    cy(1.42, 1.72, 2.85, [0, 1.85, 0], st, 'brick', 12),
+    cy(1.73, 1.73, 0.14, [0, 1.2, 0], dk, 'brick', 12),
+    cy(1.58, 1.58, 0.14, [0, 2.45, 0], dk, 'brick', 12),
+    cy(1.62, 1.48, 0.3, [0, 3.35, 0], st2, 'brick', 12)
+  ];
+  // 箭窗：黑色窄缝 + 上下两块压顶石（前后各一扇）
+  [1, -1].forEach(function (s) {
+    var r = rAt(1.85);
+    parts.push(bx([0.22, 0.62, 0.08], [0, 1.85, s * (r + 0.005)], 0x1a1612, 'plain'), bx([0.42, 0.1, 0.14], [0, 2.21, s * r], dk, 'brick'), bx([0.42, 0.1, 0.14], [0, 1.49, s * r], dk, 'brick'));
+  });
+  // 塔顶的垛口
+  for (var k = 0; k < 8; k++) {
+    var a = (k + 0.5) * Math.PI / 4;
+    parts.push(bx([0.46, 0.28, 0.34], [Math.sin(a) * 1.45, 3.64, Math.cos(a) * 1.45], k % 2 ? st : 0x948c7e, 'brick', [0, a, 0]));
+  }
+  // 凸出来的几块毛石（深浅两种）
+  [[0.4, 0.8], [1.3, 1.65], [2.6, 2.95], [3.9, 1.0], [4.7, 2.8], [5.5, 1.7]].forEach(function (q, i) {
+    var r = rAt(q[1]) + 0.02;
+    parts.push(bx([0.38, 0.22, 0.1], [Math.sin(q[0]) * r, q[1], Math.cos(q[0]) * r], i % 2 ? 0x9a9284 : 0x746e64, 'rock', [0, q[0], 0]));
+  });
+  // 木梯：斜靠 12°，两根梯帮、五根横档
+  var phi = -0.9, d = [Math.sin(phi), 0, Math.cos(phi)], t = [Math.cos(phi), 0, -Math.sin(phi)];
+  var p0 = [d[0] * 2.32, 0, d[2] * 2.32], p1 = [d[0] * 1.62, 3.42, d[2] * 1.62];
+  [-0.24, 0.24].forEach(function (o) {
+    parts.push(sgB([p0[0] + t[0] * o, p0[1], p0[2] + t[2] * o], [p1[0] + t[0] * o, p1[1], p1[2] + t[2] * o], 0.07, wood, 'wood', 0.07));
+  });
+  for (k = 1; k <= 5; k++) {
+    var f = k / 6;
+    parts.push(bx([0.48, 0.05, 0.06], [p0[0] + (p1[0] - p0[0]) * f, p1[1] * f, p0[2] + (p1[2] - p0[2]) * f], 0x7a5a36, 'wood', [0, phi, 0]));
+  }
+  // 铁篮火盆：碗、6 根往外张的铁肋、厚边、暗红的余烬（微微发亮）
+  parts.push(cy(1.05, 0.7, 0.45, [0, 3.72, 0], iron, 'metal', 10), cy(1.1, 1.1, 0.08, [0, 3.98, 0], 0x3a3a3e, 'metal', 10));
+  for (k = 0; k < 6; k++) {
+    var b = k * Math.PI / 3 + 0.2, c = Math.cos(b), s = Math.sin(b);
+    parts.push(sgB([c * 0.74, 3.5, s * 0.74], [c * 1.14, 3.98, s * 1.14], 0.07, 0x4a4642, 'metal', 0.07));
+  }
+  parts = parts.concat(lit(1.5, [cy(0.98, 0.98, 0.02, [0, 3.955, 0], 0xb8481e, 'plain', 10)]));
+  // 两捆柴，每捆三根并排（中间那根高一点），两捆斜着交叉叠在一起
+  [-1, 1].forEach(function (s) {
+    var a = s * 0.4, px = Math.sin(a), pz = Math.cos(a);
+    [-0.19, 0, 0.19].forEach(function (dd, j) {
+      parts.push(cy(0.08, 0.08, 1.5, [dd * px, 3.9 + (s > 0 ? 0.07 : 0) + (j === 1 ? 0.03 : 0), dd * pz], j === 1 ? 0x5e4026 : wood, 'bark', 5, [0, a, Q]));
+    });
+  });
+  return parts;
+};
+Interact.beaconModel = function () { return Enemies.buildGeo(Interact.beaconParts(), true); };
+
+// 下一关传送门：两根石柱（两级柱础、三道深色石箍、柱头）、一道门楣（压顶线脚 + 中间一块拱心石），
+// 拱心石两面挂着行会的盾徽：蓝色鸢形盾、金边、一把真的长剑（剑尖朝上，金护手、握把、圆剑首）——不是十字；
+// 门楣下面挂两面蓝色小旗。中间的漩涡半径 2.1（在两根柱子之间）
+Interact.gateParts = function () {
+  var bx = ENEMY_KIT.bx, lit = ENEMY_KIT.lit, sym = ENEMY_KIT.sym, sgB = ENEMY_KIT.sgB;
+  var gold = 0xe8b83a, blue = 0x2b4fb8, st = 0x9aa0aa, dk = 0x8a909a;
+  var parts = [
+    bx([6.6, 0.85, 1.05], [0, 6.1, 0], st, 'brick'),
+    bx([6.8, 0.12, 1.15], [0, 6.585, 0], dk, 'brick'),
+    bx([0.95, 1.0, 1.2], [0, 6.05, 0], 0xa8aeb8, 'brick')
+  ].concat(sym([
+    bx([1.15, 0.36, 1.15], [2.6, 0.18, 0], dk, 'brick'),
+    bx([0.9, 5.15, 0.9], [2.6, 2.9, 0], st, 'brick'),
+    bx([0.94, 0.16, 0.94], [2.6, 0.62, 0], dk, 'brick'), bx([0.94, 0.16, 0.94], [2.6, 2.3, 0], dk, 'brick'), bx([0.94, 0.16, 0.94], [2.6, 4.0, 0], dk, 'brick'),
+    bx([1.1, 0.25, 1.1], [2.6, 5.6, 0], dk, 'brick'),
+    // 柱础上的一块苔藓
+    ['oct', [0.26], [2.98, 0.36, 0.45], 0x4f7a34, null, [1.3, 0.3, 1], 'env_moss'],
+    // 挂小旗的铁杆和小旗（蓝底、金边、下面一个尖）
+    bx([0.4, 0.62, 0.03], [1.6, 5.32, 0], blue, 'cloth'),
+    ['c10Pyr', [0.2, 0.26], [1.6, 4.88, 0], blue, [Math.PI, 0, 0], [1, 1, 0.075], 'cloth']
+  ])).concat(lit(1.3, sym([
+    bx([0.44, 0.05, 0.04], [1.6, 5.6, 0], gold, 'gold'),
+    bx([0.03, 0.62, 0.04], [1.79, 5.32, 0], gold, 'gold'), bx([0.03, 0.62, 0.04], [1.41, 5.32, 0], gold, 'gold')
+  ])));
+  // 两面的盾徽
+  [1, -1].forEach(function (s) {
+    var z = s * 0.64, zr = s * 0.665, zs = s * 0.68, R = s > 0 ? null : [0, Math.PI, 0];
+    parts.push(bx([0.8, 0.62, 0.06], [0, 6.17, z], blue, 'cloth'),
+      ['c10Pyr', [0.4, 0.34], [0, 5.69, z], blue, [Math.PI, 0, 0], [1, 1, 0.075], 'cloth'],
+      bx([0.07, 0.46, 0.03], [0, 6.16, zs], 0xe8ecf2, 'metal'),
+      ['c10Pyr', [0.035, 0.1], [0, 6.44, zs], 0xe8ecf2, R, [1, 1, 0.43], 'metal'],
+      bx([0.045, 0.13, 0.035], [0, 5.83, zs], 0x6a3a1e, 'cloth'));
+    parts = parts.concat(lit(1.3, [
+      bx([0.9, 0.06, 0.05], [0, 6.49, zr], gold, 'gold'),
+      bx([0.06, 0.66, 0.05], [0.43, 6.16, zr], gold, 'gold'), bx([0.06, 0.66, 0.05], [-0.43, 6.16, zr], gold, 'gold'),
+      sgB([0.43, 5.84, zr], [0, 5.47, zr], 0.06, gold, 'gold', 0.05), sgB([-0.43, 5.84, zr], [0, 5.47, zr], 0.06, gold, 'gold', 0.05),
+      bx([0.3, 0.05, 0.045], [0, 5.91, zs], gold, 'gold'),
+      ['oct', [0.055], [0, 5.74, zs], gold, null, null, 'gold']
+    ]));
+  });
+  return parts;
+};
+Interact.gateModel = function () { return Enemies.buildGeo(Interact.gateParts(), true); };
+
+// 烽火台光柱的颜色：关卡数据里有 beacon（'#rrggbb' 或 0xrrggbb）就用它，没有就按关卡：森林青绿、沙漠橙、墓地紫
+Interact.BEACON_COLORS = ['#7affc0', '#ffb84a', '#b48cff'];
+Interact.beaconCss = function () {
+  var i = (Game.stage || 1) - 1, sd = typeof STAGES !== 'undefined' && STAGES[i], b = sd && sd.beacon;
+  if (typeof b === 'number') return '#' + ('000000' + (b >>> 0).toString(16)).slice(-6);
+  if (typeof b === 'string' && /^#[0-9a-f]{6}$/i.test(b)) return b.toLowerCase();
+  return Interact.BEACON_COLORS[i] || '#ffd84a';
+};
+Interact.beaconHex = function () { return parseInt(Interact.beaconCss().slice(1), 16); };
+// 烽火台的光柱：开口圆柱，颜色全白（材质染成关卡颜色），透明度底下 1、往上渐隐（顶点颜色带 alpha）
+// 用普通混合（不是加法）：加法在天空上会冲成青色 / 白色，看不出关卡颜色
+Interact.beaconGeo = function () {
+  if (Interact._beaconGeo) return Interact._beaconGeo;
+  var g = new THREE.CylinderGeometry(1, 1, 1, 12, 6, true).translate(0, 0.5, 0);
+  var p = g.attributes.position, col = [];
+  for (var i = 0; i < p.count; i++) col.push(1, 1, 1, Math.pow(1 - p.getY(i), 1.3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 4));
+  Interact._beaconGeo = g;
+  return g;
+};
+Interact.beaconMat = function () {
+  return new THREE.MeshBasicMaterial({ vertexColors: true, color: Interact.beaconHex(), transparent: true, opacity: 0.7, depthWrite: false, fog: false, side: THREE.DoubleSide });
 };
 
 // 传送门中间旋转的漩涡（白色螺旋，材质再染色）
@@ -307,10 +316,11 @@ Interact.sharedRes = function () {
   var add = function (v) { if (v && (v.isBufferGeometry || v.isMaterial)) s.add(v); };
   var all = function (o) { if (o) for (var k in o) add(o[k]); };
   Game.scene.traverse(function (m) { add(m.geometry); if (m.material) [].concat(m.material).forEach(add); });
-  all(Interact.MODELS); all(Interact.MODELS && Interact.MODELS.merchants);
+  all(Interact.MODELS);
   all(MODEL.cache); add(MODEL.mat); add(MODEL.flatMat); all(FX.geos);
   if (typeof ZONE_MODELS !== 'undefined') all(ZONE_MODELS);
   if (typeof MX !== 'undefined') { all(MX.geoCache); all(MX.mats); add(MX._beam); }
+  add(Interact._beaconGeo);
   if (typeof Evo !== 'undefined') { add(Evo._beamGeo); add(Evo._ringGeo); add(Evo.pillarGeo); add(Evo._axeGeo); all(Evo._goldGeos); }
   return s;
 };
@@ -320,8 +330,6 @@ Interact.add = function (kind, x, z, y, extra) {
   var m = Interact.models();
   var geo;
   if (kind === 'chest') geo = extra && extra.free ? m.chestFree : m.chest;
-  else if (kind === 'shrine') geo = extra && extra.golden ? m.goldshrine : m.shrine;
-  else if (kind === 'merchant') geo = m.merchant([0x222222, 0x3a6aff, 0xb05aff, 0xff3a3a, 0xffd23a][extra.rarity]);
   else if (kind === 'pot') geo = extra && extra.big ? m.bigpot : m.pot;
   else geo = m[kind];
   var mesh = new THREE.Mesh(geo, MODEL.material());
@@ -329,26 +337,36 @@ Interact.add = function (kind, x, z, y, extra) {
   mesh.position.set(x, y, z);
   mesh.rotation.y = Math.random() * TAU;
   Game.scene.add(mesh);
+  mesh.updateMatrixWorld(true);          // 第一帧画出来之前矩阵就是对的（弩车 / 军旗 / 急件算占地、测试量模型都读它）
   var o = { kind: kind, x: x, y: y, z: z, mesh: mesh, used: false, r: 2.4, charge: 0 };
   if (extra) for (var k in extra) o[k] = extra[k];
-  if (kind === 'shrine') {
-    // 充能圈：和光环、冲击环一样的像素锯齿发光圈（FX 的 pring；没有就退回普通圆环）
-    var pix = !!FX.getGeo('pring');
-    o.ring = new THREE.Mesh(FX.getGeo(pix ? 'pring' : 'ring'), new THREE.MeshBasicMaterial({ color: o.golden ? 0xffe14a : 0x7ef0ff, transparent: true, opacity: pix ? 0.95 : 0.75, side: THREE.DoubleSide, depthWrite: false, blending: pix ? THREE.AdditiveBlending : THREE.NormalBlending, fog: !pix }));
-    o.ring.renderOrder = 3;
-    o.ring.position.set(x, y + 0.2, z);
-    // 圈是平的：按神龛周围 3 米的地面坡度倾斜，坡地上不会埋进土里一半
-    var e = 3, hx = W.terrainH(x + e, z) - W.terrainH(x - e, z), hz = W.terrainH(x, z + e) - W.terrainH(x, z - e);
-    o.ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(-hx / (2 * e), 1, -hz / (2 * e)).normalize());
-    Game.scene.add(o.ring);
-  }
   if (kind === 'pot') o.r = o.big ? 1.5 : 1.0;
-  if (kind === 'bossportal' || kind === 'exitportal') {
+  if (kind === 'exitportal') {
     o.r = 4;
-    o.swirl = new THREE.Mesh(m.swirl, new THREE.MeshBasicMaterial({ map: m.swirlTex, color: kind === 'exitportal' ? 0xb07aff : 0xff3a4a, transparent: true, opacity: 0.88, side: THREE.DoubleSide, depthWrite: false }));
+    // 门里旋转的蓝白漩涡
+    o.swirl = new THREE.Mesh(m.swirl, new THREE.MeshBasicMaterial({ map: m.swirlTex, color: 0x9fd8ff, transparent: true, opacity: 0.88, side: THREE.DoubleSide, depthWrite: false }));
     o.swirl.position.set(x, y + 2.8, z);
     o.swirl.rotation.y = mesh.rotation.y;
     Game.scene.add(o.swirl);
+  }
+  if (kind === 'bossportal') {
+    o.r = 4;
+    o.parts = [];
+    // 没点燃前：塔顶冲天的光柱（关卡颜色，不进雾，整张地图都看得见；1 秒一明一暗，和屏幕边的圆环一个节奏）
+    o.pillar = new THREE.Mesh(Interact.beaconGeo(), Interact.beaconMat());
+    o.pillar.position.set(x, y + 4.05, z);
+    o.pillar.scale.set(1.05, 70, 1.05);
+    o.pillar.frustumCulled = false;
+    o.pillar.renderOrder = 2;
+    Game.scene.add(o.pillar);
+    o.parts.push(o.pillar);
+    // 点燃后的火（篝火的火苗放大 2.2 倍），先藏着
+    o.flame = MX.mesh(MX.geo('flame', MX.flameParts), 'glow');
+    o.flame.scale.setScalar(2.2);
+    o.flame.position.set(x, y + 3.9, z);
+    o.flame.visible = false;
+    Game.scene.add(o.flame);
+    o.parts.push(o.flame);
   }
   Interact.list.push(o);
   return o;
@@ -363,17 +381,9 @@ Interact.populate = function () {
   // 数量随关卡时长缩放（10 分钟为基准）：常见物品按比例，稀有物品按平方根，不会太挤
   var k = typeof Pace !== 'undefined' ? Pace.contentScale() : 1, sq = Math.sqrt(k);
   place('chest', Math.round(14 * k), 20);
-  place('shrine', Math.round(15 * sq), 22, function (i) { return { golden: i === 0 && Math.random() < 0.35 }; });
-  place('greed', Math.round(8 * k), 25);
-  place('succ', 1, 40);
-  place('curse', 1, 40);
-  place('challenge', Math.round(2 * sq), 40);
-  place('moai', Math.round(3 * sq), 30);
-  place('microwave', Math.round(2 * sq), 30, function () { return { rarity: pick([0, 0, 2, 2, 3, 4]), uses: 3 }; });
-  place('merchant', Math.round(2 * sq), 30, function () { return { rarity: pick([0, 0, 2, 2, 3, 4]) }; });
   place('pot', Math.round(60 * k), 10, function () { return { big: Math.random() < 0.2 }; });
   Interact.populateCustom(place);
-  var a = W.randomSpot(55, W.S - 30);
+  var a = W.bellTower ? W.randomSpot(9, 14, W.bellTower.x, W.bellTower.z) : W.randomSpot(55, W.S - 30);   // 沉钟古城：烽火台在倒了一半的钟楼旁边（百年沉钟从这里出来）
   Interact.portal = Interact.add('bossportal', a.x, a.z, a.y, { found: false });
 };
 
@@ -381,31 +391,18 @@ Interact.spawnChest = function (x, z, free) {
   Interact.add('chest', x, z, W.groundAt(x, z, P.pos.y + 2), { free: !!free });
 };
 
-// 第 n 个付费宝箱的价格：30, 49, 69, 93 …（越来越贵）；关卡越长金币越多，价格按时长缩放（15 分钟为基准）
+// 第 n 个付费宝箱：(20 + 15·n^1.3)·(1 + 0.6·(关卡 − 1))·时长系数·(1 − 宝箱折扣，最多 50%)
+// 第 1 关 15 分钟：35、57、83、111、142……（n 整局累计；时长系数 15 分钟为 1）
 Interact.chestCost = function () {
   var n = Interact.chestsOpened + 1, k = typeof Pace !== 'undefined' ? Pace.xpScale() : 1;
-  return Math.round(30 * Math.pow(n, 0.48) * Math.pow(1.18, n - 1) * (1 + (Game.stage - 1) * 0.5) * k);
-};
-
-Interact.microwaveCost = function (o) { return Math.round([40, 0, 120, 300, 700][o.rarity] * (1 + (Game.stage - 1) * 0.5)); };
-// 可疑商人的物品价格（三件同价，和 UI.merchant 进货时的算法一样）
-Interact.merchantCost = function (o) {
-  if (o.stock && o.stock.length) return Math.min.apply(null, o.stock.map(function (s) { return s.price; }));
-  return Math.round([25, 0, 70, 160, 380][o.rarity] * (1 + (Game.stage - 1) * 0.5));
+  return Math.round((20 + 15 * Math.pow(n, 1.3)) * (1 + 0.6 * (Game.stage - 1)) * k * (1 - Math.min(0.5, P.st.chestDisc || 0)));
 };
 
 Interact.label = function (o) {
   if (Interact.KINDS[o.kind]) return Interact.KINDS[o.kind].label(o);
   switch (o.kind) {
-    case 'chest': return o.free ? '打开金宝箱 · 免费' : '打开宝箱 · ' + Interact.chestCost() + ' 金币';
-    case 'moai': return '向摩艾像祈祷 · 三选一物品';
-    case 'merchant': return '和可疑商人交易 · ' + RARITY[o.rarity].name + '物品 · ' + Interact.merchantCost(o) + ' 金币';
-    case 'microwave': return '微波炉：复制一个' + RARITY[o.rarity].name + '物品 · ' + Interact.microwaveCost(o) + ' 金币';
-    case 'challenge': return '挑战神龛：刷出精英，全杀奖励宝箱';
-    case 'greed': return '贪婪神龛：拿金币，但难度 +5%';
-    case 'succ': return '吸取神龛：吸走地图上所有经验';
-    case 'curse': return 'Boss 诅咒：下次 Boss 多一只，多一个宝箱';
-    case 'bossportal': return Game.bossAlive ? 'Boss 战斗中…' : '召唤 Boss · 越晚召唤血越多';
+    case 'chest': return o.free ? '打开金宝箱 · 免费' : '打开宝箱 · ' + Kit.num(Interact.chestCost()) + ' 金币';
+    case 'bossportal': return Game.bossAlive ? '首领战斗中…' : '点燃烽火台：召唤首领 · 越晚点燃越强';
     case 'exitportal': return '进入传送门 · 下一关';
   }
   return '';
@@ -424,40 +421,37 @@ Interact.update = function (dt) {
       if (o.used || K.noPrompt) continue;
     }
     if (o.kind === 'pot') { if (d2 < (o.r + 0.4) * (o.r + 0.4) && Math.abs(dy) < 2) Interact.breakPot(o); continue; }
-    if (o.kind === 'shrine') {
-      // 站在圈里充能，离开就清空
-      var r = 4 * Math.sqrt(P.st.size);
-      var inside = d2 < r * r && Math.abs(dy) < 3;
-      var speed = 1 / (4 * Math.pow(0.96, P.items.wrench || 0));
-      o.charge = inside ? Math.min(1, o.charge + dt * speed) : Math.max(0, o.charge - dt * 0.6);
-      o.ring.material.color.setHSL(o.golden ? 0.14 : 0.5 - o.charge * 0.35, 1, 0.6);
-      var s = r * (0.25 + o.charge * 0.75);
-      o.ring.scale.set(s, 1, s);
-      if (inside && Math.random() < dt * 8) FX.burst(o.x + rand(-r, r) * 0.6, o.y + 0.3, o.z + rand(-r, r) * 0.6, 1, o.golden ? 0xffe14a : 0x7ef0ff, 1.5, 0.2);
-      if (o.charge >= 1) { o.used = true; Interact.removeMeshes(o); UI.shrineChoice(o.golden); }
-      continue;
-    }
     if (o.kind === 'bossportal') {
-      if (!o.found && d2 < 30 * 30) { o.found = true; UI.toast('发现了 Boss 传送门！', Kit.color('red')); }
-      if (!o.found && Math.random() < dt * 6) FX.burst(o.x + rand(-6, 6), o.y + rand(1, 6), o.z + rand(-6, 6), 1, 0xffffff, 2, 0.25);
-      o.swirl.rotation.z += dt * 2;
+      if (!o.found && d2 < 30 * 30) { o.found = true; UI.toast('发现了烽火台！', Kit.color('gold')); }
+      if (o.pillar) {
+        // 透明度和亮度一起变（只变透明度的话暗的时候天空透过来，颜色会偏）；减弱动态效果（系统设置或游戏里的开关，body.kmRM）时停在最亮
+        var pu = document.body.classList.contains('kmRM') ? 1 : Math.sin(Game.time * TAU), pm = o.pillar.material;
+        pm.opacity = 0.9 + 0.05 * pu;
+        pm.color.setHex(Interact.beaconHex()).multiplyScalar(0.88 + 0.12 * pu);
+      }
+      // 火盆里冒一股又高又浓的灰烟（点燃以前；圣锻炉的光柱没有烟）
+      if (d2 < 120 * 120 && Math.random() < dt * 7) MX.part(o.x + rand(-0.4, 0.4), o.y + 4.2, o.z + rand(-0.4, 0.4), rand(-0.25, 0.25), rand(2.2, 3.0), rand(-0.25, 0.25), rand(3.5, 4.5), 0.3, 1.1, pick([0x5a5652, 0x6a6662, 0x8a8682]), 0.3);
     }
     if (o.kind === 'exitportal') o.swirl.rotation.z += dt * 3;
     if (d2 < o.r * o.r && Math.abs(dy) < 3 && d2 < bd) { bd = d2; best = o; }
   }
   Interact.near = best;
-  UI.setPrompt(best ? Interact.label(best) : null, best && Interact.canUse(best));
+  UI.setPrompt(best ? Interact.label(best) : null, best && Interact.canUse(best), best && Interact.busy(best));
   Interact.updateGlow();
 };
 
 Interact.canUse = function (o) {
   var K = Interact.KINDS[o.kind];
   if (K) return K.canUse ? !!K.canUse(o) : true;
-  if (o.kind === 'chest' && !o.free) return P.gold >= Interact.chestCost() || (P.items.key > 0);
+  if (o.kind === 'chest' && !o.free) return P.gold >= Interact.chestCost();
   if (o.kind === 'bossportal') return !Game.bossAlive;
-  if (o.kind === 'microwave') return P.gold >= Interact.microwaveCost(o);
-  if (o.kind === 'merchant') return P.gold >= Interact.merchantCost(o);
   return true;
+};
+
+// 正在进行（KINDS[k].busy：立了誓的石碑、比武中的木人、在滚的滚石）：提示是金色的进度，不是红色的拒绝；按了也不报错
+Interact.busy = function (o) {
+  var K = Interact.KINDS[o.kind];
+  return !!(K && K.busy && K.busy(o));
 };
 
 // 不能用时的提示
@@ -465,10 +459,8 @@ Interact.denied = function (o) {
   var K = Interact.KINDS[o.kind];
   if (K) return K.denied ? K.denied(o) : '现在还不能用';
   switch (o.kind) {
-    case 'chest': return '金币不够：打开宝箱要 ' + Interact.chestCost() + ' 金币';
-    case 'merchant': return '金币不够：商人的' + RARITY[o.rarity].name + '物品要 ' + Interact.merchantCost(o) + ' 金币';
-    case 'microwave': return '金币不够：复制一次要 ' + Interact.microwaveCost(o) + ' 金币';
-    case 'bossportal': return 'Boss 还在战斗中';
+    case 'chest': return '金币不够：打开宝箱要 ' + Kit.num(Interact.chestCost()) + ' 金币';
+    case 'bossportal': return '首领还在战斗中';
   }
   return '金币不够';
 };
@@ -477,17 +469,12 @@ Interact.use = function () {
   var o = Interact.near;
   if (!o || o.used || Game.state !== 'play') return;
   var K = Interact.KINDS[o.kind];
+  if (Interact.busy(o)) return;   // 正在进行：没什么可做的，也不是错
   if (!Interact.canUse(o)) { UI.toast(Interact.denied(o), Kit.color('red')); return; }
   if (K) { K.use(o); return; }
   switch (o.kind) {
     case 'chest': {
-      var free = o.free;
-      if (!free && P.items.key) {
-        // 钥匙：x/(1+x) 的几率免费
-        var x = 0.1 * P.items.key;
-        if (Math.random() < x / (1 + x)) { free = true; UI.toast('钥匙生效：免费打开！', '#ffd84a'); }
-      }
-      if (!free) {
+      if (!o.free) {
         if (P.gold < Interact.chestCost()) { UI.toast('金币不够', Kit.color('red')); return; }
         P.gold -= Interact.chestCost(); Interact.chestsOpened++;
       }
@@ -499,38 +486,6 @@ Interact.use = function () {
       UI.chestReward(Items.roll());
       break;
     }
-    case 'moai':
-      Interact.consume(o);
-      UI.moai();
-      break;
-    case 'merchant':
-      UI.merchant(o);
-      break;
-    case 'microwave':
-      UI.microwave(o);
-      break;
-    case 'challenge':
-      Interact.consume(o);
-      Game.startChallenge(o);
-      break;
-    case 'greed':
-      Interact.consume(o);
-      var g = Math.round(25 * Game.stage * P.st.goldGain);
-      P.gold += g;
-      P.addMod('difficulty', 0.05);
-      FX.burst(o.x, o.y + 2, o.z, 20, 0xffd23a, 6, 0.3);
-      UI.toast('+' + g + ' 金币，难度 +5%', Kit.color('gold'));
-      break;
-    case 'succ':
-      Interact.consume(o);
-      Pickups.magnetAll();
-      UI.toast('所有经验都飞过来了！', Kit.color('cya'));
-      break;
-    case 'curse':
-      Interact.consume(o);
-      Game.bossCurses++;
-      UI.toast('Boss 诅咒：下次 Boss 多一只', Kit.color('red'));
-      break;
     case 'bossportal':
       Game.summonBoss(o);
       break;
@@ -543,6 +498,37 @@ Interact.use = function () {
 Interact.consume = function (o) {
   o.used = true;
   Interact.removeMeshes(o);
+};
+
+// 点燃烽火台（Game.summonBoss 调用）：石塔留着，光柱收掉，火盆里烧起大火，火光冲天一下，之后一直摇曳到换关
+Interact.lightBeacon = function (o) {
+  if (!o || o.lit) return;
+  o.used = true; o.lit = true;
+  if (o.pillar) {
+    if (o.pillar.parent) o.pillar.parent.remove(o.pillar);
+    o.pillar.material.dispose();
+    var pi = o.parts.indexOf(o.pillar);
+    if (pi >= 0) o.parts.splice(pi, 1);
+    o.pillar = null;
+  }
+  if (o.flame) o.flame.visible = true;
+  var x = o.x, y = o.y, z = o.z;
+  FX.burst(x, y + 4.2, z, 30, 0xffa040, 8, 0.4);
+  FX.flash(x, y + 4.4, z, 4, 0xffb050, 0.5);
+  MX.pillar(x, y + 4, z, Interact.beaconHex(), 1.6, 14, 0.8);
+  var glow = new THREE.Color(0xffa040), t0 = Math.random() * 10;
+  MX.anims.push({ o: o, fn: function (q, dt) {
+    if (Interact.list.indexOf(q) < 0) return false;
+    var t = (t0 += dt) * 11;
+    if (q.flame) {
+      q.flame.scale.set(2.2 * (1 + Math.sin(t * 0.7) * 0.06), 2.2 * (1 + Math.sin(t) * 0.14 + Math.sin(t * 1.9) * 0.08), 2.2 * (1 + Math.cos(t * 0.8) * 0.06));
+      q.flame.rotation.y += dt * 0.9;
+    }
+    FX.glow(x, y + 4.6, z, 3.2, 3.2, glow, 0.8, 0);
+    if (Math.random() < dt * 5) MX.part(x + rand(-0.5, 0.5), y + 6.5, z + rand(-0.5, 0.5), rand(-0.3, 0.3), rand(1.5, 2.4), rand(-0.3, 0.3), rand(2.5, 3.5), 0.3, 0.9, pick([0x5a5652, 0x6a6662, 0x7a7672]), 0.4);
+    if (Math.random() < dt * 6) MX.part(x + rand(-0.6, 0.6), y + 5, z + rand(-0.6, 0.6), rand(-0.5, 0.5), rand(2, 3.5), rand(-0.5, 0.5), rand(0.6, 1.1), 0.1, 0.03, pick([0xffd27a, 0xff9a3a, 0xff6020]), 0.3);
+    return true;
+  } });
 };
 
 Interact.breakPot = function (o) {
@@ -583,6 +569,7 @@ Interact.addCustom = function (kind, x, z, y, extra) {
     if (o.rotY == null) o.rotY = Math.random() * TAU;
     mesh.rotation.y = o.rotY;
     Game.scene.add(mesh);
+    mesh.updateMatrixWorld(true);        // 同上：组模型的子网格不用等到第一帧
   }
   o.mesh = mesh;
   if (K.init) K.init(o);

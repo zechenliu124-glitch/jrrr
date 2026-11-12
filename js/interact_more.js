@@ -28,6 +28,16 @@ var MX = {
   geoCache: {}
 };
 
+// 互动点数值的修改钩子：铁匠骑士、铁匠的徽牌、许愿铜钱读这里，不在这个文件里到处改
+MX.mods = [];
+MX.onMod = function (fn) { MX.mods.push(fn); return fn; };          // fn(kind, key, value) → 新值（undefined = 不改）
+MX.offMod = function (fn) { var i = MX.mods.indexOf(fn); if (i >= 0) MX.mods.splice(i, 1); };
+MX.mod = function (kind, key, base) {
+  var v = base;
+  for (var i = 0; i < MX.mods.length; i++) { var r = MX.mods[i](kind, key, v); if (r !== undefined) v = r; }
+  return v;
+};
+
 // 两对传送石的颜色
 MX.PAIR = [0x46f2ff, 0xff5ae0];
 MX.PAIR_CSS = ['#46f2ff', '#ff5ae0'];
@@ -909,10 +919,24 @@ MX.boltInit = function () {
   Game.scene.add(MX.trailMesh);
 };
 
+// 友军炮台（弩车或别的东西放的）：o 可以没有；quiet 时不弹「弩车停火了」，也不进 HUD 增益栏
+// opts: { o?, x, y, z, active = 30, rate = 0.6, range = 35, dmg?: number | function (t) → number, quiet = false,
+//         onUpdate?(t, dt), onEnd?(t) }；返回炮台 t（t.kills 计数）
+MX.addTurret = function (opts) {
+  var o = opts.o || null;
+  var t = { o: o, active: opts.active != null ? opts.active : 30, fireT: 0.5, aim: o ? o.rotY + o.top.rotation.y : (opts.aim || 0),
+    retarget: 0, target: null, kills: 0, recoil: 0, raise: 0,
+    x: o ? o.x : opts.x, y: o ? o.y : opts.y, z: o ? o.z : opts.z,
+    rate: opts.rate != null ? opts.rate : 0.6, range: opts.range != null ? opts.range : 35,
+    dmg: opts.dmg != null ? opts.dmg : null, quiet: !!opts.quiet, onUpdate: opts.onUpdate || null, onEnd: opts.onEnd || null };
+  if (t.y == null) t.y = W.groundAt(t.x, t.z, 999);
+  MX.turrets.push(t);
+  return t;
+};
+
 MX.activateBallista = function (o) {
   o.used = true;
-  var t = { o: o, active: 30, fireT: 0.5, aim: o.rotY + o.top.rotation.y, retarget: 0, target: null, kills: 0, recoil: 0, raise: 0 };
-  MX.turrets.push(t);
+  MX.addTurret({ o: o, active: 30 });
   o.allyRing.visible = true;
   o.crest.visible = true;
   FX.ring(o.x, o.y + 0.4, o.z, 35, 0x4a9cff, 0.6);
@@ -926,44 +950,57 @@ MX.updateTurrets = function (dt) {
     var t = MX.turrets[i], o = t.o;
     t.active -= dt;
     t.raise = Math.min(1, t.raise + dt * 2);
-    o.flag.scale.set(1, Math.max(0.01, t.raise), 1);
-    o.flag.rotation.y = Math.sin(Game.time * 3 + i) * 0.25;
-    o.allyRing.material.opacity = 0.35 + Math.sin(Game.time * 5) * 0.15;
+    if (o) {
+      o.flag.scale.set(1, Math.max(0.01, t.raise), 1);
+      o.flag.rotation.y = Math.sin(Game.time * 3 + i) * 0.25;
+      o.allyRing.material.opacity = 0.35 + Math.sin(Game.time * 5) * 0.15;
+    } else if (t.onUpdate) t.onUpdate(t, dt);
     if (t.active <= 0) {
       MX.turrets.splice(i, 1);
-      o.allyRing.visible = false;
-      o.crest.visible = false;
-      o.flag.scale.set(1, 0.01, 1);
-      MX.smoke(o.x, o.y + 1.2, o.z, 10, 0xb8b0a4, 0.8, 0.4);
-      UI.toast('弩车停火了 · 击倒 ' + t.kills + ' 个敌人', '#7ab8ff');
+      if (o) {
+        o.allyRing.visible = false;
+        o.crest.visible = false;
+        o.flag.scale.set(1, 0.01, 1);
+        MX.smoke(o.x, o.y + 1.2, o.z, 10, 0xb8b0a4, 0.8, 0.4);
+      }
+      if (!t.quiet) UI.toast(t.kills > 0 ? '弩车停火了 · 击倒 ' + t.kills + ' 个敌人' : '弩车停火了', Kit.color('goldL'));   // 一个也没打到：只说停火了
+      if (t.onEnd) t.onEnd(t);
       continue;
     }
     t.retarget -= dt;
-    if (t.retarget <= 0 || (t.target && !t.target.alive)) { t.retarget = 0.15; t.target = Enemies.nearest(o.x, o.z, 35); }
+    if (t.retarget <= 0 || (t.target && !t.target.alive)) { t.retarget = 0.15; t.target = Enemies.nearest(t.x, t.z, t.range); }
     var want = t.aim;
-    if (t.target) want = Math.atan2(t.target.x - o.x, t.target.z - o.z);
+    if (t.target) want = Math.atan2(t.target.x - t.x, t.target.z - t.z);
     t.aim += clamp(MX.angDiff(want, t.aim), -7 * dt, 7 * dt);
-    o.top.rotation.y = t.aim - o.rotY;
+    if (o) o.top.rotation.y = t.aim - o.rotY;
     t.fireT -= dt;
     t.recoil = Math.max(0, t.recoil - dt * 5);
-    o.loaded.position.z = -t.recoil * 0.35;
-    o.loaded.visible = t.fireT < 0.3;
-    if (t.target && t.fireT <= 0 && Math.abs(MX.angDiff(want, t.aim)) < 0.3) { MX.fireBolt(t); t.fireT = 0.6; }
+    if (o) {
+      o.loaded.position.z = -t.recoil * 0.35;
+      o.loaded.visible = t.fireT < 0.3;
+    }
+    if (t.target && t.fireT <= 0 && Math.abs(MX.angDiff(want, t.aim)) < 0.3) { MX.fireBolt(t); t.fireT = t.rate; }
   }
 };
 
 MX.fireBolt = function (t) {
-  var e = t.target, o = t.o, a = t.aim, speed = 70;
-  var sx = o.x + Math.sin(a) * 1.5, sz = o.z + Math.cos(a) * 1.5, sy = o.y + 1.3;
+  var e = t.target, a = t.aim, speed = 70;
+  var sx = t.x + Math.sin(a) * 1.5, sz = t.z + Math.cos(a) * 1.5, sy = t.y + 1.3;
   // 简单的提前量
   var lead = Math.sqrt(dist2(sx, sz, e.x, e.z)) / speed;
   var dx = e.x + (e.vx || 0) * lead - sx, dz = e.z + (e.vz || 0) * lead - sz, dy = e.y + e.r - sy;
   var L = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-  MX.bolts.push({ x: sx, y: sy, z: sz, vx: dx / L * speed, vy: dy / L * speed, vz: dz / L * speed, life: 0.75, hit: [], dmg: 25 * MX.sf() * (1 + 0.05 * P.level), t: t, stuck: 0 });
+  MX.bolts.push({ x: sx, y: sy, z: sz, vx: dx / L * speed, vy: dy / L * speed, vz: dz / L * speed, life: 0.75, hit: [], dmg: MX.turretDmg(t), t: t, stuck: 0 });
   if (MX.bolts.length > MX.BOLT_CAP) MX.bolts.shift();
   t.recoil = 1;
   FX.burst(sx, sy, sz, 5, 0xe8d8b0, 4, 0.18);
   MX.sparks(sx, sy, sz, 6, [0xffe27a, 0xffffff], 3, 0.12);
+};
+
+// 一发弩箭的伤害：炮台自己定的（数字或函数），没有就按弩车的公式
+MX.turretDmg = function (t) {
+  if (t.dmg == null) return 25 * MX.sf() * (1 + 0.05 * P.level);
+  return typeof t.dmg === 'function' ? t.dmg(t) : t.dmg;
 };
 
 MX.updateBolts = function (dt) {
@@ -1035,16 +1072,17 @@ MX.CSS = [
   '.mxBuff .tm i{font-style:normal;margin-left:var(--o);letter-spacing:0;text-shadow:var(--ol1)}',
   '.mxBuff .trk{position:absolute;left:2px;right:2px;bottom:1px;height:3px;background:rgba(0,0,0,.75)}',
   '.mxBuff .bar{display:block;height:100%;width:100%;box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}',
-  // 站圈进度：正上方倒计时（和 Boss 血条）下面
-  '#mxProgress{width:248px;margin-top:6px;padding:6px 9px 9px;pointer-events:none;white-space:nowrap}',
+  // 站圈进度：正上方倒计时（和 Boss 血条）下面，一行的宽状态条（§4.11 的小面板，34 像素高：iPad 上 y 97–131，不进屏幕中间的框）：
+  // 左边 18 号的字，右边 18 号像素加粗的秒数 +「秒」（或百分比），面板底边里面一条 4 像素的进度
+  '#mxProgress{position:relative;box-sizing:border-box;width:max-content;min-width:248px;max-width:min(340px,calc(100vw - 32px));margin-top:3px;padding:4px 9px 8px;pointer-events:none;white-space:nowrap;' +
+    'border-width:2px;border-image:var(--fr-plate) 4 4 7 4 / 4px 4px 7px 4px / 0 0 3px 0 stretch;background-color:rgba(8,13,28,.86);background-clip:padding-box}',
   '#mxProgress.float{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 96px);transform:translateX(-50%)}',
-  '#mxProgress .row{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-bottom:6px}',
-  '#mxProgress .tt{font-size:var(--fs-m);line-height:18px;color:#fff;text-shadow:var(--ol1)}',
-  '#mxProgress .pc{font-size:var(--fs-m);line-height:18px;text-shadow:var(--ol1)}',
-  '#mxProgress .trk{position:relative;height:14px;border:2px solid #000;background:#0b1020;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}',
-  '#mxProgress .fill{height:100%;width:0;box-shadow:inset 0 3px 0 rgba(255,255,255,.35),inset 0 -3px 0 rgba(0,0,0,.3)}',
-  // 每 10% 一道刻度
-  '#mxProgress .trk::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(10% - 2px),rgba(0,0,0,.5) calc(10% - 2px),rgba(0,0,0,.5) 10%)}',
+  '#mxProgress .row{display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:9px;margin:0}',   // 不吃通用的 .row（按钮行）的上边距
+  '#mxProgress .tt{font-size:var(--fs-m);line-height:18px;color:#fff;text-align:left;text-shadow:var(--ol1)}',
+  '#mxProgress .pc{font-size:var(--fs-m);line-height:18px;letter-spacing:var(--o);text-align:right;text-shadow:var(--olB)}',
+  '#mxProgress .pc i{font-style:normal;margin-left:var(--o);letter-spacing:0;text-shadow:var(--ol1)}',
+  '#mxProgress .trk{position:absolute;left:2px;right:2px;bottom:1px;height:4px;background:rgba(0,0,0,.75);box-shadow:inset 0 -1px 0 rgba(255,255,255,.14)}',   // 0% 时也看得出是一条空槽
+  '#mxProgress .fill{height:100%;width:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}',
   // 传送闪光：一圈圈硬边色带，分几格淡出（像素风）
   '#mxFlash{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0}',
   '#mxFlash.on{animation:mxFlash .5s steps(5,end)}',
@@ -1087,10 +1125,12 @@ MX.buffList = function () {
   var out = [];
   if (MX.mount) out.push({ icon: '马', name: '战马', t: MX.mount.t, max: MX.mount.max, color: '#c8874a' });
   if (MX.warmT > 0) out.push({ icon: '暖', name: '温暖', t: MX.warmT, max: 30, color: '#ff9a3a' });
-  if (MX.turrets.length) {
+  // 只算不安静的炮台（别的炮台在自己的被动 HUD 行里显示）
+  var tu = MX.turrets.filter(function (t) { return !t.quiet; });
+  if (tu.length) {
     var tl = 0;
-    MX.turrets.forEach(function (t) { tl = Math.max(tl, t.active); });
-    out.push({ icon: '弩', name: '弩车' + (MX.turrets.length > 1 ? ' ×' + MX.turrets.length : ''), t: tl, max: 30, color: '#4a9cff' });
+    tu.forEach(function (t) { tl = Math.max(tl, t.active); });
+    out.push({ icon: '弩', name: '弩车' + (tu.length > 1 ? ' ×' + tu.length : ''), t: tl, max: 30, color: '#4a9cff' });
   }
   return out;
 };
@@ -1127,18 +1167,33 @@ MX.hudUpdate = function () {
     if (c.w !== w) { c.w = w; c.bar.style.width = w + '%'; }
   }
   var p = MX.shown;
-  var pk = p ? p.text + '|' + Math.floor(p.pct * 100) : '';
+  var pk = p ? p.text + '|' + Math.floor(p.pct * 100) + '|' + (p.side || '') : '';
   if (pk !== h.pkey) {
     h.pkey = pk;
     h.pr.style.display = p ? '' : 'none';
     if (p) {
       h.txt.textContent = p.text;
-      h.pc.textContent = Math.floor(p.pct * 100) + '%';
+      // 秒数：数字像素加粗，「秒」不加粗；百分比整个加粗
+      var sd = p.side != null ? String(p.side) : Math.floor(p.pct * 100) + '%', sm = /^(\d+)秒$/.exec(sd);
+      h.pc.textContent = sm ? sm[1] : sd;
+      if (sm) { var si = document.createElement('i'); si.textContent = '秒'; h.pc.appendChild(si); }
       h.pc.style.color = p.color;
+      MX.progressWidth(h, p, !!sm);
       h.fill.style.width = (p.pct * 100) + '%';
       h.fill.style.background = p.color;
     }
   }
+};
+
+// 进度条的字一变长（计数多一位、秒数从 10 变 9）面板就跟着变宽变窄：左边的字按 p.wide（计数换成目标值的那句）、
+// 右边按两位数的秒数（或 100%）先留够宽度。只在这几样或字号变了时量一次（UI.fpw 是画布量，不读布局）
+MX.progressWidth = function (h, p, secs) {
+  var fs = parseFloat(getComputedStyle(h.txt).fontSize) || 18, k = (p.wide || '') + '|' + secs + '|' + fs;
+  if (h.wkey === k || typeof UI === 'undefined' || !UI.fpw) return;
+  h.wkey = k;
+  var u = fs / 12;
+  h.txt.style.minWidth = p.wide ? Math.ceil(UI.fpw(p.wide) * u) + 'px' : '';
+  h.pc.style.minWidth = Math.ceil((secs ? UI.fpw('00', true) + 1 + UI.fpw('秒') : UI.fpw('100%', true)) * u) + 'px';
 };
 
 // '#46f2ff' → 'rgba(70,242,255,a)'
@@ -1223,8 +1278,9 @@ window.addEventListener('load', function () { MX.lateInstall(); });
 // ============================================================
 //  铁匠铺：花金币挑一把武器，强化一级（至少稀有）；每座最多 3 次，越来越贵
 // ============================================================
-MX.smithPrice = function (o) { return Math.round(45 * MX.sf() * Math.pow(1.4, o.uses)); };
-MX.smithWeapons = function () { return P.weapons.filter(function (w) { return w.level < 40; }); };
+MX.smithPrice = function (o) { return Math.round(MX.mod('blacksmith', 'price', 45 * MX.sf() * Math.pow(1.4, o.uses))); };
+MX.smithUses = function () { return MX.mod('blacksmith', 'uses', 3); };
+MX.smithWeapons = function () { return P.weapons.filter(function (w) { return w.level < LEVEL_CAP.weapon; }); };
 MX.smithParts = function () {
   var T = MX.tiles(), wood = 0x7a5230, stone = 0x8a8078, iron = 0x3d3f46;
   var p = [
@@ -1297,9 +1353,12 @@ Interact.KINDS.blacksmith = {
     var f = MX.local(o, -1.15, -1.3);
     MX.collide(f.x, f.z, 0.9, o.y + 1.15);
   },
-  label: function (o) { return '铁匠铺：花 ' + MX.smithPrice(o) + ' 金币锻造武器 · 还能锻造 ' + (3 - o.uses) + ' 次'; },
+  label: function (o) { return '铁匠铺：花 ' + Kit.num(MX.smithPrice(o)) + ' 金币，锻造武器 · 还能锻造 ' + (MX.smithUses() - o.uses) + ' 次'; },
+  // 最窄的提示牌（320 宽 Split View，UI.promptTiny）：18 号字两行「铁匠铺 · 剩 3 次 / 花 1,400 金币锻造」，不用退到 12 号
+  // 两行写死（\n）：第一行末尾不带「 · 」，320 宽的 151 像素里放得下「花 1,400 金币锻造」
+  short: function (o) { return '铁匠铺 · 剩 ' + (MX.smithUses() - o.uses) + ' 次\n花 ' + Kit.num(MX.smithPrice(o)) + ' 金币锻造'; },
   canUse: function (o) { return P.gold >= MX.smithPrice(o) && MX.smithWeapons().length > 0; },
-  denied: function (o) { return MX.smithWeapons().length ? '金币不够 · 需要 ' + MX.smithPrice(o) : '没有还能强化的武器'; },
+  denied: function (o) { return MX.smithWeapons().length ? '金币不够 · 需要 ' + Kit.num(MX.smithPrice(o)) : '没有还能强化的武器'; },
   use: function (o) { MX.openSmith(o); },
   update: function (o, dt, d2) {
     if (d2 > 3600) return;
@@ -1329,10 +1388,10 @@ MX.openSmith = function (o) {
   Game.openModal(function () {
     var opts = ws.map(function (w) {
       var r = Rarity.roll(2), picks = Weapons.rollUpgrade(w, r);
-      return { kind: 'weapon-up', id: w.id, rarity: r, title: w.def.name, icon: w.def.icon, color: w.def.color, sub: '等级 ' + w.level + ' → ' + (w.level + 1), picks: picks, lines: picks.map(Weapons.upgradeText) };
+      return { kind: 'weapon-up', id: w.id, rarity: r, title: w.def.name, icon: w.def.icon, color: w.def.color, sub: '等级 ' + w.level + ' → ' + (w.level + 1), picks: picks, lines: Weapons.cardLines(w, picks) };
     });
     opts.push({ kind: 'leave', rarity: 0, title: '先不锻造', icon: '走', color: 0x5a5470, sub: '不花钱', lines: ['铁匠铺会一直等你回来'], foot: '离开' });
-    UI.choiceModal('blacksmith', '铁匠铺 · 选一把武器锻造 · ' + price + ' 金币', opts);
+    UI.choiceModal('blacksmith', '铁匠铺 · 选一把武器锻造 · ' + Kit.num(price) + ' 金币', opts);
     var foot = document.querySelector('#levelCards .card:last-child .cardRarity');
     if (foot) foot.textContent = '离开';
   });
@@ -1352,8 +1411,8 @@ MX.smithPick = function (opt) {
   MX.sparks(a.x, o.y + 1.3, a.z, 20, [0xffd27a, 0xffa040, 0xffffff], 6, 0.14);
   FX.ring(a.x, o.y + 1.1, a.z, 2.4, 0xffb040, 0.35);
   Game.shake(0.25);
-  UI.toast('锻造成功：' + w.def.name + ' Lv' + w.level + ' · ' + RARITY[opt.rarity].name, RARITY[opt.rarity].color);
-  if (o.uses >= 3) {
+  UI.toast('锻造成功：' + w.def.name + ' Lv' + w.level + ' · ' + RARITY[opt.rarity].name, '#ffd84a');   // 奖励 = 金色
+  if (o.uses >= MX.smithUses()) {
     // 用完了：炉火熄灭
     o.used = true;
     o.fire.visible = false;
@@ -1366,7 +1425,7 @@ MX.smithPick = function (opt) {
 // ============================================================
 //  许愿井：投金币许愿（祝福 / 双倍返还 / 宝物 / 诅咒），每口井 5 次
 // ============================================================
-MX.wishCost = function () { return Math.round(20 * MX.sf()); };
+MX.wishCost = function () { return Math.round(MX.mod('wishwell', 'price', 20 * MX.sf())); };
 MX.wellParts = function () {
   var T = MX.tiles(), p = [mxC(1.55, 1.7, 1.0, 10, 0, -0.4, 0, 0x7a746a, T.block), mxC(0.84, 0.84, 0.55, 10, 0, 0.32, 0, 0x14181c, 'plain')];
   for (var i = 0; i < 10; i++) {
@@ -1407,9 +1466,11 @@ Interact.KINDS.wishwell = {
     return g;
   },
   init: function (o) { o.uses = 5; o.pending = 0; o.dunk = 9; MX.collide(o.x, o.z, 1.15, o.y + 0.95); },
-  label: function (o) { return o.pending > 0 ? '许愿中……' : '许愿井：投 ' + MX.wishCost() + ' 金币许个愿 · 还能许 ' + o.uses + ' 次'; },
+  label: function (o) { return o.pending > 0 ? '许愿中……' : '许愿井：投 ' + Kit.num(MX.wishCost()) + ' 金币，许个愿 · 还能许 ' + o.uses + ' 次'; },
+  // 最窄的提示牌（UI.promptTiny）：「许愿井 · 剩 5 次 / 投 1,200 金币许愿」，和铁匠铺一个样子
+  short: function (o) { return o.pending > 0 ? null : '许愿井 · 剩 ' + o.uses + ' 次\n投 ' + Kit.num(MX.wishCost()) + ' 金币许愿'; },
   canUse: function (o) { return !(o.pending > 0) && P.gold >= MX.wishCost(); },
-  denied: function (o) { return o.pending > 0 ? '硬币还在往下掉……' : '金币不够 · 需要 ' + MX.wishCost(); },
+  denied: function (o) { return o.pending > 0 ? '硬币还在往下掉……' : '金币不够 · 需要 ' + Kit.num(MX.wishCost()); },
   use: function (o) { MX.wish(o); },
   update: function (o, dt, d2) {
     if (o.pending > 0) {
@@ -1437,8 +1498,16 @@ MX.wish = function (o) {
   MX.part(P.pos.x, sy, P.pos.z, (o.x - P.pos.x) / 0.6, (ty - sy + 0.5 * 15 * 0.36) / 0.6, (o.z - P.pos.z) / 0.6, 0.6, 0.2, 0.16, 0xffd23a, -15);
 };
 MX.wishResolve = function (o, force) {
-  var r = Math.random();
-  var kind = force || (r < 0.4 ? 'bless' : r < 0.65 ? 'double' : r < 0.85 ? 'item' : 'curse');
+  var r = Math.random(), kind = force;
+  if (!kind) {
+    // 诅咒的几率可以改（许愿铜钱）；其余三种按原来的比例分剩下的
+    var pc = clamp(MX.mod('wishwell', 'curse', 0.15), 0, 1);
+    if (r >= 1 - pc) kind = 'curse';
+    else {
+      var q = pc === 0.15 ? r : r * 0.85 / (1 - pc);
+      kind = q < 0.4 ? 'bless' : q < 0.65 ? 'double' : 'item';
+    }
+  }
   var cost = MX.wishCost(), x = o.x, y = o.y, z = o.z;
   FX.burst(x, y + 0.75, z, 14, 0x7ff0ff, 4, 0.18);
   FX.ring(x, y + 0.5, z, 1.6, 0x7ff0ff, 0.35);
@@ -1792,7 +1861,7 @@ Interact.KINDS.catapult = {
 // ============================================================
 MX.cryptCount = function () { return 4 + 2 * Game.stage; };
 MX.undeadTypes = function () {
-  var pref = [['skelarmor', 'skeleton', 'skelarmor'], ['dustyarmor', 'dustyskel', 'mummy'], ['skelarmor', 'skeleton', 'zombie', 'ghost2']][Game.stage - 1] || ['skeleton'];
+  var pref = [['skeleton', 'skelguard', 'skeleton'], ['mummy', 'pallbearer', 'skeleton'], ['skelguard', 'skeleton', 'zombie', 'ghost']][Game.stage - 1] || ['skeleton'];
   var ok = pref.filter(function (id) { return ENEMIES[id] && !ENEMIES[id].boss && !ENEMIES[id].miniboss; });
   return ok.length ? ok : Director.currentPool().types;
 };
@@ -1878,7 +1947,7 @@ Interact.KINDS.crypt = {
     o.glow.scale.y = 1 + Math.sin(Game.time * 7 + o.idx) * 0.04;
     if (Math.random() < dt * 2) { var p = MX.local(o, rand(-0.6, 0.6), 1.7); MX.part(p.x, o.y + rand(0.3, 2.2), p.z, 0, rand(0.3, 0.8), 0, 1.5, 0.1, 0.04, 0x6dffb0, 0.2); }
   },
-  mapIcon: { color: '#b9b2ff', shape: 'cross', size: 3.4 },         // 墓地十字
+  mapIcon: { color: '#b9b2ff', shape: 'cross', size: 3.4 },         // 墓园十字
   clear: function () { MX.reset(); }
 };
 MX.openCrypt = function (o) {

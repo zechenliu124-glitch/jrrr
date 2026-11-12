@@ -14,4 +14,4 @@
 ## 说明
 
 - 这个仓库只放发布用的游戏文件，由 GitHub Pages 直接发布。
-- 字体：Pixelify Sans、ZCOOL KuaiLe（SIL OFL 1.1，见 `fonts/`）。3D 引擎：three.js（MIT，见 `vendor/`）。
+- 字体：KM Pixel 12（由 TakWolf 的缝合像素字体 Fusion Pixel Font 裁剪修改而来，改动见 `fonts/KM-PATCH.txt`）和 ZCOOL KuaiLe，都用 SIL OFL 1.1 授权，见 `fonts/`。3D 引擎：three.js（MIT，见 `vendor/`）。

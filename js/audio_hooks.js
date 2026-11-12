@@ -1,7 +1,7 @@
 'use strict';
 // ============================================================
 //  把声音接到游戏上：只包装已有的函数（原函数照常调用），不改别的文件
-//  · 音乐：按游戏状态选曲（主菜单 / 第几关 / Boss / 最终虫潮），强度跟着关卡进度和敌潮走，弹窗时压低，暂停时停
+//  · 音乐：按游戏状态选曲（主菜单 / 第几关 / 首领 / 午夜钟声），强度跟着关卡进度和敌潮走，弹窗时压低，暂停时停
 //  · 音效：武器、命中、击杀、爆炸、拾取、跳跃落地滑铲、受伤、低血量心跳、地图上的东西、界面按钮
 //  Game.* 在 main.js 里定义（最后加载）：在 load 事件里包装（这个监听比 main.js 的先注册，Game.init 之前就包好了）
 //  热路径（每次命中、每次击杀）只多一次布尔判断；没解锁声音时什么都不做
@@ -130,7 +130,7 @@
       if (pr.hum) SFX.setParam(H.loop, 'h', pr.hum * (1 + Math.min(spd, 50) / 50), 0.1);
     }
   };
-  // 站圈充能（神龛、篝火、战旗……有 charge 的东西）：一格一格往上走的音
+  // 站圈充能（篝火、战旗……有 charge 的东西）：一格一格往上走的音
   H.charge = function (t) {
     if (typeof Interact === 'undefined' || !H.chg || t - (H.chargeT || 0) < 0.2) return;
     var best = -1, list = Interact.list;
@@ -147,7 +147,7 @@
       SFX.play('charge_tick', CO);
     }
   };
-  // 走近时“发现了 Boss 传送门”
+  // 走近时“发现了烽火台”
   H.portal = function () {
     var p = typeof Interact !== 'undefined' && Interact.portal;
     if (p && p.found && !p.used && H.portalSeen !== p) {
@@ -164,7 +164,7 @@
     if (opts && opts.quiet) return;
     HO.x = e.x; HO.z = e.z;
     HO.s = e.boss ? 2 : (e.mini || e.elite) ? 1.5 : Math.max(0.7, Math.min(1.6, (e.r || 0.55) / 0.55));
-    SFX.play(crit >= 2 ? 'crit2' : crit ? 'crit' : 'hit', HO);
+    SFX.play(crit ? 'crit' : 'hit', HO);   // crit 只有 0 / 1
   };
   H.onKill = function (e) {
     if (e.boss) return;   // Boss 在 Game.onBossKilled 里
@@ -272,15 +272,63 @@
   }
 
   // ---------------- 武器 ----------------
+  // 武器出手以外的事件（weapons.js 的 Weapons.emit(name, w, x, z, a1)）：事件 → [配方, 参数, 最短间隔秒, 限流键]
+  // 参数里没写的照 SFX.weaponOpts（超武 +15 % 音量）；hook 用这把武器自己的出手声音；null = 不出声
+  // gap 由这里管（同一个键两次之间至少 gap 秒），配方自己的 gap 不再叠加
+  SFX.EMIT = {
+    ring: ['w_bell', { soft: 1, vol: 0.6, pitch: 1.06 }, 0.25, 'w:bell2'],   // 铜钟后面几圈（第一圈是出手声）
+    hook: [null, null, 0.3, null],                                         // 钓竿甩出去 = SFX.WEAPON[id]
+    land: ['w_reel', { land: 1 }, 0.2, 'w:land'],                         // 鱼上岸
+    ram: ['w_swing', { len: 0.3, lo: 200, hi: 700, dark: 1 }, 0.35, 'w:ram'],   // 骑枪冲锋
+    quake: ['w_mine', { pitch: 0.8 }, 0.2, 'w:quake'],                    // 出师之剑的地震：低的闷响
+    stick: ['w_heavy', { vol: 0.75 }, 0.15, 'w:stick'],                   // 标枪扎地（压到 §3.3 的上限以下）
+    hop: ['w_throw', { kind: 'clack', wood: 1, vol: 1 }, 0.12, 'w:hop'],     // 棋子落地
+    trap: ['w_mine', { snap: 1 }, 0.12, 'w:trap'],                        // 铁夹合上
+    clang: ['w_throw', { kind: 'clang' }, 0.28, 'w:pan'],                 // 平底锅打中（悬着连打时一秒最多三四下）
+    split: null                                                            // 弹弓分裂：命中声就够了
+  };
+  // 参数对象每个（事件, 武器, 超武）只建一次
+  var EC = {};
+  H.emitOpts = function (name, w) {
+    var m = SFX.EMIT[name];
+    if (!m || !w || !w.id) return null;
+    var key = name + ':' + w.id + (w.evo ? '*' : ''), c = EC[key];
+    if (c) return c;
+    if (!m[0]) { var wc = SFX.weaponOpts(w), wo = {}; for (var q in wc.o) wo[q] = wc.o[q]; c = { name: wc.name, o: wo, gap: m[2] }; }
+    else {
+      var o = { key: m[3], evo: false, vol: w.evo ? 1.15 : 1 };   // 事件声音不加超武的金色闪光层（太密），只响一点
+      for (var k in m[1]) o[k] = m[1][k];
+      if (m[1].vol != null) o.vol = m[1].vol * (w.evo ? 1.15 : 1);
+      if (name === 'ring' && w.evo) o.evo = true;   // 铜钟每一圈都是钟声，超武照样带闪光层
+      c = { name: m[0], o: o, gap: m[2] };
+    }
+    c.o.x = 0; c.o.z = 0;
+    EC[key] = c;
+    return c;
+  };
+  H.onEmit = function (name, w, x, z) {
+    if (!SFX.live) return null;
+    var c = H.emitOpts(name, w);
+    if (!c) return null;
+    var o = c.o, ek = 'emit|' + (o.key || c.name), t = now(), last = SFX.last[ek];
+    if (last != null && t - last < c.gap) { SFX.stats.limited++; return null; }
+    if (x === x && z === z && x != null && z != null) { o.x = x; o.z = z; } else { o.x = P.pos.x; o.z = P.pos.z; }
+    SFX.last[o.key || c.name] = null;   // 间隔这里已经管了
+    var v = SFX.play(c.name, o);
+    if (v) SFX.last[ek] = t;
+    return v;
+  };
   if (typeof Weapons !== 'undefined') {
+    var hasEmit = typeof Weapons.emit === 'function';
+    if (hasEmit) after(Weapons, 'emit', function (r, a) { H.onEmit(a[0], a[1], a[2], a[3]); });
     var fire0 = Weapons.fire;
     Weapons.fire = function (w) {
       var ok = fire0.apply(this, arguments);
       if (ok && SFX.live) { var c = SFX.weaponOpts(w); SFX.play(c.name, c.o); }
       return ok;
     };
-    // 常驻武器：光环跳伤、锁链勾住、龙息喷火、流星锤转一圈、火焰足迹
-    var FO = { dur: 1, evo: false, key: '' };
+    // 常驻武器：光环跳伤、提灯光束、环绕武器转一圈、足迹；钓竿在有 Weapons.emit 时走 'hook' 事件（没有时按 w.target 勾上的那一帧）
+    var FO = { dur: 1, evo: false, key: '', vol: 1 };
     var per0 = Weapons.updatePersistent;
     Weapons.updatePersistent = function (w, dt) {
       if (!SFX.live) return per0.apply(this, arguments);
@@ -289,18 +337,14 @@
       var r = per0.apply(this, arguments);
       var c = null;
       if (ty === 'aura') { if (w.tick > (t0 || 0) + 0.01 && H.tickHits > 0) c = SFX.weaponOpts(w); }
-      else if (ty === 'tether') { if (!tg && w.target) c = SFX.weaponOpts(w); }
+      else if (ty === 'tether') { if (!hasEmit && !tg && w.target) c = SFX.weaponOpts(w); }
       else if (ty === 'flame') {
-        if (!fl && w.flaming > 0) { c = SFX.weaponOpts(w); FO.dur = w.flaming; FO.evo = !!w.evo; FO.key = c.o.key; SFX.play(c.name, FO); c = null; }
+        if (!fl && w.flaming > 0) { c = SFX.weaponOpts(w); FO.dur = w.flaming; FO.evo = !!w.evo; FO.key = c.o.key; FO.vol = c.o.vol; SFX.play(c.name, FO); c = null; }
       } else if (ty === 'orbit') { if (Math.floor((w.ang || 0) / 6.2832) !== Math.floor(ang / 6.2832)) c = SFX.weaponOpts(w); }
       else if (ty === 'trail') { if (w.tick > (t0 || 0) + 0.01) c = SFX.weaponOpts(w); }
       if (c) SFX.play(c.name, c.o);
       return r;
     };
-    var AO = { evo: false };
-    after(Weapons, 'aegisBlock', function (ok) {
-      if (ok && SFX.live) { var w = Weapons.find('aegis'); AO.evo = !!(w && w.evo); SFX.play('aegis', AO); H.blockT = now(); }
-    });
   }
   // 爆炸（武器、炸药桶、自爆怪、Boss 砸地……）和拾取的数字
   if (typeof FX !== 'undefined') {
@@ -350,11 +394,10 @@
     var hurt0 = P.hurt;
     P.hurt = function () {
       if (!SFX.live) return hurt0.apply(this, arguments);
-      var hp0 = P.hp, sh0 = P.shield, inv0 = P.invuln, zw = P.items && P.items.zawarudo;
+      var hp0 = P.hp, sh0 = P.shield, inv0 = P.invuln;
       var r = hurt0.apply(this, arguments);
       try {
-        if (P.items && P.items.zawarudo < zw) SFX.play('timestop');
-        else if (P.hp < hp0 - 0.01) SFX.play('hurt');
+        if (P.hp < hp0 - 0.01) SFX.play('hurt');
         else if (P.shield < sh0 - 0.01) SFX.play('hurt_shield');
         else if (inv0 <= 0 && P.invuln === 0.15) SFX.play('evade');
         else if (inv0 <= 0 && P.invuln === 0.3 && now() - H.blockT > 0.05) SFX.play('block');
@@ -363,24 +406,50 @@
     };
   }
 
-  // 骑士被动：胸甲猛男秀肌肉、闪电骑士放电、幽灵骑士囤的宝箱
+  // 骑士被动（第 5 块）：Passive.emit(名字, x, z) → [配方, 音量, 音高, 别的参数（可以不写）]，限流键 'p_' + 名字
   if (typeof Passive !== 'undefined' && Passive.update) {
     var pu0 = Passive.update;
-    Passive.update = function () {
-      if (!SFX.live) return pu0.apply(this, arguments);
-      var fl = Passive.flexT, zp = Passive.zap, ct = Passive.chestT;
-      var r = pu0.apply(this, arguments);
-      if (typeof fl === 'number' && Passive.flexT > fl + 1) SFX.play('flex');
-      if (typeof zp === 'number' && zp > 5 && Passive.zap === 0) SFX.play('discharge');
-      if (typeof ct === 'number' && Passive.chestT > ct + 1) SFX.play('use');
-      return r;
-    };
+    Passive.update = function () { return pu0.apply(this, arguments); };
+  }
+  SFX.PASSIVE = {
+    bell: ['w_bell', 1.2, 0.7], grave: ['heal', 0.8, 0.8], meal: ['powerup', 0.9, 0.9],
+    letter: ['ready', 0.8, 1], letter_done: ['wish_good', 0.9, 1], letter_late: ['deny', 0.4, 1],
+    laugh: ['p_honk', 0.8, 1], wind_empty: ['click', 0.5, 0.7], wind_full: ['charge_tick', 0.6, 1.2],
+    star: ['p_star', 0.8, 1.1], falcon: ['ct_dive', 0.8, 1.2], sing: ['hurt_shield', 0.3, 1.5],
+    rabbit: ['w_crackle', 0.8, 1.3], bee: ['w_dagger', 0.5, 1.6, { buzz: 1 }], meow: ['p_meow', 1, 1], fish: ['p_catch', 0.8, 1],
+    lamp: ['fire_up', 0.6, 1.2], camp: ['ballista', 0.9, 1.1], flag: ['banner', 0.9, 1], fury: ['p_growl', 1, 1],
+    // 第 6 块：宝物（Relic.emit 的名字前面加 r_）
+    r_bugle: ['r_bugle', 1, 1], r_drum: ['r_drum', 1.1, 1], r_bark: ['r_bark', 0.7, 1], r_caw: ['r_caw', 0.6, 1],
+    r_tinder: ['fire_up', 0.4, 1.4], r_bolt: ['w_zap', 0.7, 0.8], r_talisman: ['wish_good', 1, 1.1], r_duel: ['crit', 0.9, 0.8],
+    r_stand: ['block', 0.6, 1.4], r_gust: ['puff', 0.6, 1.3], r_stirrup: ['w_heavy', 0.6, 0.8], r_knee: ['w_heavy', 0.35, 1.3],
+    r_honey: ['powerup', 0.6, 1.2], r_grail: ['heal', 0.9, 1.2], r_medal: ['ready', 0.7, 0.9], r_shield: ['hurt_shield', 0.4, 1.3],
+    r_caltrop: ['w_dagger', 0.25, 1.6]   // 一声短的金属「叮」；不能用 scrape（循环配方，会占满 loop 组）
+  };
+  // 有的事件另外限流（秒）：火绒盒点着的「呼」全宝物时一分钟能有四五十下，至少隔 1.5 秒
+  SFX.PASSIVE_GAP = { r_tinder: 1.5 };
+  if (typeof Passive !== 'undefined' && Passive.emit) {
+    var PO = {}, PG = {};   // 每个事件一个参数对象（不在每次出声时新建）；PG：上次出声的时刻
+    after(Passive, 'emit', function (r, a) {
+      if (!SFX.live) return;
+      var name = a[0], m = SFX.PASSIVE[name];
+      if (!m) return;
+      var o = PO[name];
+      if (!o) {
+        o = PO[name] = { x: 0, z: 0, vol: m[1], pitch: m[2], key: 'p_' + name };
+        if (m[3]) for (var ok in m[3]) o[ok] = m[3][ok];   // 第 4 项：配方自己的参数（比如蜜蜂的 buzz），只合并一次
+      }
+      var gp = SFX.PASSIVE_GAP[name];
+      if (gp && SFX.ctx && SFX.ctx.currentTime - (PG[name] == null ? -1e9 : PG[name]) < gp) return;
+      var x = a[1], z = a[2];
+      if (x === x && z === z && x != null && z != null) { o.x = x; o.z = z; } else { o.x = P.pos.x; o.z = P.pos.z; }
+      if (SFX.play(m[0], o) && gp) PG[name] = SFX.ctx.currentTime;
+    });
   }
 
   // ---------------- 地图上的东西 ----------------
   // 按 E / 互动按钮：用哪个声音（null 不出声：那一步自己有声音，比如召唤 Boss、传送）
   SFX.USE = {
-    chest: 'chest', moai: 'moai', merchant: null, microwave: 'microwave', challenge: 'challenge', greed: 'greed', succ: 'succ', curse: 'curse',
+    chest: 'chest',
     bossportal: null, exitportal: null, blacksmith: 'anvil', wishwell: 'wish', ballista: 'ballista', warhorse: 'horse', crypt: 'crypt',
     waystone: null, holyforge: 'forge',
     // 内容扩展（content_map.js）：秘宝箱用开宝箱的声音；火盆、挖宝、宝箱怪醒来有自己的 special 声音，商人有弹窗的声音
@@ -460,7 +529,7 @@
 
   // ---------------- 界面：弹窗、选卡、按钮 ----------------
   if (typeof UI !== 'undefined') {
-    var RV = { rarity: 0 }, SL = { rarity: 0 }, GD = { golden: false };
+    var RV = { rarity: 0 }, SL = { rarity: 0 };
     var sl0 = UI.showLevelUp;
     UI.showLevelUp = function (reroll) {
       H.reroll = !!reroll;
@@ -473,12 +542,8 @@
           if (H.banishing) return;
           if (H.reroll) SFX.play('reroll');
           else H.sting('levelup', 'levelup');
-        } else if (UI.mode === 'shrine') {
-          // 金色神龛：三个选项全是传说
-          GD.golden = !!(UI.options && UI.options.length && UI.options.every(function (o) { return (o.rarity || 0) >= 4; }));
-          SFX.play('shrine_done', GD);
         }
-        else if (UI.mode !== 'evodone' && UI.mode !== 'moai' && UI.mode !== 'microwave' && UI.mode !== 'blacksmith' && UI.mode !== 'evoforge') SFX.play('open');
+        else if (UI.mode !== 'evodone' && UI.mode !== 'pick' && UI.mode !== 'oath' && UI.mode !== 'supply' && UI.mode !== 'crucible' && UI.mode !== 'blacksmith' && UI.mode !== 'evoforge') SFX.play('open');
       } else if (id === 'itemModal') {
         var it = typeof ITEMS !== 'undefined' && ITEMS[UI.pendingItem];
         RV.rarity = it ? it.rarity : 0;
@@ -724,7 +789,7 @@
 
   // ---------------- 内容扩展：随机事件、Boss 第二阶段、发现秘密 ----------------
   // 原则：持续的声音（流星雨的轰鸣、金袋哥布林的钱袋、音乐叠加层）都从游戏状态现算（Content.ev、Boss 的 phase2），
-  // 每 50 毫秒对一次；事件回调只负责一次性的插曲，并马上对一次。所以不管事件怎么结束（成功、超时、被 Boss 战 / 虫潮打断、
+  // 每 50 毫秒对一次；事件回调只负责一次性的插曲，并马上对一次。所以不管事件怎么结束（成功、超时、被首领战 / 午夜钟声打断、
   // 换关、回菜单、阵亡、通关），声音都会收掉；暂停、弹窗、静音、页面隐藏时循环音也停（和 Boss 激光一样）
   H.ev = function () { return typeof Content !== 'undefined' && Content.ev || null; };
   H.inRun = function () { return typeof Game !== 'undefined' && Game.state !== 'menu' && Game.state !== 'end'; };

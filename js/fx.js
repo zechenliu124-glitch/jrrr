@@ -180,7 +180,8 @@ FX.GLOW_FS = [
   '  float r = length(d);',
   '  float a;',
   '  if (vShape < 1.5) {',
-  '    a = 1.0 - r; a *= a;',
+  // 四角（r > 1）夹到 0：不然 a² 又变正，量化后在方块四角留下淡淡的三角
+  '    a = max(1.0 - r, 0.0); a *= a;',
   '  } else if (vShape < 2.5) {',
   '    a = 1.0 - abs(r - 0.8) * 7.0;',
   '  } else {',
@@ -386,15 +387,15 @@ FX.text = function (x, y, z, str, color, scale) {
   return L;
 };
 
-// crit: 0 普通白色，1 暴击黄色，2 超大暴击红色
+// crit: 0 普通白色，1 暴击黄色（别的真值也按暴击算）
 // 同一个敌人短时间内挨的几下合并成一个数字（数字变大、再弹一下），不会一排排地重复
 // FX.dmgE：正在结算伤害的敌人（weapons.js 包了一层 Enemies.damage）；FX.tickDmg：光环/毒云这类跳伤
 FX.dmgE = null;
 FX.tickDmg = false;
-FX.DMG_COL = ['#ffffff', '#ffd23a', '#ff3b30'];
-FX.DMG_PX = [13, 18, 22];
+FX.DMG_COL = ['#ffffff', '#ffd23a'];
+FX.DMG_PX = [13, 18];
 FX.damage = function (x, y, z, dmg, crit) {
-  crit = crit || 0;
+  crit = crit ? 1 : 0;
   var e = FX.dmgE, L = e ? e._lbl : null, tick = FX.tickDmg && !crit;
   if (L && !L.dead && L.t < L.life * 0.7 && FX.now - L.b < 1.2 && FX.now - L.m < (FX.tickDmg ? 0.7 : 0.25)) {
     L.v += dmg; L.s = fmtNum(L.v); L.m = FX.now;
@@ -408,7 +409,7 @@ FX.damage = function (x, y, z, dmg, crit) {
     L.v = dmg; L.crit = crit; L.keep = crit > 0; L.life = crit ? 0.75 : 0.6;
     if (e) { e._lbl = L; e._lblT = FX.now; }
   }
-  if (crit) FX.flash(x, y - 0.3, z, (crit === 2 ? 1.6 : 1.1) * 1.3, crit === 2 ? 0xff5030 : 0xffd23a, 0.18, 2);
+  if (crit) FX.flash(x, y - 0.3, z, 1.43, 0xffd23a, 0.18, 2);
 };
 
 // 不显示数字的伤害（quiet）：如果这个敌人头上正好有数字，就悄悄加进去
@@ -461,7 +462,7 @@ FX.setFont = function (ctx, f) { if (_font !== f) { ctx.font = f; _font = f; } }
 // ---------------- 画布上的字（伤害数字、拾取提示、「鼓舞！」「格挡」「处决」） ----------------
 // 和界面一样的像素字：字号只用 12 / 18 / 24 / 36（中文至少 18）；描边 = 8 个方向各 1 个字体像素 + 底下一行厚度（深紫黑 #120c1c）；
 // 数字和字母「像素加粗」（同色往右多画 1 个字体像素、字距 1 个字体像素），汉字不加粗。
-// 数字和字母（伤害、+经验、$、BONK!：打斗时每帧几十个）从一张静态的像素字形图集里贴（FX.glyph）：KM Pixel 12 在 12 号时 1 个字体像素
+// 数字和字母（伤害、+经验、$：打斗时每帧几十个）从一张静态的像素字形图集里贴（FX.glyph）：KM Pixel 12 在 12 号时 1 个字体像素
 // 正好是 1 像素，每个字形画一次描边、每种颜色画一次字（字体到了就建，以后不再往这张图上写）；贴的时候按整数倍放大
 // （12 / 18 / 24 / 36 号在 2 倍屏上是 2 / 3 / 4 / 6 倍）、不平滑，和直接画出来的像素字一样。先贴整行字的描边，再贴字（描边不盖住旁边的字）。
 // 全从一张图里贴：Chrome 一帧几十个数字合成一两次绘制，打斗时不新建画布、不往别的画布上写字（那样每个新数字都会卡一下）；Safari 也只是贴图。
@@ -525,9 +526,9 @@ FX.labelWidth = function (ctx, s, size, bold) {
 };
 // ---- 像素字形图集：第 0 行是描边，后面每种颜色一行；每个字形一格（左右各留 3 像素给描边和加粗），一行 23 像素高、字母基线在 15
 // cell[字符编码] = { x, w（格宽）, a（字宽，字体像素）}；rows[颜色] = 第几行（-1：放不下了，直接画）
-// 建图集时就画好的颜色：伤害三档、经验 / 金币提示、回血、BONK!、骰子的「6!」（不在表里的颜色第一次用到时再补一行）
+// 建图集时就画好的颜色：伤害三档、经验 / 金币提示、回血和两种常用的提示色（不在表里的颜色第一次用到时再补一行）
 FX.GLYPHS = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
-FX.GLYPH_COLORS = ['#ffffff', '#fff', '#ffd23a', '#ff3b30', '#5fc8ff', '#5dff6a', '#ff3030', '#ffd84a'];
+FX.GLYPH_COLORS = ['#ffffff', '#fff', '#ffd23a', '#5fc8ff', '#5dff6a', '#ff3030', '#ffd84a'];
 FX.glyph = { cv: null, cx: null, cell: [], rows: {}, n: 0, ROWS: 16, ROW: 23, BASE: 15, PAD: 3, fail: false };
 FX.glyphInit = function () {
   var G = FX.glyph;
@@ -1032,9 +1033,9 @@ FX.RING_FS = 'uniform vec3 uCol;\nuniform float uA;\nvoid main() { gl_FragColor 
 
 // ---------------- 形状特效（对象池） ----------------
 // opts：x y z 位置，s0→s1 缩放，life，a0 起始透明度，rx ry rz 朝向，sy 竖直缩放，
-//       blend 'normal'（深色底，不发光），spin（每秒绕 Y 轴转多少弧度）
+//       blend 'normal'（深色底，不发光），spin（每秒绕 Y 轴转多少弧度），own（谁在每帧接着改它：被别人重用以后 e.own 就变了）
 // 每种（形状 + 颜色）最多 FX.POOL_CAP 个同时播放，再多就重用播放得最久的那个；同时存在的特效总数超过
-// FX.EFFECT_CAP 时先回收最老的短命特效。Boss 战、虫潮里特效再多，池子和场景里的物体数也不会越涨越多；
+// FX.EFFECT_CAP 时先回收最老的短命特效。Boss 战、午夜钟声里特效再多，池子和场景里的物体数也不会越涨越多；
 // 换关时每种只留 FX.POOL_KEEP 个
 FX.POOL_CAP = 48;
 FX.POOL_KEEP = 6;
@@ -1088,6 +1089,7 @@ FX.spawn = function (kind, color, opts) {
   e.s1 = opts.s1 != null ? opts.s1 : 1;
   e.a0 = opts.a0 != null ? opts.a0 : 0.8;
   e.follow = opts.follow || null;
+  e.own = opts.own || null;
   e.spin = opts.spin || 0;
   e.ry0 = opts.ry || 0;
   e.mesh.visible = true;
@@ -1118,7 +1120,9 @@ FX.ring = function (x, y, z, r, color, life, a0) {
 
 // 爆炸：一小团火光 + 白色星光 + 像素冲击环 + 碎块和往上飘的烟
 // 同一帧第 3 个起、或者 0.15 秒内已经炸了 6 次：只留冲击环和碎块（一轮齐射不会把画面炸白）
-// o（可选）：{ evo: 超武（深橙色核心、金环 + 白环、往上窜的火舌、地上的焦痕），ring: 冲击环颜色 }
+// o（可选）：{ evo: 超武（深橙色核心、金环 + 内环、往上窜的火舌、地上的焦痕），ring: 冲击环颜色，
+//            cols: [亮, 中, 暗] 三种碎块颜色（第 4 块的武器外观）：给了 cols 时火光用「中」、星光用「亮」且不超过 0.8 米、
+//            超武的内环也用「亮」（R-W1 / R-W2：不再有白色星光和白环），grit: [个数, 颜色] 额外的碎石 }
 FX.FIRE_PAL = [0xfff0a0, 0xff8a1a, 0xc8360a];
 var _hsl = { h: 0, s: 0, l: 0 };
 FX.boom = function (x, y, z, r, color, o) {
@@ -1131,20 +1135,22 @@ FX.boom = function (x, y, z, r, color, o) {
   // 火系颜色用固定的火焰三色，其他颜色（紫色魔弹、绿色毒爆）按自己的颜色配
   FX.tc.setHex(color).getHSL(_hsl);
   var fire = (_hsl.h < 0.14 || _hsl.h > 0.96) && _hsl.s > 0.5;
-  var c0 = fire ? FX.FIRE_PAL[0] : FX.mixHex(color, 0xffffff, 0.55), c1 = fire ? FX.FIRE_PAL[1] : color, c2 = fire ? FX.FIRE_PAL[2] : FX.scaleHex(color, 0.6);
+  var cols = o && o.cols;
+  var c0 = cols ? cols[0] : fire ? FX.FIRE_PAL[0] : FX.mixHex(color, 0xffffff, 0.55), c1 = cols ? cols[1] : fire ? FX.FIRE_PAL[1] : color, c2 = cols ? cols[2] : fire ? FX.FIRE_PAL[2] : FX.scaleHex(color, 0.6);
   if (full) {
     // 火光球只给火系爆炸（别的颜色的半透明多面球看起来像防护罩）
     // 大小有上限：大范围的爆炸（黄金火药）不会冒出一个罩住半个画面的半透明大球
-    if (fire) FX.spawn('ball0', evo ? 0xff6a1a : FX.mixHex(color, 0xffffff, 0.2), { x: x, y: y, z: z, s0: Math.min(r * 0.2, 1), s1: Math.min(r * 0.6, 2.6), life: 0.2, a0: 0.32 });
-    FX.flash(x, y, z, Math.min(r * 1.2, 4.5), evo ? 0xff6a1a : color, 0.2, 0);
-    FX.flash(x, y, z, Math.min(r * 0.6, 2.2), 0xffffff, 0.1, 2);
+    if (fire) FX.spawn('ball0', evo ? 0xff6a1a : cols ? c1 : FX.mixHex(color, 0xffffff, 0.2), { x: x, y: y, z: z, s0: Math.min(r * 0.2, 1), s1: Math.min(r * 0.6, 2.6), life: 0.2, a0: 0.32 });
+    FX.flash(x, y, z, Math.min(r * 1.2, 4.5), evo ? 0xff6a1a : cols ? c1 : color, 0.2, 0);
+    if (cols) FX.flash(x, y, z, Math.min(r * 0.3, 0.8), c0, 0.1, 2);
+    else FX.flash(x, y, z, Math.min(r * 0.6, 2.2), 0xffffff, 0.1, 2);
   }
   var gy = W.groundAt(x, z, y + 0.5);
   if (y - gy < r + 1) {
     // 超出预算的爆炸：冲击环淡一些
     if (evo) {
       FX.ring(x, gy, z, r * 1.1, (o && o.ring) || 0xffc23a, 0.34, full ? 0.8 : 0.5);
-      if (full) FX.ring(x, gy, z, r * 0.5, 0xffffff, 0.24);
+      if (full) FX.ring(x, gy, z, r * 0.5, cols ? c0 : 0xffffff, 0.24);
       if (full) FX.scorch(x, gy + 0.1, z, Math.min(r * 0.6, 3.5), 0x2a0e06, 0.4, 1.2);
     } else FX.ring(x, gy, z, r * 1.15, (o && o.ring) || color, 0.32, full ? 0.95 : 0.6);
   }
@@ -1154,6 +1160,7 @@ FX.boom = function (x, y, z, r, color, o) {
     FX.part(x, y, z, Math.cos(a) * s, rand(2, 7), Math.sin(a) * s, k < 0.35 ? c0 : k < 0.75 ? c1 : c2, rand(0.35, 0.55), rand(0.35, 0.8));
   }
   FX.smoke(x, y, z, full ? 4 : 2, fire ? 0x3a2e2a : FX.scaleHex(color, 0.25));
+  if (o && o.grit) FX.burst(x, y, z, o.grit[0], o.grit[1], 6, 0.22);     // 额外的碎石（投石车）
   if (evo) for (i = 0; i < 6; i++) FX.part(x + rand(-r, r) * 0.35, y, z + rand(-r, r) * 0.35, rand(-1, 1), rand(5, 8), rand(-1, 1), i % 2 ? 0xffd23a : 0xff4a1a, 0.4, rand(0.4, 0.6), 6);
 };
 
@@ -1186,7 +1193,7 @@ FX.slash = function (x, y, z, r, ry, color, arc, gold, look) {
 };
 
 // 绕身横扫（镰刀）：刀头最亮的刀光转一整圈 + 深紫色的底 + 淡淡的淡紫色像素环
-// gold（超武）：金边白刀光，金环在 Evo.slashCore 里画（0.6 倍半径，不会跑到镜头后面），这里不再画环
+// gold（超武）：金边白刀光，不画环（第 4 块起没有武器调用它；飞斧的旋风刀光借它的 sweep 几何体）
 // ring：false 时不画环（同一把镰刀连砍几下只画一次）
 FX.sweep = function (x, y, z, r, ang, color, gold, ring) {
   var life = 0.24, ry = ang - Math.PI, spin = TAU / life;

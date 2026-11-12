@@ -135,10 +135,12 @@
         level: P.level, xp: P.xp, xpNext: P.xpNext, gold: P.gold, kills: P.kills, damageDealt: P.damageDealt || 0, poison: P.poison || 0,
         hp: P.hp, yaw: P.yaw, pitch: P.pitch,
         mods: P.mods.map(function (m) { return [m.stat, m.value]; }),
+        // 临时属性（开饭啦、星象、暴怒、蜂蜜罐……）：剩下几秒照存（一直在的存 -1，JSON 没有 Infinity）
+        temp: P.temp.slice(0, R.MAX_TEMP).map(function (e) { return [e.stat, e.value, isFinite(e.t) ? e.t : -1, e.key == null ? null : String(e.key)]; }),
         items: items,
-        tomes: P.tomes.map(function (t) { return { id: t.id, level: t.level, value: t.value, mult: t.mult }; }),
+        tomes: P.tomes.map(function (t) { return { id: t.id, level: t.level, value: t.value || 0, value2: t.value2 || 0 }; }),
         weapons: P.weapons.map(function (w) {
-          return { id: w.id, level: w.level, s: copy(w.s), kills: w.kills || 0, dmg: w.dmg || 0, charges: w.charges || 0, evo: !!w.evo, evoHow: w.evo ? String(w.evoHow || '') : '' };
+          return { id: w.id, level: w.level, s: copy(w.s), kills: w.kills || 0, dmg: w.dmg || 0, charges: w.charges || 0, perkN: w.perkN || 0, evo: !!w.evo, evoHow: w.evo ? String(w.evoHow || '') : '' };
         })
       },
       passive: passive,
@@ -168,14 +170,16 @@
     P.weapons = [];
     p.weapons.forEach(function (sw) {
       var w = Weapons.give(sw.id);
-      w.level = sw.level; w.s = copy(sw.s); w.kills = sw.kills; w.dmg = sw.dmg; w.charges = sw.charges;
+      w.level = sw.level; w.s = copy(sw.s); w.kills = sw.kills; w.dmg = sw.dmg; w.charges = sw.charges; w.perkN = sw.perkN;
       if (sw.evo && typeof Evo !== 'undefined') { w.def = Evo.makeDef(w); w.evo = true; w.evoHow = sw.evoHow || ''; Evo.dress(w); }
     });
-    P.tomes = p.tomes.map(function (t) { return { id: t.id, level: t.level, value: t.value, mult: t.mult }; });
+    P.tomes = p.tomes.map(function (t) { return { id: t.id, level: t.level, value: t.value, value2: t.value2 }; });   // 套装（P.sets）由 P.recalc 算
     P.items = {};
     for (k in p.items) P.items[k] = p.items[k];
     // 强化、卡片、神龛、混沌……的加成都在存档点的 mods 里：P.reset 刚加的强化整个换掉
     P.mods = p.mods.map(function (m) { return { stat: m[0], value: m[1] }; });
+    // 临时属性放回去（P.reset 刚清空）：剩下的秒数接着走；先放回再 recalc（护盾上限、最大生命都算进去）
+    P.temp = p.temp.map(function (e) { return { stat: e[0], value: e[1], t: e[2] === -1 ? Infinity : e[2], key: e[3] }; });
     P.level = p.level; P.xp = p.xp;
     var need = P.xpFor(p.level);
     P.xpNext = p.xpNext === need ? p.xpNext : need;
@@ -237,6 +241,8 @@
   if (typeof FX !== 'undefined') ['getGeo', 'cellsGeo'].forEach(function (n) { R.quiet(FX, n); });
   if (typeof MX !== 'undefined') ['mat', 'beamGeo'].forEach(function (n) { R.quiet(MX, n); });
   if (typeof Evo !== 'undefined') ['beamGeo', 'fadeTex'].forEach(function (n) { R.quiet(Evo, n); });
+  // 行会互动点的模型（第 10 块）：模型细节再改，关卡布局也不跟着变
+  if (typeof Guild !== 'undefined' && Guild.MODELS) Object.keys(Guild.MODELS).forEach(function (n) { R.quiet(Guild.MODELS, n); });
 
   // ============================================================
   //  继续 / 放弃
